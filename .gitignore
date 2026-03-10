@@ -1,0 +1,48 @@
+# ── Backend ────────────────────────────────────────────────
+backend-spring/target/
+backend-spring/uploads/
+backend-spring/.mvn/wrapper/maven-wrapper.jar
+
+# ── Frontend ───────────────────────────────────────────────
+front-nuxt/node_modules/
+front-nuxt/.nuxt/
+front-nuxt/.output/
+
+# ── Docker ─────────────────────────────────────────────────
+docker/postgres_data/
+
+# ── Variables de entorno (nunca subir) ─────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Archivos de desarrollo/scripts locales ─────────────────
+create_modules.py
+task.md.resolved
+implementation_plan.md.resolved
+stitch/
+
+# ── Claude Code (configuración local del IDE AI) ───────────
+.claude/
+
+# ── Documentación interna / TFG (no subir al repo público) ─
+MEMORANDUM_DEFENSA_TFG.md
+MEMORANDUM_DEFENSA_TFG.pdf
+MEMORANDUM_FRONTEND_TFG.md
+MEMORANDUM_FRONTEND_TFG.pdf
+Plan_GitFlow_TFG.md
+implementation_plan.md.resolved
+"Dossier Proyecto DAM_DAW 2025 2026 - puntos 1-2-3-4.docx"
+"Sistema de Gestión de Peluquería (1).pdf"
+*.docx
+*.pdf
+
+# ── OS / IDE ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo

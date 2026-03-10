@@ -1,0 +1,13 @@
+# Normaliza saltos de línea: LF en repo, conversión automática en Windows
+* text=auto eol=lf
+
+# Binarios: no tocar
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.docx binary
+*.zip binary
