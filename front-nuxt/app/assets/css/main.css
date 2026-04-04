@@ -1,0 +1,172 @@
+/* ============================================================
+   DESIGN SYSTEM — Atelier Sapphire
+   Basado en el stitch de referencia aprobado.
+   Fuente: Manrope | Colores: primary #002045 / surface #faf9fd
+   ============================================================ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Fuente y base ───────────────────────────────────────── */
+@layer base {
+  html {
+    font-family: 'Manrope', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background-color: #faf9fd;
+    color: #1a1c1e;
+  }
+
+  /* Scrollbar fino y elegante */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c4c6cf; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #74777f; }
+}
+
+/* ── Transiciones de página ──────────────────────────────── */
+.page-enter-active, .page-leave-active {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.page-enter-from { opacity: 0; transform: translateY(8px); }
+.page-leave-to   { opacity: 0; transform: translateY(-4px); }
+
+.layout-enter-active, .layout-leave-active { transition: opacity 120ms ease; }
+.layout-enter-from, .layout-leave-to { opacity: 0; }
+
+/* ── Animaciones ─────────────────────────────────────────── */
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-scale-in  { animation: fadeScaleIn  200ms ease forwards; }
+.animate-slide-in-right { animation: slideInRight 220ms ease forwards; }
+.animate-slide-in-up    { animation: slideInUp    200ms ease forwards; }
+
+/* Overlay de modales */
+.modal-overlay-enter-active, .modal-overlay-leave-active { transition: opacity 180ms ease; }
+.modal-overlay-enter-from, .modal-overlay-leave-to { opacity: 0; }
+
+/* ── Componentes del design system ──────────────────────── */
+@layer components {
+
+  /* ── Botones ─────────────────────────────────────────── */
+
+  /* Botón primario azul marino */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           px-5 py-2.5 rounded-xl
+           bg-primary-container text-white font-semibold text-sm tracking-tight
+           transition-all duration-200
+           hover:brightness-110 hover:shadow-card-md hover:-translate-y-px
+           active:scale-95 active:shadow-none
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+  }
+
+  /* Botón secundario — borde sutil */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2
+           px-5 py-2.5 rounded-xl
+           border border-outline-variant bg-surface-container-lowest
+           text-on-surface-variant font-medium text-sm
+           transition-all duration-200
+           hover:bg-surface-container-low hover:text-on-surface hover:border-primary-container
+           active:scale-95
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Botón de peligro */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2
+           px-5 py-2.5 rounded-xl
+           bg-error text-white font-semibold text-sm
+           transition-all duration-200
+           hover:brightness-90 hover:shadow-card-md hover:-translate-y-px
+           active:scale-95
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Botón fantasma */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           px-3 py-2 rounded-lg
+           text-on-surface-variant font-medium text-sm
+           transition-all duration-200
+           hover:bg-surface-container-low hover:text-on-surface
+           active:scale-95;
+  }
+
+  /* ── Cards ───────────────────────────────────────────── */
+  .card {
+    @apply bg-surface-container-lowest rounded-2xl shadow-card border border-outline-variant/20
+           transition-all duration-300
+           hover:shadow-card-md;
+  }
+
+  /* Card de KPI — fondo gris claro, blanco al hover */
+  .card-kpi {
+    @apply bg-surface-container-low rounded-2xl p-6
+           border border-outline-variant/10
+           transition-all duration-300
+           hover:bg-white hover:shadow-card-md hover:-translate-y-0.5;
+  }
+
+  /* ── Inputs ──────────────────────────────────────────── */
+  .input {
+    @apply w-full px-4 py-2.5 rounded-xl
+           border border-outline-variant/40 bg-surface-container-highest
+           text-on-surface text-sm font-medium
+           placeholder:text-on-surface-variant/50
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-primary-container/20
+           focus:border-primary-container focus:bg-white
+           disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  .label {
+    @apply block text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-1.5;
+  }
+
+  /* ── Badges de estado de cita ────────────────────────── */
+  .badge-pendiente  { @apply px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800; }
+  .badge-en-curso   { @apply px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800; }
+  .badge-completada { @apply px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700; }
+  .badge-cancelada  { @apply px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700; }
+  .badge-activo     { @apply px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700; }
+  .badge-baja       { @apply px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700; }
+  .badge-vacaciones { @apply px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700; }
+
+  /* Badge VIP dorado */
+  .badge-vip {
+    @apply px-2.5 py-1 rounded-full text-xs font-bold
+           bg-tertiary-fixed text-amber-900;
+  }
+
+  /* ── Navegación del sidebar ──────────────────────────── */
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-2.5
+           text-sm font-medium text-on-surface-variant
+           transition-all duration-200 cursor-pointer rounded-lg
+           hover:bg-white/60 hover:text-on-surface;
+  }
+
+  /* Ítem activo: borde DERECHO y fondo blanco semitransparente */
+  .nav-item-active {
+    @apply flex items-center gap-3 px-4 py-2.5
+           text-sm font-bold text-primary-container
+           border-r-4 border-primary-container bg-white/50
+           cursor-pointer;
+  }
+}
