@@ -8,7 +8,6 @@ import com.marcog.peluqueria.citas.infrastructure.in.web.dto.CitaResumenDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -152,7 +151,7 @@ public class CitaController {
             .estado(cita.getEstado().toString())
             .clienteNombre(cita.getCliente().getNombre())
             .clienteApellidos(cita.getCliente().getApellidos())
-            .clienteEsVip(cita.getCliente().getEsVip())
+            .clienteEsVip(cita.getCliente().isEsVip())
             .clienteDescuentoPorcentaje(cita.getCliente().getDescuentoPorcentaje())
             .servicioNombre(servicioNombre)
             .comentarios(cita.getComentarios() != null ? cita.getComentarios() : "")
