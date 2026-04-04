@@ -48,10 +48,11 @@ export const useAuthStore = defineStore('auth', () => {
    */
   function guardarSesion(token: string, refreshToken?: string): void {
     accessToken.value = token
-    localStorage.setItem('access_token', token)
-
-    if (refreshToken) {
-      localStorage.setItem('refresh_token', refreshToken)
+    if (import.meta.client) {
+      localStorage.setItem('access_token', token)
+      if (refreshToken) {
+        localStorage.setItem('refresh_token', refreshToken)
+      }
     }
 
     // Extraemos los datos del usuario directamente del payload JWT
@@ -71,6 +72,8 @@ export const useAuthStore = defineStore('auth', () => {
    * Si el token guardado ha expirado, limpia la sesión.
    */
   function restaurarSesion(): void {
+    if (!import.meta.client) return
+
     const tokenGuardado = localStorage.getItem('access_token')
     if (!tokenGuardado) return
 
@@ -91,8 +94,10 @@ export const useAuthStore = defineStore('auth', () => {
   function cerrarSesion(): void {
     accessToken.value = null
     usuario.value = null
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    if (import.meta.client) {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+    }
   }
 
   return {
