@@ -29,6 +29,8 @@ const diaSeleccionado = ref(new Date())       // hoy por defecto
 const resumenMes      = ref<ResumenDia[]>([])
 const citasDia        = ref<CitaAgenda[]>([])
 const cargandoCitas   = ref(false)
+const citaEnEdicion   = ref<string | null>(null)  // ID de la cita en edición
+const comentarioTemp  = ref('')                    // Comentario temporal durante edición
 
 // ── Días del calendario (grid 7 cols) ─────────────────────
 const diasDelCalendario = computed(() => {
@@ -98,6 +100,31 @@ async function cargarResumenMes() {
 
 function mesAnterior() { mesActual.value = subMonths(mesActual.value, 1) }
 function mesSiguiente() { mesActual.value = addMonths(mesActual.value, 1) }
+
+async function iniciarEdicionComentario(cita: CitaAgenda) {
+  citaEnEdicion.value = cita.id
+  comentarioTemp.value = cita.comentarios
+}
+
+async function guardarComentario(cita: CitaAgenda) {
+  if (comentarioTemp.value === cita.comentarios) {
+    citaEnEdicion.value = null
+    return
+  }
+
+  try {
+    await agendaService.actualizarComentario(cita.id, comentarioTemp.value)
+    cita.comentarios = comentarioTemp.value
+    citaEnEdicion.value = null
+  } catch (error) {
+    console.error('Error al guardar comentario:', error)
+  }
+}
+
+function cancelarEdicion() {
+  citaEnEdicion.value = null
+  comentarioTemp.value = ''
+}
 
 // Clases CSS de cada celda del calendario
 function claseCelda(dia: Date): string {
@@ -329,6 +356,38 @@ onMounted(async () => {
                 -{{ cita.clienteDescuentoPorcentaje }}%
               </span>
             </span>
+          </div>
+
+          <!-- Comentarios — edición inline -->
+          <div class="mt-3 pt-3 border-t border-surface-container">
+            <p v-if="citaEnEdicion !== cita.id"
+               class="text-[11px] text-on-surface-variant cursor-pointer hover:text-primary transition-colors"
+               @click="iniciarEdicionComentario(cita)">
+              <span v-if="!cita.comentarios" class="italic opacity-70">+ Añadir comentario</span>
+              <span v-else>{{ cita.comentarios }}</span>
+            </p>
+            <div v-else class="space-y-2">
+              <textarea
+                v-model="comentarioTemp"
+                class="w-full px-2 py-1 text-[11px] border border-primary rounded bg-surface-container-lowest text-on-surface resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+                rows="2"
+                placeholder="Añadir nota..."
+              />
+              <div class="flex gap-2">
+                <button
+                  @click="guardarComentario(cita)"
+                  class="flex-1 px-2 py-1 text-[10px] font-bold bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+                >
+                  Guardar
+                </button>
+                <button
+                  @click="cancelarEdicion"
+                  class="flex-1 px-2 py-1 text-[10px] font-bold bg-surface-container text-on-surface rounded hover:bg-surface-container/80 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
