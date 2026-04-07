@@ -11,7 +11,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 // El locale español viene incluido en @fullcalendar/core
 import esLocale from '@fullcalendar/core/locales/es'
-import { X, Clock, Scissors, User, Loader2 } from 'lucide-vue-next'
+import { X, Clock, Scissors, User, Loader2, Plus } from 'lucide-vue-next'
 import type { EventClickArg, DatesSetArg } from '@fullcalendar/core'
 import type { ResumenDia, CitaResumen } from '~/modules/calendario/types/calendario.types'
 import { calendarioService } from '~/modules/calendario/services/calendarioService'
@@ -30,6 +30,14 @@ const popoverVisible   = ref(false)
 const diaSeleccionado  = ref<ResumenDia | null>(null)
 const popoverX         = ref(0)
 const popoverY         = ref(0)
+
+// Mini-form nueva cita
+const mostrarFormNuevaCita = ref(false)
+const guardandoCita        = ref(false)
+const nuevaCitaHora        = ref('09:00')
+const nuevaCitaClienteId   = ref('')
+const nuevaCitaPeluqueroId = ref('')
+const nuevaCitaServicioId  = ref('')
 
 // ── Eventos de FullCalendar ───────────────────────────────
 // Cada evento es un punto en el calendario con el número de citas del día
@@ -108,8 +116,34 @@ function handleEventClick(arg: EventClickArg) {
 }
 
 function cerrarPopover() {
-  popoverVisible.value  = false
-  diaSeleccionado.value = null
+  popoverVisible.value     = false
+  diaSeleccionado.value    = null
+  mostrarFormNuevaCita.value = false
+}
+
+async function guardarNuevaCita() {
+  if (!diaSeleccionado.value || !nuevaCitaClienteId.value || !nuevaCitaPeluqueroId.value || !nuevaCitaServicioId.value) return
+  guardandoCita.value = true
+  try {
+    const fechaHora = `${diaSeleccionado.value.fecha}T${nuevaCitaHora.value}:00`
+    await calendarioService.crearCita({
+      fechaHora,
+      peluquero: { id: nuevaCitaPeluqueroId.value },
+      cliente:   { id: nuevaCitaClienteId.value },
+      servicios: [{ id: nuevaCitaServicioId.value }],
+      estado:    'PENDIENTE',
+    })
+    await cargarMes(
+      new Date(diaSeleccionado.value.fecha).getFullYear(),
+      new Date(diaSeleccionado.value.fecha).getMonth() + 1,
+    )
+    mostrarFormNuevaCita.value = false
+    nuevaCitaClienteId.value   = ''
+    nuevaCitaPeluqueroId.value = ''
+    nuevaCitaServicioId.value  = ''
+  } finally {
+    guardandoCita.value = false
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────
@@ -251,15 +285,58 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Footer con enlace a la agenda del día -->
-        <div class="px-4 py-3 border-t border-surface-border">
+        <!-- Mini-form nueva cita -->
+        <div v-if="mostrarFormNuevaCita" class="px-4 py-3 border-t border-surface-border space-y-2">
+          <p class="text-xs font-semibold text-text-primary mb-1">Nueva cita</p>
+          <input
+            v-model="nuevaCitaHora"
+            type="time"
+            class="input-field w-full text-sm"
+          />
+          <input
+            v-model="nuevaCitaClienteId"
+            type="text"
+            placeholder="ID cliente"
+            class="input-field w-full text-sm"
+          />
+          <input
+            v-model="nuevaCitaPeluqueroId"
+            type="text"
+            placeholder="ID peluquero"
+            class="input-field w-full text-sm"
+          />
+          <input
+            v-model="nuevaCitaServicioId"
+            type="text"
+            placeholder="ID servicio"
+            class="input-field w-full text-sm"
+          />
+          <div class="flex gap-2">
+            <button class="btn-primary flex-1 text-xs py-1.5" :disabled="guardandoCita" @click="guardarNuevaCita">
+              <Loader2 v-if="guardandoCita" class="w-3 h-3 animate-spin inline mr-1" />
+              Guardar
+            </button>
+            <button class="btn-ghost text-xs py-1.5 px-2" @click="mostrarFormNuevaCita = false">Cancelar</button>
+          </div>
+        </div>
+
+        <!-- Footer con enlace a la agenda del día y botón nueva cita -->
+        <div class="px-4 py-3 border-t border-surface-border flex items-center justify-between">
           <NuxtLink
             :to="`/agenda?fecha=${diaSeleccionado.fecha}`"
             class="text-sm text-primary hover:text-primary-light font-medium transition-colors"
             @click="cerrarPopover"
           >
-            Ver agenda completa del día →
+            Ver agenda completa →
           </NuxtLink>
+          <button
+            v-if="!mostrarFormNuevaCita"
+            class="btn-ghost text-xs flex items-center gap-1 py-1 px-2"
+            @click="mostrarFormNuevaCita = true"
+          >
+            <Plus class="w-3 h-3" />
+            Nueva cita
+          </button>
         </div>
 
       </div>
