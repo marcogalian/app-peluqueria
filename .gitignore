@@ -18,6 +18,7 @@ docker/postgres_data/
 *.env
 
 # ── Archivos de desarrollo/scripts locales ─────────────────
+scripts/
 create_modules.py
 task.md.resolved
 implementation_plan.md.resolved

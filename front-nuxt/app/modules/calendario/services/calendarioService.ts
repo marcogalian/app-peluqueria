@@ -1,5 +1,5 @@
 import { api } from '~/infrastructure/http/api'
-import type { ResumenDia } from '../types/calendario.types'
+import type { ResumenDia, NuevaCitaPayload } from '../types/calendario.types'
 import { format } from 'date-fns'
 
 export const calendarioService = {
@@ -9,5 +9,10 @@ export const calendarioService = {
       params: { anio, mes },
     })
     return data
+  },
+
+  /** Crea una nueva cita desde el popover del calendario */
+  async crearCita(payload: NuevaCitaPayload): Promise<void> {
+    await api.post('/citas', payload)
   },
 }
