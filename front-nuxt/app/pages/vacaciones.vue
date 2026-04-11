@@ -139,6 +139,16 @@ async function rechazar() {
   } catch { /* toast */ } finally { procesando.value = false }
 }
 
+// ── Cancelar solicitud propia (empleado, solo si está PENDIENTE) ─────────────
+async function cancelarSolicitud(id: number) {
+  procesando.value = true
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.patch(`/ausencias/${id}/cancelar`)
+    solicitudes.value = solicitudes.value.filter(s => s.id !== id)
+  } catch { /* toast */ } finally { procesando.value = false }
+}
+
 // ── Helpers ───────────────────────────────────────────────
 function badgeEstado(e: EstadoSolicitud): string {
   return {
