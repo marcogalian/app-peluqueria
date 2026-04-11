@@ -34,4 +34,11 @@ public class ClientePersistenceAdapter implements ClienteRepository {
                 .map(mapper::toDomain)
                 .collect(java.util.stream.Collectors.toList());
     }
+
+    @Override
+    public java.util.List<Cliente> findByFiltros(String nombre, Boolean esVip) {
+        return jpaRepository.findByFiltros(nombre, esVip).stream()
+                .map(mapper::toDomain)
+                .collect(java.util.stream.Collectors.toList());
+    }
 }

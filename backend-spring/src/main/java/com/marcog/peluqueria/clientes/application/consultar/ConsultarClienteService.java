@@ -22,6 +22,10 @@ public class ConsultarClienteService {
         return clienteRepository.findAll();
     }
 
+    public List<Cliente> buscarClientes(String nombre, Boolean esVip) {
+        return clienteRepository.findByFiltros(nombre, esVip);
+    }
+
     public HistorialClinicoDTO getHistorialClinico(UUID clienteId) {
         Cliente cliente = clienteRepository.findById(clienteId)
                 .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));

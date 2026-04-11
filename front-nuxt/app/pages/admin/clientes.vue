@@ -40,6 +40,18 @@ const descripcionFoto  = ref('')
 // Modal de confirmación de consentimiento
 const modalConsentimiento = ref(false)
 
+// Modal crear/editar cliente
+const modalClienteAbierto = ref(false)
+const guardandoCliente    = ref(false)
+const formCliente = ref({
+  nombre:    '',
+  apellidos: '',
+  telefono:  '',
+  email:     '',
+  genero:    'OTRO' as Genero,
+  notas:     '',
+})
+
 // ── Filtrado local ────────────────────────────────────────
 const clientesFiltrados = computed(() => {
   const q = busqueda.value.toLowerCase()
@@ -154,6 +166,24 @@ async function toggleVip(cliente: Cliente) {
   const { api } = await import('~/infrastructure/http/api')
   await api.patch(`/v1/clientes/${cliente.id}`, { esVip: !cliente.esVip })
   cliente.esVip = !cliente.esVip
+}
+
+function abrirModalNuevoCliente() {
+  formCliente.value = { nombre: '', apellidos: '', telefono: '', email: '', genero: 'OTRO', notas: '' }
+  modalClienteAbierto.value = true
+}
+
+async function guardarCliente() {
+  if (!formCliente.value.nombre || !formCliente.value.telefono) return
+  guardandoCliente.value = true
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    const { data } = await api.post<Cliente>('/v1/clientes', formCliente.value)
+    clientes.value.unshift(data)
+    modalClienteAbierto.value = false
+  } finally {
+    guardandoCliente.value = false
+  }
 }
 </script>
 

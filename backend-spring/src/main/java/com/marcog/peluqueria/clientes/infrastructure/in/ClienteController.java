@@ -23,7 +23,12 @@ public class ClienteController {
     private final ActualizarClienteService actualizarClienteService;
 
     @GetMapping
-    public ResponseEntity<List<Cliente>> getAllClientes() {
+    public ResponseEntity<List<Cliente>> getAllClientes(
+            @RequestParam(required = false) String nombre,
+            @RequestParam(required = false) Boolean esVip) {
+        if (nombre != null || esVip != null) {
+            return ResponseEntity.ok(consultarClienteService.buscarClientes(nombre, esVip));
+        }
         return ResponseEntity.ok(consultarClienteService.getAllClientes());
     }
 
