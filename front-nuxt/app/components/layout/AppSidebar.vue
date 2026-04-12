@@ -19,6 +19,7 @@ import {
 
 const authStore = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 
 // Estructura de items según rol
 const itemsAdmin = [
@@ -44,9 +45,9 @@ function esActivo(path: string): boolean {
   return route.path.startsWith(path)
 }
 
-async function cerrarSesion() {
+function cerrarSesion() {
   authStore.cerrarSesion()
-  await navigateTo('/login')
+  router.push('/login')
 }
 </script>
 
@@ -56,7 +57,7 @@ async function cerrarSesion() {
     Fondo: bg-surface-container-low = #F4F3F7 (gris muy claro del diseño)
     w-sidebar = 256px (w-64 del stitch original)
   -->
-  <aside class="w-sidebar flex-shrink-0 h-screen flex flex-col bg-surface-container-low select-none border-r border-outline-variant/10">
+  <aside class="w-sidebar flex-shrink-0 h-screen flex flex-col bg-surface-container-low select-none">
 
     <!-- ── Logo ─────────────────────────────────────────── -->
     <div class="px-6 pt-8 pb-6">
