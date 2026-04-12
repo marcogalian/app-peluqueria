@@ -62,10 +62,10 @@ function cerrarSesion() {
     <!-- ── Logo ─────────────────────────────────────────── -->
     <div class="px-6 pt-8 pb-6">
       <h1 class="text-xl font-extrabold tracking-tighter text-primary leading-none">
-        Atelier Sapphire
+        Peluquería Isabella
       </h1>
       <p class="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant/60 mt-0.5">
-        {{ authStore.isAdmin ? 'Management Suite' : 'Portal Empleado' }}
+        {{ authStore.isAdmin ? 'Panel de administración' : 'Portal Empleado' }}
       </p>
     </div>
 
@@ -99,10 +99,10 @@ function cerrarSesion() {
       <!-- Info de versión (igual que en el stitch) -->
       <div class="flex items-center gap-3 px-2">
         <div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-          AS
+          PI
         </div>
         <div>
-          <p class="text-xs font-bold text-primary leading-none">Atelier Sapphire</p>
+          <p class="text-xs font-bold text-primary leading-none">Peluquería Isabella</p>
           <p class="text-[10px] text-on-surface-variant">v1.0.0</p>
         </div>
       </div>

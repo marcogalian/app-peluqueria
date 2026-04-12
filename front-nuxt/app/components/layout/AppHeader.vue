@@ -33,9 +33,7 @@ const iniciales = computed(() => {
     Header con glass effect: fondo #FAF9FD semitransparente + backdrop-blur.
     Posición sticky para que quede sobre el contenido al hacer scroll.
   -->
-  <header class="h-16 flex-shrink-0 flex items-center justify-between px-8
-                 bg-surface/70 backdrop-blur-md sticky top-0 z-10
-                 border-b border-outline-variant/10 transition-all">
+  <header class="h-16 flex-shrink-0 flex items-center justify-between px-8">
 
     <!-- ── Búsqueda global ──────────────────────────────── -->
     <div class="flex items-center gap-4 flex-1 max-w-md">
@@ -49,11 +47,11 @@ const iniciales = computed(() => {
         <input
           type="search"
           :placeholder="placeholderBusqueda"
-          class="w-full pl-10 pr-4 py-2 rounded-full border-none
-                 bg-surface-container-highest text-sm text-on-surface
+          class="w-full pl-10 pr-4 py-2 rounded-full border border-outline-variant/20
+                 bg-white text-sm text-on-surface shadow-sm
                  placeholder:text-on-surface-variant/50
-                 focus:outline-none focus:ring-2 focus:ring-primary-container/20
-                 focus:bg-white transition-all"
+                 focus:outline-none focus:ring-2 focus:ring-primary/20
+                 transition-all"
         />
       </div>
     </div>
