@@ -116,6 +116,18 @@ async function crearEmpleado() {
   }
 }
 
+async function reactivarEmpleado(empleado: Empleado) {
+  guardando.value = true
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.patch(`/peluqueros/${empleado.id}`, { enBaja: false, disponible: true })
+    empleado.enBaja     = false
+    empleado.disponible = true
+  } catch { /* toast */ } finally {
+    guardando.value = false
+  }
+}
+
 function abrirWhatsApp(telefono: string) {
   const numero = telefono.replace(/\D/g, '')
   window.open(`https://wa.me/34${numero}`, '_blank')
