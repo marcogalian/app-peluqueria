@@ -13,6 +13,7 @@ public class Producto {
     private Integer stock;
     private Integer stockMinimo;
     private CategoriaProducto categoria;
+    private GeneroProducto genero;
     private String imageUrl;
     private boolean activo;
     private LocalDateTime creadoEn;

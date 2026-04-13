@@ -28,6 +28,7 @@ stitch/
 .claude/
 
 # ── Documentación interna / TFG (no subir al repo público) ─
+documentacion-no-github/
 MEMORANDUM_DEFENSA_TFG.md
 MEMORANDUM_DEFENSA_TFG.pdf
 MEMORANDUM_FRONTEND_TFG.md
