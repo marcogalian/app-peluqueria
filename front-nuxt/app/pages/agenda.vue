@@ -9,11 +9,13 @@
  * para proteger la privacidad y evitar que se lleven clientela.
  */
 import {
-  ChevronLeft, ChevronRight, User, MoreVertical, Plus, CheckCircle2,
+  User, MoreVertical, Plus, CheckCircle2, X, Loader2,
 } from 'lucide-vue-next'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  addDays, isSameMonth, isToday, isSameDay, addMonths, subMonths,
+  addDays, isSameMonth, isToday, isSameDay,
+  setMonth as dfSetMonth, setDate as dfSetDate,
+  getDaysInMonth, getMonth, getDate,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { CitaAgenda } from '~/modules/agenda/types/agenda.types'
@@ -29,8 +31,109 @@ const diaSeleccionado = ref(new Date())       // hoy por defecto
 const resumenMes      = ref<ResumenDia[]>([])
 const citasDia        = ref<CitaAgenda[]>([])
 const cargandoCitas   = ref(false)
-const citaEnEdicion   = ref<string | null>(null)  // ID de la cita en edición
-const comentarioTemp  = ref('')                    // Comentario temporal durante edición
+const citaEnEdicion   = ref<string | null>(null)
+const comentarioTemp  = ref('')
+
+// ── Selects de mes y día ───────────────────────────────────
+const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+const mesSeleccionado = computed({
+  get: () => getMonth(mesActual.value) + 1,
+  set: (val: number) => {
+    const nueva = dfSetMonth(mesActual.value, val - 1)
+    mesActual.value = nueva
+    const maxDia = getDaysInMonth(nueva)
+    const diaActual = getDate(diaSeleccionado.value)
+    seleccionarDia(dfSetDate(nueva, Math.min(diaActual, maxDia)))
+  },
+})
+
+const diasDelMes = computed(() => {
+  const n = getDaysInMonth(mesActual.value)
+  return Array.from({ length: n }, (_, i) => i + 1)
+})
+
+const numeroDia = computed({
+  get: () => getDate(diaSeleccionado.value),
+  set: (val: number) => seleccionarDia(dfSetDate(mesActual.value, val)),
+})
+
+// ── Modal nueva cita ───────────────────────────────────────
+const modalAbierto   = ref(false)
+const cargandoModal  = ref(false)
+const guardandoCita  = ref(false)
+const errorModal     = ref('')
+const clientes       = ref<any[]>([])
+const serviciosLista = ref<any[]>([])
+const peluqueros     = ref<any[]>([])
+
+const formNuevaCita = ref({
+  fecha:       '',
+  hora:        '10:00',
+  clienteId:   '',
+  servicioId:  '',
+  peluqueroId: '',
+})
+
+async function abrirModal() {
+  formNuevaCita.value = {
+    fecha:       format(diaSeleccionado.value, 'yyyy-MM-dd'),
+    hora:        '10:00',
+    clienteId:   '',
+    servicioId:  '',
+    peluqueroId: '',
+  }
+  errorModal.value = ''
+  modalAbierto.value = true
+
+  if (!clientes.value.length) {
+    cargandoModal.value = true
+    try {
+      const { api } = await import('~/infrastructure/http/api')
+      const [resC, resS, resP] = await Promise.all([
+        api.get('/v1/clientes'),
+        api.get('/v1/servicios'),
+        api.get('/peluqueros'),
+      ])
+      clientes.value       = resC.data
+      serviciosLista.value = resS.data
+      peluqueros.value     = resP.data
+    } catch {
+      errorModal.value = 'Error cargando datos. Comprueba que el backend esté activo.'
+    } finally {
+      cargandoModal.value = false
+    }
+  }
+}
+
+async function crearCita() {
+  const { fecha, hora, clienteId, servicioId, peluqueroId } = formNuevaCita.value
+  if (!clienteId || !servicioId || !peluqueroId) {
+    errorModal.value = 'Completa todos los campos.'
+    return
+  }
+  guardandoCita.value = true
+  errorModal.value = ''
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.post('/citas', {
+      fechaHora: `${fecha}T${hora}:00`,
+      estado: 'PENDIENTE',
+      cliente:   { id: clienteId },
+      peluquero: { id: peluqueroId },
+      servicios: [{ id: servicioId }],
+    })
+    modalAbierto.value = false
+    await cargarResumenMes()
+    if (format(diaSeleccionado.value, 'yyyy-MM-dd') === fecha) {
+      await seleccionarDia(diaSeleccionado.value)
+    }
+  } catch {
+    errorModal.value = 'Error al crear la cita. Inténtalo de nuevo.'
+  } finally {
+    guardandoCita.value = false
+  }
+}
 
 // ── Días del calendario (grid 7 cols) ─────────────────────
 const diasDelCalendario = computed(() => {
@@ -98,8 +201,6 @@ async function cargarResumenMes() {
   }
 }
 
-function mesAnterior() { mesActual.value = subMonths(mesActual.value, 1) }
-function mesSiguiente() { mesActual.value = addMonths(mesActual.value, 1) }
 
 async function iniciarEdicionComentario(cita: CitaAgenda) {
   citaEnEdicion.value = cita.id
@@ -159,26 +260,21 @@ onMounted(async () => {
 
       <!-- Cabecera del calendario -->
       <div class="px-6 py-4 flex items-center justify-between border-b border-surface-container">
-        <div class="flex items-center gap-4">
-          <!-- Nombre del mes + año -->
-          <h3 class="text-xl font-extrabold tracking-tight text-primary capitalize">
-            {{ textoMes }}
-          </h3>
-          <!-- Botones de navegación < > -->
-          <div class="flex bg-surface-container-low p-1 rounded-full gap-0.5">
-            <button
-              class="p-1.5 rounded-full hover:bg-white transition-colors text-on-surface-variant hover:text-primary-container"
-              @click="mesAnterior"
-            >
-              <ChevronLeft class="w-4 h-4" />
-            </button>
-            <button
-              class="p-1.5 rounded-full hover:bg-white transition-colors text-on-surface-variant hover:text-primary-container"
-              @click="mesSiguiente"
-            >
-              <ChevronRight class="w-4 h-4" />
-            </button>
-          </div>
+        <div class="flex items-center gap-3">
+          <!-- Selector de mes -->
+          <select
+            v-model.number="mesSeleccionado"
+            class="px-3 py-1.5 rounded-xl border border-surface-container bg-surface-container-low text-sm font-semibold text-primary-container focus:outline-none focus:ring-2 focus:ring-primary-container/30 cursor-pointer"
+          >
+            <option v-for="(mes, i) in meses" :key="i" :value="i + 1">{{ mes }}</option>
+          </select>
+          <!-- Selector de día -->
+          <select
+            v-model.number="numeroDia"
+            class="px-3 py-1.5 rounded-xl border border-surface-container bg-surface-container-low text-sm font-semibold text-primary-container focus:outline-none focus:ring-2 focus:ring-primary-container/30 cursor-pointer"
+          >
+            <option v-for="d in diasDelMes" :key="d" :value="d">Día {{ d }}</option>
+          </select>
         </div>
 
         <div class="flex items-center gap-2">
@@ -190,15 +286,8 @@ onMounted(async () => {
             Hoy
           </button>
 
-          <!-- Toggle Vista (decorativo por ahora) -->
-          <div class="flex bg-surface-container-low p-1 rounded-full">
-            <span class="px-3 py-1 rounded-full text-xs font-bold bg-white shadow-sm text-primary-container">Mes</span>
-            <span class="px-3 py-1 rounded-full text-xs font-medium text-on-surface-variant">Semana</span>
-            <span class="px-3 py-1 rounded-full text-xs font-medium text-on-surface-variant">Día</span>
-          </div>
-
           <!-- Botón nueva cita (solo admin) -->
-          <button v-if="useAuthStore().isAdmin" class="btn-primary py-2">
+          <button v-if="useAuthStore().isAdmin" class="btn-primary py-2" @click="abrirModal">
             <Plus class="w-4 h-4" />
             Nueva cita
           </button>
@@ -417,4 +506,138 @@ onMounted(async () => {
     </aside>
 
   </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       MODAL — Nueva Cita
+       ════════════════════════════════════════════════════ -->
+  <Teleport to="body">
+    <Transition name="fade">
+      <div
+        v-if="modalAbierto"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        @click.self="modalAbierto = false"
+      >
+        <div class="bg-surface-container-lowest rounded-2xl shadow-2xl w-full max-w-md border border-outline-variant/20">
+
+          <!-- Cabecera del modal -->
+          <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-surface-container">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Plus class="w-5 h-5 text-primary-container" />
+              </div>
+              <h2 class="text-base font-bold text-primary">Nueva Cita</h2>
+            </div>
+            <button
+              class="p-1.5 rounded-full hover:bg-surface-container transition-colors text-on-surface-variant"
+              @click="modalAbierto = false"
+            >
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+
+          <!-- Cuerpo del modal -->
+          <div class="px-6 py-5 space-y-4">
+
+            <!-- Loader inicial -->
+            <div v-if="cargandoModal" class="flex items-center justify-center py-8">
+              <Loader2 class="w-6 h-6 animate-spin text-primary-container" />
+            </div>
+
+            <template v-else>
+              <!-- Fecha -->
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Fecha</label>
+                <input
+                  v-model="formNuevaCita.fecha"
+                  type="date"
+                  class="w-full px-3 py-2 rounded-xl border border-surface-container bg-surface-container-low text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/30"
+                />
+              </div>
+
+              <!-- Hora -->
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Hora</label>
+                <input
+                  v-model="formNuevaCita.hora"
+                  type="time"
+                  class="w-full px-3 py-2 rounded-xl border border-surface-container bg-surface-container-low text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/30"
+                />
+              </div>
+
+              <!-- Cliente -->
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Cliente</label>
+                <select
+                  v-model="formNuevaCita.clienteId"
+                  class="w-full px-3 py-2 rounded-xl border border-surface-container bg-surface-container-low text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/30 cursor-pointer"
+                >
+                  <option value="" disabled>Seleccionar cliente…</option>
+                  <option v-for="c in clientes" :key="c.id" :value="c.id">
+                    {{ c.nombre }} {{ c.apellidos }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Servicio -->
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Servicio</label>
+                <select
+                  v-model="formNuevaCita.servicioId"
+                  class="w-full px-3 py-2 rounded-xl border border-surface-container bg-surface-container-low text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/30 cursor-pointer"
+                >
+                  <option value="" disabled>Seleccionar servicio…</option>
+                  <option v-for="s in serviciosLista" :key="s.id" :value="s.id">
+                    {{ s.nombre }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Peluquero -->
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Peluquero/a</label>
+                <select
+                  v-model="formNuevaCita.peluqueroId"
+                  class="w-full px-3 py-2 rounded-xl border border-surface-container bg-surface-container-low text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/30 cursor-pointer"
+                >
+                  <option value="" disabled>Seleccionar peluquero…</option>
+                  <option v-for="p in peluqueros" :key="p.id" :value="p.id">
+                    {{ p.nombre }} {{ p.apellidos }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Error -->
+              <p v-if="errorModal" class="text-xs text-red-600 font-semibold bg-red-50 px-3 py-2 rounded-lg">
+                {{ errorModal }}
+              </p>
+            </template>
+          </div>
+
+          <!-- Pie del modal -->
+          <div class="flex gap-3 px-6 pb-6">
+            <button
+              class="flex-1 px-4 py-2.5 rounded-xl border border-surface-container bg-surface-container-low text-sm font-semibold text-on-surface-variant hover:bg-surface-container transition-colors"
+              @click="modalAbierto = false"
+            >
+              Cancelar
+            </button>
+            <button
+              class="flex-1 btn-primary py-2.5 flex items-center justify-center gap-2"
+              :disabled="guardandoCita || cargandoModal"
+              @click="crearCita"
+            >
+              <Loader2 v-if="guardandoCita" class="w-4 h-4 animate-spin" />
+              <span>{{ guardandoCita ? 'Guardando…' : 'Crear cita' }}</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+</style>
