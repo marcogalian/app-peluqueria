@@ -52,9 +52,9 @@ services:
       dockerfile: Dockerfile
     container_name: peluqueria-front
     ports:
-      - "3000:3000"
+      - "4000:3000"
     environment:
-      NUXT_PUBLIC_API_BASE: http://api:8080
+      NUXT_PUBLIC_API_BASE: http://localhost:8080/api
     depends_on:
       - api
     restart: always

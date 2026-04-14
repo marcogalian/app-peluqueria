@@ -19,7 +19,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         if (userRepository.count() == 0) {
-            // Create default admin
+            // Crear administrador por defecto
             UserEntity admin = UserEntity.builder()
                     .username("admin")
                     .password(passwordEncoder.encode("1234"))
@@ -29,7 +29,7 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
             userRepository.save(admin);
 
-            // Create default peluquero
+            // Crear peluquero por defecto
             UserEntity peluquero = UserEntity.builder()
                     .username("maria")
                     .password(passwordEncoder.encode("1234"))
@@ -39,7 +39,7 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
             userRepository.save(peluquero);
 
-            System.out.println("Mock Users initialized: admin/1234 & maria/1234");
+            System.out.println("Usuarios de prueba inicializados: admin/1234 y maria/1234");
         }
     }
 }
