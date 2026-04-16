@@ -164,15 +164,6 @@ TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 
 ---
 
-## Credenciales por defecto (desarrollo)
-
-| Usuario | Contraseña | Rol |
-|---|---|---|
-| `admin` | `1234` | Administrador |
-| `maria` | `1234` | Empleada |
-
----
-
 ## Metodología de desarrollo
 
 - **GitFlow**: ramas `main`, `develop` y `feature/*` por funcionalidad
