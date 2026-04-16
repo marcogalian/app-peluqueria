@@ -9,7 +9,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List; import java.util.UUID;
 
 @RestController @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class FotoController {
     private final GestionarFotoUseCase useCase;
 
