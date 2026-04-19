@@ -31,6 +31,7 @@ const resetEnviado    = ref(false)
 
 const authStore = useAuthStore()
 const route     = useRoute()
+const router    = useRouter()
 
 // Si ya está autenticado al entrar a /login, redirige directamente
 onMounted(() => {
@@ -43,7 +44,7 @@ onMounted(() => {
 /** Ruta de destino tras login según el rol del usuario */
 function redirigirSegunRol() {
   const destino = (route.query.redirect as string) || (authStore.isAdmin ? '/admin/dashboard' : '/agenda')
-  navigateTo(destino)
+  router.push(destino)
 }
 
 /** Envía las credenciales al backend */
@@ -67,8 +68,8 @@ async function handleLogin() {
     authStore.guardarSesion(respuesta.token, respuesta.refreshToken)
     redirigirSegunRol()
   } catch (err: any) {
-    // El backend devuelve 401 con mensaje en el body
-    if (err.response?.status === 401) {
+    // El backend puede devolver 401 o 403 cuando las credenciales son incorrectas
+    if (err.response?.status === 401 || err.response?.status === 403) {
       error.value = 'Usuario o contraseña incorrectos.'
     } else {
       error.value = 'No se pudo conectar con el servidor. Inténtalo de nuevo.'
@@ -112,10 +113,7 @@ async function handleRecuperar() {
         Copia la imagen en front-nuxt/public/images/salon-login.jpg
         y descomenta la etiqueta <img> de abajo.
       -->
-      <!-- <img src="/images/salon-login.jpg" alt="Peluquería" class="absolute inset-0 w-full h-full object-cover" /> -->
-
-      <!-- Gradiente provisional mientras no haya foto real -->
-      <div class="absolute inset-0 bg-gradient-to-br from-[#0a1628] via-[#1a2d5a] to-[#0f1c3a]" />
+      <img src="/images/foto-admin.jpeg" alt="Peluquería" class="absolute inset-0 w-full h-full object-cover" />
 
       <!-- Overlay oscuro con tono azulado — mismo efecto que el diseño de referencia -->
       <div class="absolute inset-0 bg-gradient-to-b from-[#1a2d5a]/70 via-[#1a2d5a]/50 to-[#0f1c3a]/85" />
@@ -123,12 +121,10 @@ async function handleRecuperar() {
       <!-- Contenido sobre el overlay -->
       <div class="relative z-10 flex flex-col justify-between p-10 w-full">
 
-        <!-- Logo en la esquina superior izquierda -->
+        <!-- Logo/Foto en la esquina superior izquierda -->
         <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-            <Scissors class="w-5 h-5 text-white" />
-          </div>
-          <span class="text-white font-semibold text-lg">Peluquería</span>
+          <img src="/images/propietaria.jpeg" alt="Propietaria" class="w-9 h-9 rounded-full object-cover border-2 border-white/20 shadow-sm" />
+          <span class="text-white font-semibold text-lg">Peluquería Isabella</span>
         </div>
 
         <!-- Texto principal en la parte inferior -->
@@ -152,12 +148,10 @@ async function handleRecuperar() {
 
         <!-- Encabezado del formulario -->
         <div class="mb-8">
-          <!-- En móvil mostramos el logo aquí -->
+          <!-- En móvil mostramos la foto/logo aquí -->
           <div class="flex items-center gap-2 mb-6 lg:hidden">
-            <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Scissors class="w-4 h-4 text-white" />
-            </div>
-            <span class="text-text-primary font-semibold">Peluquería</span>
+            <img src="/images/propietaria.jpeg" alt="Propietaria" class="w-8 h-8 rounded-full object-cover border border-gray-200 shadow-sm" />
+            <span class="text-text-primary font-semibold">Peluquería Isabella</span>
           </div>
 
           <h1 class="text-2xl font-bold text-text-primary">Bienvenido de nuevo</h1>

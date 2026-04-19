@@ -29,7 +29,7 @@ public class CitaController {
     private final GenerarTicketPdfUseCase generarTicketPdfUseCase;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<List<Cita>> getCitas(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
@@ -38,25 +38,25 @@ public class CitaController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<Cita> getCitaById(@PathVariable UUID id) {
         return ResponseEntity.ok(citaService.getCitaById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<Cita> createCita(@RequestBody Cita cita) {
         return ResponseEntity.ok(citaService.createCita(cita));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<Cita> updateCita(@PathVariable UUID id, @RequestBody Cita cita) {
         return ResponseEntity.ok(citaService.updateCita(id, cita));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> deleteCita(@PathVariable UUID id) {
         citaService.deleteCita(id);
         return ResponseEntity.noContent().build();
@@ -66,7 +66,7 @@ public class CitaController {
      * Obtiene las citas del día para la agenda del empleado autenticado.
      */
     @GetMapping("/agenda")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<List<CitaAgendaDto>> getCitasAgenda(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
         LocalDateTime inicio = fecha.atStartOfDay();
@@ -84,7 +84,7 @@ public class CitaController {
      * Obtiene el resumen de citas para un mes (para los badges del calendario).
      */
     @GetMapping("/resumen-mes")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<List<ResumenDiaDto>> getResumenMes(
             @RequestParam Integer anio,
             @RequestParam Integer mes) {
@@ -117,7 +117,7 @@ public class CitaController {
      * HU13: Endpoint para descargar la factura o ticket de la cita en formato PDF.
      */
     @GetMapping("/{id}/ticket")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<byte[]> descargarTicketPdf(@PathVariable UUID id) {
         try {
             byte[] pdfBytes = generarTicketPdfUseCase.generarTicket(id);

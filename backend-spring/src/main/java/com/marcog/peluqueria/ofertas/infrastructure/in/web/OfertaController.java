@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List; import java.util.UUID;
 
 @RestController @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class OfertaController {
     private final GestionarOfertaUseCase useCase;
 

@@ -18,25 +18,25 @@ public class PeluqueroController {
     private final PeluqueroService peluqueroService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<List<Peluquero>> getAllPeluqueros() {
         return ResponseEntity.ok(peluqueroService.getAllPeluqueros());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<Peluquero> getPeluqueroById(@PathVariable UUID id) {
         return ResponseEntity.ok(peluqueroService.getPeluqueroById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ROLE_ADMIN')") // Solo Admin puede crear peluqueros
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')") // Solo Admin puede crear peluqueros
     public ResponseEntity<Peluquero> createPeluquero(@RequestBody Peluquero peluquero) {
         return ResponseEntity.ok(peluqueroService.createPeluquero(peluquero));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Peluquero> updatePeluquero(
             @PathVariable UUID id,
             @RequestBody Peluquero peluquero) {
@@ -44,7 +44,7 @@ public class PeluqueroController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> deletePeluquero(@PathVariable UUID id) {
         peluqueroService.deletePeluquero(id);
         return ResponseEntity.noContent().build();

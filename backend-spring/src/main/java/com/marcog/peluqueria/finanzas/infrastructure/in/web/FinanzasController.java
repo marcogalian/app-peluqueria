@@ -23,7 +23,7 @@ public class FinanzasController {
     // ----- Endpoints de Gastos -----
 
     @GetMapping("/gastos")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<List<Gasto>> getGastos(
             @RequestParam(required = false) Integer mes,
             @RequestParam(required = false) Integer anio) {
@@ -34,13 +34,13 @@ public class FinanzasController {
     }
 
     @PostMapping("/gastos")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Gasto> addGasto(@RequestBody Gasto gasto) {
         return ResponseEntity.ok(gastoService.createGasto(gasto));
     }
 
     @DeleteMapping("/gastos/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> deleteGasto(@PathVariable UUID id) {
         gastoService.deleteGasto(id);
         return ResponseEntity.noContent().build();
@@ -49,7 +49,7 @@ public class FinanzasController {
     // ----- Endpoints del Dashboard Financiero -----
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<DashboardStats> getDashboardStats(
             @RequestParam int mes,
             @RequestParam int anio) {

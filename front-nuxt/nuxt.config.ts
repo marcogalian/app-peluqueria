@@ -52,10 +52,9 @@ export default defineNuxtConfig({
     '~infra':   '/app/infrastructure',
   },
 
-  // Transiciones de página
+  // Configuración de la app sin transiciones de página para evitar
+  // el bug de "pantalla en blanco" al navegar entre layouts en Nuxt
   app: {
-    pageTransition:   { name: 'page',   mode: 'out-in' },
-    layoutTransition: { name: 'layout', mode: 'out-in' },
     head: {
       title: 'Atelier Sapphire — Gestión',
       meta: [
@@ -72,6 +71,8 @@ export default defineNuxtConfig({
       ],
     },
   },
+
+  ssr: false,
 
   typescript: {
     strict: true,

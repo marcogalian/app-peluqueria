@@ -14,7 +14,7 @@ import {
   Phone, Mail, User, Loader2, ChevronRight,
   Upload, X, ZoomIn, Trash2,
 } from 'lucide-vue-next'
-import type { Cliente, FotoCliente } from '~/modules/clientes/types/cliente.types'
+import type { Cliente, FotoCliente, Genero } from '~/modules/clientes/types/cliente.types'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
 
@@ -57,9 +57,9 @@ const clientesFiltrados = computed(() => {
   const q = busqueda.value.toLowerCase()
   if (!q) return clientes.value
   return clientes.value.filter(c =>
-    `${c.nombre} ${c.apellidos}`.toLowerCase().includes(q) ||
-    c.telefono.includes(q) ||
-    c.email.toLowerCase().includes(q),
+    `${c.nombre || ''} ${c.apellidos || ''}`.toLowerCase().includes(q) ||
+    (c.telefono || '').includes(q) ||
+    (c.email || '').toLowerCase().includes(q),
   )
 })
 
@@ -69,7 +69,7 @@ onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
     const { data } = await api.get<Cliente[]>('/v1/clientes')
-    clientes.value = data
+    clientes.value = data || []
   } catch {
     clientes.value = []
   } finally {
@@ -229,7 +229,7 @@ async function guardarCliente() {
           <!-- Avatar con inicial -->
           <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
             <span class="text-primary font-semibold text-sm">
-              {{ cliente.nombre.charAt(0).toUpperCase() }}
+              {{ (cliente.nombre || '?').charAt(0).toUpperCase() }}
             </span>
           </div>
 

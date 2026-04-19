@@ -16,7 +16,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/clientes")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class ClienteController {
     private final RegistrarClienteUseCase registrarClienteUseCase;
     private final ConsultarClienteService consultarClienteService;

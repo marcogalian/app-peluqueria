@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List; import java.util.Map; import java.util.UUID;
 
 @RestController @RequestMapping("/api/v1/ausencias") @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class AusenciaController {
     private final GestionarAusenciaUseCase useCase;
 
