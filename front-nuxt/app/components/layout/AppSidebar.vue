@@ -29,6 +29,7 @@ const itemsAdmin = [
   { path: '/admin/servicios',  label: 'Servicios',        icon: Scissors },
   { path: '/admin/inventario', label: 'Inventario',       icon: Package },
   { path: '/admin/empleados',  label: 'Empleados',        icon: UserCog },
+  { path: '/mensajes',         label: 'Mensajes',         icon: MessageCircle },
   { path: '/admin/resultados', label: 'Resultados',       icon: BarChart3 },
 ]
 

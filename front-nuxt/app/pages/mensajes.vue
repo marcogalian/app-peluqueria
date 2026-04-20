@@ -13,7 +13,7 @@ definePageMeta({ middleware: 'auth' })
 // ── Tipos ─────────────────────────────────────────────────
 interface Mensaje {
   id: string
-  emisorId: number
+  emisorId: string
   emisorNombre: string
   contenido: string
   enviadoEn: string
@@ -21,7 +21,7 @@ interface Mensaje {
 }
 
 interface Contacto {
-  id: number
+  id: string
   nombre: string
   iniciales: string
   rol: string
@@ -159,7 +159,7 @@ function abrirEmail(email: string) {
 
 // ── Helpers ───────────────────────────────────────────────
 function esMio(m: Mensaje): boolean {
-  return m.emisorId === authStore.user?.id
+  return m.emisorId === authStore.usuario?.id
 }
 
 function formatHora(iso: string): string {
