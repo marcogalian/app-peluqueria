@@ -17,7 +17,6 @@ public class AusenciaController {
     public ResponseEntity<List<SolicitudAusencia>> listar(
             Authentication auth,
             @RequestParam(required = false) UUID peluqueroId) {
-        // Admin ve todas; empleado filtra por su peluqueroId
         if (auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
             return ResponseEntity.ok(useCase.listarTodas());
         }
@@ -29,13 +28,20 @@ public class AusenciaController {
         return ResponseEntity.ok(useCase.solicitar(solicitud));
     }
 
-    @PreAuthorize("hasRole('ADMIN')") @PatchMapping("/{id}/aprobar")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PatchMapping("/{id}/aprobar")
     public ResponseEntity<SolicitudAusencia> aprobar(@PathVariable UUID id) {
         return ResponseEntity.ok(useCase.aprobar(id));
     }
 
-    @PreAuthorize("hasRole('ADMIN')") @PatchMapping("/{id}/rechazar")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PatchMapping("/{id}/rechazar")
     public ResponseEntity<SolicitudAusencia> rechazar(@PathVariable UUID id, @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(useCase.rechazar(id, body.get("motivo")));
+    }
+
+    @PatchMapping("/{id}/cancelar")
+    public ResponseEntity<SolicitudAusencia> cancelar(@PathVariable UUID id) {
+        return ResponseEntity.ok(useCase.cancelar(id));
     }
 }

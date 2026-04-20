@@ -4,6 +4,8 @@ import com.marcog.peluqueria.citas.domain.model.Cita;
 import com.marcog.peluqueria.citas.domain.model.EstadoCita;
 import com.marcog.peluqueria.citas.domain.model.exception.CitaSuperpuestaException;
 import com.marcog.peluqueria.citas.domain.port.out.CitaRepositoryPort;
+import com.marcog.peluqueria.clientes.domain.model.Cliente;
+import com.marcog.peluqueria.clientes.domain.port.out.ClienteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,7 @@ import java.util.UUID;
 public class CitaService {
 
     private final CitaRepositoryPort repositoryPort;
+    private final ClienteRepository clienteRepository;
 
     public List<Cita> getAllCitas() {
         return repositoryPort.findAll();
@@ -57,6 +60,25 @@ public class CitaService {
         existing.setServicios(citaDetails.getServicios());
 
         return repositoryPort.save(existing);
+    }
+
+    public Cita cancelar(UUID id, String motivo) {
+        Cita cita = getCitaById(id);
+        cita.setEstado(EstadoCita.CANCELADO);
+        cita.setMotivoCancelacion(motivo);
+
+        boolean cancelacionTardia = LocalDateTime.now().isAfter(cita.getFechaHora().minusHours(24));
+        if (cancelacionTardia && cita.getCliente() != null) {
+            clienteRepository.findById(cita.getCliente().getId()).ifPresent(cliente -> {
+                String penalizacion = String.format("[Penalización %s] Canceló con menos de 24h de antelación.",
+                        LocalDateTime.now().toLocalDate());
+                String notasActuales = cliente.getNotas() != null ? cliente.getNotas() : "";
+                cliente.setNotas(notasActuales.isEmpty() ? penalizacion : notasActuales + "\n" + penalizacion);
+                clienteRepository.save(cliente);
+            });
+        }
+
+        return repositoryPort.save(cita);
     }
 
     public void deleteCita(UUID id) {

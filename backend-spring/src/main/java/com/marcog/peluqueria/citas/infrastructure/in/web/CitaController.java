@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
@@ -53,6 +54,15 @@ public class CitaController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<Cita> updateCita(@PathVariable UUID id, @RequestBody Cita cita) {
         return ResponseEntity.ok(citaService.updateCita(id, cita));
+    }
+
+    @PatchMapping("/{id}/cancelar")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    public ResponseEntity<Cita> cancelarCita(
+            @PathVariable UUID id,
+            @RequestBody(required = false) Map<String, String> body) {
+        String motivo = body != null ? body.getOrDefault("motivo", "") : "";
+        return ResponseEntity.ok(citaService.cancelar(id, motivo));
     }
 
     @DeleteMapping("/{id}")

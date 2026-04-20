@@ -89,6 +89,15 @@ public class AusenciaService implements GestionarAusenciaUseCase {
         });
     }
 
+    @Override
+    public SolicitudAusencia cancelar(UUID id) {
+        SolicitudAusencia s = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada: " + id));
+        s.setEstado(EstadoAusencia.CANCELADA);
+        s.setResueltaEn(LocalDateTime.now());
+        return repository.guardar(s);
+    }
+
     private void validarAntelacion(SolicitudAusencia s) {
         if (s.getTipo() == TipoAusencia.BAJA) return;
         int diasMinimos = s.getTipo() == TipoAusencia.VACACIONES ? 7 : 5;
