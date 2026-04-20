@@ -4,6 +4,7 @@ import com.marcog.peluqueria.finanzas.application.service.FinanzasDashboardServi
 import com.marcog.peluqueria.finanzas.application.service.GastoService;
 import com.marcog.peluqueria.finanzas.domain.model.DashboardStats;
 import com.marcog.peluqueria.finanzas.domain.model.Gasto;
+import com.marcog.peluqueria.finanzas.domain.model.ResultadosDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -54,5 +55,12 @@ public class FinanzasController {
             @RequestParam int mes,
             @RequestParam int anio) {
         return ResponseEntity.ok(dashboardService.getStatsByMesAndAnio(mes, anio));
+    }
+
+    @GetMapping("/resultados")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<ResultadosDTO> getResultados(
+            @RequestParam(defaultValue = "mes") String periodo) {
+        return ResponseEntity.ok(dashboardService.getResultados(periodo));
     }
 }
