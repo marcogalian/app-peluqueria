@@ -191,6 +191,21 @@ APP_ADMIN_PHONE=+34600000000
 
 ---
 
+## Datos demo
+
+En el primer arranque se crean datos de ejemplo para facilitar pruebas y defensa:
+
+| Usuario | Contraseña | Rol |
+|---|---|---|
+| `admin` | `1234` | Administrador |
+| `sofia` | `1234` | Empleada |
+| `carmen` | `1234` | Empleada |
+| `lucia` | `1234` | Empleada |
+
+También se generan servicios, productos y clientes de muestra. Si `randomuser.me` no está disponible, el backend usa un conjunto local de clientes de respaldo para no depender de internet.
+
+---
+
 ## Metodología de desarrollo
 
 - **GitFlow**: ramas `main`, `develop` y `feature/*` por funcionalidad

@@ -20,6 +20,7 @@ import com.marcog.peluqueria.servicios.infrastructure.out.persistence.ServicioEn
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -39,14 +40,17 @@ public class DataInitializer implements CommandLineRunner {
     private final JpaServicioRepository  servicioRepository;
     private final JpaProductoRepository  productoRepository;
     private final PasswordEncoder        passwordEncoder;
+    @Value("${app.seed.remote-clients.enabled:true}")
+    private boolean remoteClientsEnabled;
 
     @Override
     public void run(String... args) {
+        crearAdminSiNoExiste();
         if (peluqueroRepository.count() == 0) {
             crearPeluqueros();
         }
         if (clienteRepository.count() == 0) {
-            crearClientesDesdeAPI();
+            crearClientes();
         }
         if (servicioRepository.count() == 0) {
             crearServicios();
@@ -54,6 +58,22 @@ public class DataInitializer implements CommandLineRunner {
         if (productoRepository.count() == 0) {
             crearProductos();
         }
+    }
+
+    private void crearAdminSiNoExiste() {
+        if (userRepository.findByUsername("admin").isPresent()) {
+            return;
+        }
+
+        userRepository.save(UserEntity.builder()
+                .username("admin")
+                .password(passwordEncoder.encode("1234"))
+                .role(Role.ROLE_ADMIN)
+                .email("admin@peluqueria.com")
+                .active(true)
+                .build());
+
+        log.info("DataInitializer: usuario administrador demo creado.");
     }
 
     private void crearPeluqueros() {
@@ -85,7 +105,7 @@ public class DataInitializer implements CommandLineRunner {
                     .enVacaciones(false)
                     .build());
         }
-        log.info("DataInitializer: admin y 3 peluqueras creadas.");
+        log.info("DataInitializer: 3 peluqueras demo creadas.");
     }
 
     private void crearServicios() {
@@ -157,7 +177,13 @@ public class DataInitializer implements CommandLineRunner {
         log.info("DataInitializer: 15 productos creados.");
     }
 
-    private void crearClientesDesdeAPI() {
+    private void crearClientes() {
+        if (!remoteClientsEnabled) {
+            log.info("DataInitializer: seed remoto desactivado, usando clientes locales.");
+            crearClientesFallback();
+            return;
+        }
+
         try {
             RestTemplate rest = new RestTemplate();
             RandomUserResponse response = rest.getForObject(
@@ -166,7 +192,8 @@ public class DataInitializer implements CommandLineRunner {
             );
 
             if (response == null || response.getResults() == null) {
-                log.warn("randomuser.me no disponible, sin clientes de seed.");
+                log.warn("randomuser.me no disponible, usando clientes locales de respaldo.");
+                crearClientesFallback();
                 return;
             }
 
@@ -188,8 +215,37 @@ public class DataInitializer implements CommandLineRunner {
             }
             log.info("DataInitializer: 30 clientes creados desde randomuser.me.");
         } catch (Exception e) {
-            log.warn("No se pudieron obtener clientes de randomuser.me: {}", e.getMessage());
+            log.warn("No se pudieron obtener clientes de randomuser.me: {}. Usando clientes locales.", e.getMessage());
+            crearClientesFallback();
         }
+    }
+
+    private void crearClientesFallback() {
+        record C(String nombre, String apellidos, String telefono, String email, Genero genero) {}
+
+        List<C> datos = List.of(
+                new C("Laura", "Navarro Ruiz", "600123111", "laura.navarro@correo.test", Genero.FEMENINO),
+                new C("Diego", "Sánchez Mora", "600123112", "diego.sanchez@correo.test", Genero.MASCULINO),
+                new C("Elena", "Romero Vidal", "600123113", "elena.romero@correo.test", Genero.FEMENINO),
+                new C("Pablo", "Ortega León", "600123114", "pablo.ortega@correo.test", Genero.MASCULINO),
+                new C("Sara", "Gil Campos", "600123115", "sara.gil@correo.test", Genero.FEMENINO),
+                new C("Álvaro", "Marín Soto", "600123116", "alvaro.marin@correo.test", Genero.MASCULINO),
+                new C("Lucía", "Reyes Peña", "600123117", "lucia.reyes@correo.test", Genero.FEMENINO),
+                new C("Adrián", "Castro Nieto", "600123118", "adrian.castro@correo.test", Genero.MASCULINO)
+        );
+
+        for (C c : datos) {
+            clienteRepository.save(ClienteEntity.builder()
+                    .nombre(c.nombre())
+                    .apellidos(c.apellidos())
+                    .telefono(c.telefono())
+                    .email(c.email())
+                    .genero(c.genero())
+                    .consentimientoFotos(true)
+                    .build());
+        }
+
+        log.info("DataInitializer: {} clientes locales de respaldo creados.", datos.size());
     }
 
     private String capitalize(String s) {

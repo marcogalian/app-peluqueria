@@ -1,20 +1,42 @@
 # API de Gestión de Peluquería
 
-### Descripción del proyecto
-Desarrollo de una API REST profesional 
-para la gestión integral de una peluquería, 
-utilizando Java 21, Spring Boot 3 y una 
-arquitectura hexagonal (puertos y adaptadores) 
-para garantizar la escalabilidad y el mantenimiento del sistema. 
-Incluye gestión de clientes, servicios y citas.
+Backend Spring Boot 3 para la gestión integral de una peluquería. Expone una API REST con autenticación JWT, módulos de negocio separados por dominio y soporte para chat vía WebSocket/STOMP, notificaciones y seed de datos demo.
 
-### Alumno
-**Marco Antonio Galián Raja**
+## Stack
 
-### Curso
-**2 DAM**
+- Java 21
+- Spring Boot 3.5
+- Spring Security + JWT
+- Spring Data JPA + Hibernate
+- PostgreSQL
+- WebSocket STOMP
+- Mailtrap / Twilio
+- MapStruct + Lombok
 
-### GitFlow
-Main  
-Develop  
-Feature
+## Módulos principales
+
+- `security`: login, JWT y autorización por rol
+- `clientes`: CRUD, historial y consentimiento de fotos
+- `citas`: agenda, validación de solapes y cancelaciones
+- `peluqueros`: empleados, bajas, reactivación y foto
+- `ausencias`: solicitudes, aprobación y cancelación
+- `servicios`: catálogo con categoría, precio y duración
+- `productos`: inventario y control de stock
+- `ofertas`: promociones y días especiales
+- `finanzas`: dashboard y resultados
+- `chat`: mensajería interna con STOMP
+- `shared/notification`: notificaciones transversales
+
+## Ejecución local
+
+```bash
+./mvnw spring-boot:run
+```
+
+## Tests
+
+```bash
+./mvnw test
+```
+
+Los tests usan H2 en memoria para no depender de una base PostgreSQL local.
