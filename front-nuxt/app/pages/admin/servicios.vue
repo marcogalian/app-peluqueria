@@ -41,7 +41,7 @@ const totalSenora       = computed(() => servicios.value.filter(s => s.categoria
 onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
-    const { data } = await api.get('/servicios')
+    const { data } = await api.get('/v1/servicios')
     servicios.value = data
   } catch { /* vacío */ } finally { cargando.value = false }
 })
@@ -61,11 +61,11 @@ async function guardar() {
   try {
     const { api } = await import('~/infrastructure/http/api')
     if (servicioEditar.value.id) {
-      const { data } = await api.put(`/servicios/${servicioEditar.value.id}`, servicioEditar.value)
+      const { data } = await api.put(`/v1/servicios/${servicioEditar.value.id}`, servicioEditar.value)
       const idx = servicios.value.findIndex(s => s.id === data.id)
       if (idx !== -1) servicios.value[idx] = data
     } else {
-      const { data } = await api.post('/servicios', servicioEditar.value)
+      const { data } = await api.post('/v1/servicios', servicioEditar.value)
       servicios.value.unshift(data)
     }
     drawerAbierto.value = false
@@ -75,7 +75,7 @@ async function guardar() {
 async function eliminar(id: number) {
   if (!confirm('¿Eliminar este servicio?')) return
   const { api } = await import('~/infrastructure/http/api')
-  await api.delete(`/servicios/${id}`)
+  await api.delete(`/v1/servicios/${id}`)
   servicios.value = servicios.value.filter(s => s.id !== id)
   if (servicioEditar.value.id === id) drawerAbierto.value = false
 }

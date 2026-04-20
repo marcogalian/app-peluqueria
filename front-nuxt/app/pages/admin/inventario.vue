@@ -49,7 +49,7 @@ const valorInventario = computed(() =>
 onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
-    const { data } = await api.get('/productos')
+    const { data } = await api.get('/v1/productos')
     productos.value = data
   } catch {
     // vacío si falla
@@ -74,11 +74,11 @@ async function guardar() {
   try {
     const { api } = await import('~/infrastructure/http/api')
     if (productoEditar.value.id) {
-      const { data } = await api.put(`/productos/${productoEditar.value.id}`, productoEditar.value)
+      const { data } = await api.put(`/v1/productos/${productoEditar.value.id}`, productoEditar.value)
       const idx = productos.value.findIndex(p => p.id === data.id)
       if (idx !== -1) productos.value[idx] = data
     } else {
-      const { data } = await api.post('/productos', productoEditar.value)
+      const { data } = await api.post('/v1/productos', productoEditar.value)
       productos.value.unshift(data)
     }
     drawerAbierto.value = false
@@ -90,7 +90,7 @@ async function guardar() {
 async function eliminar(id: number) {
   if (!confirm('¿Eliminar este producto?')) return
   const { api } = await import('~/infrastructure/http/api')
-  await api.delete(`/productos/${id}`)
+  await api.delete(`/v1/productos/${id}`)
   productos.value = productos.value.filter(p => p.id !== id)
 }
 

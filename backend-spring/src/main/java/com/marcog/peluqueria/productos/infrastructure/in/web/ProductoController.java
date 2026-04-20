@@ -18,16 +18,20 @@ public class ProductoController {
         return ResponseEntity.ok(useCase.listar(categoria));
     }
 
-    @PreAuthorize("hasRole('ADMIN')") @PostMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PostMapping
     public ResponseEntity<Producto> crear(@RequestBody Producto producto) { return ResponseEntity.ok(useCase.crear(producto)); }
 
-    @PreAuthorize("hasRole('ADMIN')") @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping("/{id}")
     public ResponseEntity<Producto> actualizar(@PathVariable UUID id, @RequestBody Producto producto) { return ResponseEntity.ok(useCase.actualizar(id, producto)); }
 
-    @PreAuthorize("hasRole('ADMIN')") @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable UUID id) { useCase.eliminar(id); return ResponseEntity.noContent().build(); }
 
-    @PreAuthorize("hasRole('ADMIN')") @PatchMapping("/{id}/stock")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PatchMapping("/{id}/stock")
     public ResponseEntity<Producto> ajustarStock(@PathVariable UUID id, @RequestBody Map<String, Integer> body) {
         return ResponseEntity.ok(useCase.ajustarStock(id, body.get("cantidad")));
     }

@@ -63,8 +63,8 @@ onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
     const [resOfertas, resDias, resConfig] = await Promise.all([
-      api.get('/ofertas'),
-      api.get('/dias-especiales'),
+      api.get('/v1/ofertas'),
+      api.get('/v1/dias-especiales'),
       api.get('/configuracion'),
     ])
     ofertas.value     = resOfertas.data
@@ -102,11 +102,11 @@ async function guardarOferta() {
   try {
     const { api } = await import('~/infrastructure/http/api')
     if (ofertaEditar.value.id) {
-      const { data } = await api.put(`/ofertas/${ofertaEditar.value.id}`, ofertaEditar.value)
+      const { data } = await api.put(`/v1/ofertas/${ofertaEditar.value.id}`, ofertaEditar.value)
       const idx = ofertas.value.findIndex(o => o.id === data.id)
       if (idx !== -1) ofertas.value[idx] = data
     } else {
-      const { data } = await api.post('/ofertas', ofertaEditar.value)
+      const { data } = await api.post('/v1/ofertas', ofertaEditar.value)
       ofertas.value.unshift(data)
     }
     modalOferta.value = false
@@ -117,13 +117,13 @@ async function guardarOferta() {
 
 async function eliminarOferta(id: number) {
   const { api } = await import('~/infrastructure/http/api')
-  await api.delete(`/ofertas/${id}`)
+  await api.delete(`/v1/ofertas/${id}`)
   ofertas.value = ofertas.value.filter(o => o.id !== id)
 }
 
 async function toggleOferta(o: Oferta) {
   const { api } = await import('~/infrastructure/http/api')
-  await api.patch(`/ofertas/${o.id}`, { activa: !o.activa })
+  await api.patch(`/v1/ofertas/${o.id}`, { activa: !o.activa })
   o.activa = !o.activa
 }
 
@@ -138,11 +138,11 @@ async function guardarDia() {
   try {
     const { api } = await import('~/infrastructure/http/api')
     if (diaEditar.value.id) {
-      const { data } = await api.put(`/dias-especiales/${diaEditar.value.id}`, diaEditar.value)
+      const { data } = await api.put(`/v1/dias-especiales/${diaEditar.value.id}`, diaEditar.value)
       const idx = dias.value.findIndex(d => d.id === data.id)
       if (idx !== -1) dias.value[idx] = data
     } else {
-      const { data } = await api.post('/dias-especiales', diaEditar.value)
+      const { data } = await api.post('/v1/dias-especiales', diaEditar.value)
       dias.value.push(data)
     }
     modalDia.value = false
@@ -153,7 +153,7 @@ async function guardarDia() {
 
 async function eliminarDia(id: number) {
   const { api } = await import('~/infrastructure/http/api')
-  await api.delete(`/dias-especiales/${id}`)
+  await api.delete(`/v1/dias-especiales/${id}`)
   dias.value = dias.value.filter(d => d.id !== id)
 }
 </script>
