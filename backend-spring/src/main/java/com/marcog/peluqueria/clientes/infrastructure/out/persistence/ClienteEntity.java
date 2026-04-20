@@ -53,6 +53,10 @@ public class ClienteEntity {
     @Builder.Default
     private boolean esVip = false;
 
+    @Column(name = "archivado", nullable = false)
+    @Builder.Default
+    private boolean archivado = false;
+
     @Column(name = "descuento_porcentaje")
     private Integer descuentoPorcentaje;
 

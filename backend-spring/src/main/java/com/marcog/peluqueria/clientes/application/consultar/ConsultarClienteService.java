@@ -18,12 +18,12 @@ public class ConsultarClienteService {
     private final ClienteRepository clienteRepository;
     private final CitaService citaService;
 
-    public List<Cliente> getAllClientes() {
-        return clienteRepository.findAll();
+    public List<Cliente> getAllClientes(boolean archivado) {
+        return clienteRepository.findAllByArchivado(archivado);
     }
 
-    public List<Cliente> buscarClientes(String nombre, Boolean esVip) {
-        return clienteRepository.findByFiltros(nombre, esVip);
+    public List<Cliente> buscarClientes(String nombre, Boolean esVip, boolean archivado) {
+        return clienteRepository.findByFiltros(nombre, esVip, archivado);
     }
 
     public HistorialClinicoDTO getHistorialClinico(UUID clienteId) {

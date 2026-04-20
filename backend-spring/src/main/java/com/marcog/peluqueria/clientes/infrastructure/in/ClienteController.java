@@ -25,11 +25,12 @@ public class ClienteController {
     @GetMapping
     public ResponseEntity<List<Cliente>> getAllClientes(
             @RequestParam(required = false) String nombre,
-            @RequestParam(required = false) Boolean esVip) {
+            @RequestParam(required = false) Boolean esVip,
+            @RequestParam(defaultValue = "false") boolean archivado) {
         if (nombre != null || esVip != null) {
-            return ResponseEntity.ok(consultarClienteService.buscarClientes(nombre, esVip));
+            return ResponseEntity.ok(consultarClienteService.buscarClientes(nombre, esVip, archivado));
         }
-        return ResponseEntity.ok(consultarClienteService.getAllClientes());
+        return ResponseEntity.ok(consultarClienteService.getAllClientes(archivado));
     }
 
     @GetMapping("/{id}/historial")
@@ -46,6 +47,16 @@ public class ClienteController {
     @PutMapping("/{id}")
     public ResponseEntity<Cliente> actualizar(@PathVariable UUID id, @RequestBody Cliente cliente) {
         return ResponseEntity.ok(actualizarClienteService.actualizarCliente(id, cliente));
+    }
+
+    @PostMapping("/{id}/archivar")
+    public ResponseEntity<Cliente> archivar(@PathVariable UUID id) {
+        return ResponseEntity.ok(actualizarClienteService.actualizarArchivado(id, true));
+    }
+
+    @PostMapping("/{id}/reactivar")
+    public ResponseEntity<Cliente> reactivar(@PathVariable UUID id) {
+        return ResponseEntity.ok(actualizarClienteService.actualizarArchivado(id, false));
     }
 
     @PostMapping("/{id}/consentimiento")
