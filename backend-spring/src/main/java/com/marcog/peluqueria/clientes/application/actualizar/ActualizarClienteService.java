@@ -38,4 +38,11 @@ public class ActualizarClienteService {
 
         return clienteRepository.save(cliente);
     }
+
+    public Cliente actualizarConsentimiento(UUID clienteId, boolean consentimientoFotos) {
+        Cliente cliente = clienteRepository.findById(clienteId)
+                .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+        cliente.setConsentimientoFotos(consentimientoFotos);
+        return clienteRepository.save(cliente);
+    }
 }

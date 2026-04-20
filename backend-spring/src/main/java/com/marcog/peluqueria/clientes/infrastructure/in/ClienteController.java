@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import com.marcog.peluqueria.clientes.application.actualizar.ActualizarClienteService;
 import com.marcog.peluqueria.clientes.application.consultar.ConsultarClienteService;
 import com.marcog.peluqueria.clientes.domain.model.HistorialClinicoDTO;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -45,5 +46,14 @@ public class ClienteController {
     @PutMapping("/{id}")
     public ResponseEntity<Cliente> actualizar(@PathVariable UUID id, @RequestBody Cliente cliente) {
         return ResponseEntity.ok(actualizarClienteService.actualizarCliente(id, cliente));
+    }
+
+    @PostMapping("/{id}/consentimiento")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Cliente> actualizarConsentimiento(
+            @PathVariable UUID id,
+            @RequestBody java.util.Map<String, Boolean> body) {
+        boolean valor = Boolean.TRUE.equals(body.get("consentimientoFotos"));
+        return ResponseEntity.ok(actualizarClienteService.actualizarConsentimiento(id, valor));
     }
 }
