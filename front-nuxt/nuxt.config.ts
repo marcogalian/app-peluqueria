@@ -45,6 +45,16 @@ export default defineNuxtConfig({
   // CSS global con el design system
   css: ['~/assets/css/main.css'],
 
+  // En desarrollo queremos usar siempre el 3000 y fallar si está ocupado,
+  // para no acabar en 3001 sin darnos cuenta.
+  vite: {
+    server: {
+      host: 'localhost',
+      port: 3000,
+      strictPort: true,
+    },
+  },
+
   // Alias útiles para imports
   alias: {
     '~modules': '/app/modules',
