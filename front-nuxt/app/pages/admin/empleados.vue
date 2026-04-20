@@ -9,12 +9,15 @@ import {
 } from 'lucide-vue-next'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useAuthStore } from '~/modules/auth/store/auth.store'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
 
+const authStore = useAuthStore()
+
 // ── Tipos ─────────────────────────────────────────────────
 interface Empleado {
-  id: number
+  id: string
   nombre: string
   apellidos: string
   email: string
@@ -25,6 +28,7 @@ interface Empleado {
   enVacaciones: boolean
   citasMes: number
   iniciales: string
+  fotoUrl?: string
 }
 
 // ── Estado ────────────────────────────────────────────────
@@ -33,13 +37,13 @@ const cargando          = ref(true)
 const empleadoSeleccionado = ref<Empleado | null>(null)
 const modalBaja         = ref(false)
 const modalNuevo        = ref(false)
+const modalEditar       = ref(false)
 const guardando         = ref(false)
 const mesCalendario     = ref(new Date())
 
-// Form nueva baja
-const formBaja = reactive({ fechaInicio: '', fechaFin: '', motivo: '' })
-// Form nuevo empleado
-const formNuevo = reactive({ nombre: '', apellidos: '', email: '', telefono: '', especialidades: '' })
+const formBaja   = reactive({ fechaInicio: '', fechaFin: '', motivo: '' })
+const formNuevo  = reactive({ nombre: '', apellidos: '', email: '', telefono: '', especialidades: '' })
+const formEditar = reactive({ nombre: '', telefono: '', especialidades: '', horarioBase: '' })
 
 // ── Computed ──────────────────────────────────────────────
 const enTurnoHoy     = computed(() => empleados.value.filter(e => e.disponible && !e.enBaja && !e.enVacaciones).length)
@@ -64,7 +68,23 @@ onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
     const { data } = await api.get('/peluqueros')
-    empleados.value = data
+    empleados.value = data.map((p: any) => {
+      const partes = (p.nombre || '').trim().split(' ')
+      return {
+        id:            p.id,
+        nombre:        partes[0] || '',
+        apellidos:     partes.slice(1).join(' '),
+        email:         p.user?.email || '',
+        telefono:      p.telefono || '',
+        especialidades: p.especialidades || p.especialidad || '',
+        disponible:    p.disponible,
+        enBaja:        p.enBaja,
+        enVacaciones:  p.enVacaciones,
+        citasMes:      0,
+        iniciales:     partes.map((n: string) => n[0]).slice(0, 2).join('').toUpperCase(),
+        fotoUrl:       p.fotoUrl || undefined,
+      }
+    })
   } catch {
     // vacío
   } finally {
@@ -116,6 +136,42 @@ async function crearEmpleado() {
   }
 }
 
+function abrirEditar() {
+  if (!empleadoSeleccionado.value) return
+  const e = empleadoSeleccionado.value
+  formEditar.nombre        = e.nombre + (e.apellidos ? ' ' + e.apellidos : '')
+  formEditar.telefono      = e.telefono
+  formEditar.especialidades = e.especialidades
+  formEditar.horarioBase   = ''
+  modalEditar.value = true
+}
+
+async function guardarEdicion() {
+  if (!empleadoSeleccionado.value) return
+  guardando.value = true
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    const { data } = await api.put(`/peluqueros/${empleadoSeleccionado.value.id}`, {
+      nombre:        formEditar.nombre,
+      telefono:      formEditar.telefono,
+      especialidades: formEditar.especialidades,
+      especialidad:  formEditar.especialidades,
+      horarioBase:   formEditar.horarioBase,
+    })
+    // Actualizar local
+    const partes = (data.nombre || '').trim().split(' ')
+    empleadoSeleccionado.value.nombre       = partes[0] || ''
+    empleadoSeleccionado.value.apellidos    = partes.slice(1).join(' ')
+    empleadoSeleccionado.value.telefono     = data.telefono || ''
+    empleadoSeleccionado.value.especialidades = data.especialidades || ''
+    const idx = empleados.value.findIndex(e => e.id === empleadoSeleccionado.value!.id)
+    if (idx !== -1) empleados.value[idx] = { ...empleadoSeleccionado.value }
+    modalEditar.value = false
+  } catch { /* toast */ } finally {
+    guardando.value = false
+  }
+}
+
 async function reactivarEmpleado(empleado: Empleado) {
   guardando.value = true
   try {
@@ -126,6 +182,24 @@ async function reactivarEmpleado(empleado: Empleado) {
   } catch { /* toast */ } finally {
     guardando.value = false
   }
+}
+
+const inputFoto = ref<HTMLInputElement | null>(null)
+
+async function subirFoto(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file || !empleadoSeleccionado.value) return
+  const form = new FormData()
+  form.append('file', file)
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    const { data } = await api.post(`/peluqueros/${empleadoSeleccionado.value.id}/foto`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    empleadoSeleccionado.value.fotoUrl = data.fotoUrl
+    const idx = empleados.value.findIndex(e => e.id === empleadoSeleccionado.value!.id)
+    if (idx !== -1) empleados.value[idx].fotoUrl = data.fotoUrl
+  } catch { /* toast */ }
 }
 
 function abrirWhatsApp(telefono: string) {
@@ -237,11 +311,28 @@ function abrirEmail(email: string) {
         <!-- Avatar grande + nombre -->
         <div class="text-center mb-6">
           <div
-            class="w-20 h-20 rounded-full mx-auto flex items-center justify-center text-white text-2xl font-bold mb-3"
-            :class="empleadoSeleccionado.enBaja ? 'bg-red-400' : 'bg-primary-container'"
+            class="relative w-20 h-20 rounded-full mx-auto mb-3"
+            :class="authStore.isAdmin ? 'cursor-pointer group' : ''"
+            @click="authStore.isAdmin && inputFoto?.click()"
           >
-            {{ (empleadoSeleccionado.nombre[0] + empleadoSeleccionado.apellidos[0]).toUpperCase() }}
+            <img
+              v-if="empleadoSeleccionado.fotoUrl"
+              :src="`${$config.public.uploadsBase}/${empleadoSeleccionado.fotoUrl}`"
+              class="w-20 h-20 rounded-full object-cover"
+              alt="Foto empleado"
+            />
+            <div
+              v-else
+              class="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold"
+              :class="empleadoSeleccionado.enBaja ? 'bg-red-400' : 'bg-primary-container'"
+            >
+              {{ (empleadoSeleccionado.nombre[0] + (empleadoSeleccionado.apellidos[0] || '')).toUpperCase() }}
+            </div>
+            <div class="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <span class="text-white text-[10px] font-bold">Cambiar</span>
+            </div>
           </div>
+          <input ref="inputFoto" type="file" accept="image/*" class="hidden" @change="subirFoto" />
           <h3 class="text-lg font-bold text-on-surface">{{ empleadoSeleccionado.nombre }} {{ empleadoSeleccionado.apellidos }}</h3>
           <p class="text-sm text-on-surface-variant">{{ empleadoSeleccionado.especialidades || 'Sin especialidad' }}</p>
 
@@ -309,8 +400,14 @@ function abrirEmail(email: string) {
           </div>
         </div>
 
-        <!-- Acciones -->
-        <div class="space-y-2">
+        <!-- Acciones — solo admin -->
+        <div v-if="authStore.isAdmin" class="space-y-2">
+          <button
+            class="w-full bg-primary-container/10 hover:bg-primary-container/20 text-primary-container font-bold py-2.5 rounded-xl text-sm transition-colors"
+            @click="abrirEditar"
+          >
+            Editar empleado
+          </button>
           <button
             v-if="!empleadoSeleccionado.enBaja"
             class="w-full bg-red-50 hover:bg-red-100 text-red-700 font-bold py-2.5 rounded-xl text-sm transition-colors"
@@ -423,6 +520,50 @@ function abrirEmail(email: string) {
             <button class="btn-primary flex-1" :disabled="guardando" @click="crearEmpleado">
               <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" />
               <span>{{ guardando ? 'Creando...' : 'Crear empleado' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+    <!-- Modal editar empleado -->
+    <Transition name="modal-overlay">
+      <div
+        v-if="modalEditar"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+        @click.self="modalEditar = false"
+      >
+        <div class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold text-primary">Editar Empleado</h3>
+            <button class="p-1 rounded hover:bg-surface-container-low" @click="modalEditar = false">
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="label">Nombre completo</label>
+              <input v-model="formEditar.nombre" type="text" class="input" />
+            </div>
+            <div>
+              <label class="label">Teléfono</label>
+              <input v-model="formEditar.telefono" type="tel" class="input" placeholder="Ej. 600123456" />
+            </div>
+            <div>
+              <label class="label">Especialidades</label>
+              <input v-model="formEditar.especialidades" type="text" class="input" placeholder="Ej. Colorimetría, Corte, Alisados" />
+            </div>
+            <div>
+              <label class="label">Horario base</label>
+              <input v-model="formEditar.horarioBase" type="text" class="input" placeholder="Ej. L-V 09:00-17:00" />
+            </div>
+          </div>
+
+          <div class="flex gap-3 mt-5">
+            <button class="btn-secondary flex-1" @click="modalEditar = false">Cancelar</button>
+            <button class="btn-primary flex-1" :disabled="guardando" @click="guardarEdicion">
+              <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" />
+              <span>{{ guardando ? 'Guardando...' : 'Guardar cambios' }}</span>
             </button>
           </div>
         </div>

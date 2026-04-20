@@ -47,4 +47,10 @@ public class PeluqueroEntity {
 
     @Column(name = "especialidades", columnDefinition = "TEXT")
     private String especialidades;
+
+    @Column(name = "telefono", length = 20)
+    private String telefono;
+
+    @Column(name = "foto_url", length = 500)
+    private String fotoUrl;
 }
