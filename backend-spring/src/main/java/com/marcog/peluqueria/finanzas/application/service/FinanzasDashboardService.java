@@ -15,6 +15,8 @@ import com.marcog.peluqueria.peluqueros.domain.model.Peluquero;
 import com.marcog.peluqueria.peluqueros.domain.port.out.PeluqueroRepositoryPort;
 import com.marcog.peluqueria.productos.domain.model.Producto;
 import com.marcog.peluqueria.productos.domain.port.out.ProductoRepositoryPort;
+import com.marcog.peluqueria.productos.infrastructure.out.persistence.JpaVentaProductoRepository;
+import com.marcog.peluqueria.productos.infrastructure.out.persistence.VentaProductoEntity;
 import com.marcog.peluqueria.servicios.domain.model.Servicio;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,7 @@ public class FinanzasDashboardService {
     private final PeluqueroRepositoryPort peluqueroRepository;
     private final AusenciaRepositoryPort ausenciaRepository;
     private final ProductoRepositoryPort productoRepository;
+    private final JpaVentaProductoRepository ventaProductoRepository;
 
     public DashboardStats getStatsByMesAndAnio(int mes, int anio) {
         // 1. Obtener Gastos
@@ -62,15 +65,18 @@ public class FinanzasDashboardService {
         LocalDateTime finMes = inicioMes.plusMonths(1).minusNanos(1);
 
         List<Cita> citasDelMes = citaRepository.findByCriteria(inicioMes, finMes, null);
+        List<VentaProductoEntity> ventasProductosDelMes = ventaProductoRepository.findByFechaVentaBetween(inicioMes, finMes);
 
-        BigDecimal totalIngresos = citasDelMes.stream()
+        BigDecimal ingresosServicios = citasDelMes.stream()
                 .filter(cita -> EstadoCita.COMPLETADO.equals(cita.getEstado()))
                 .filter(cita -> cita.getServicios() != null)
                 .flatMap(cita -> cita.getServicios().stream())
                 .map(Servicio::getPrecio)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal ingresosProductos = sumarIngresosVentas(ventasProductosDelMes);
+        BigDecimal totalIngresos = ingresosServicios.add(ingresosProductos);
 
-        Map<Integer, BigDecimal> ingresosPorDia = citasDelMes.stream()
+        Map<Integer, BigDecimal> ingresosServiciosPorDia = citasDelMes.stream()
                 .filter(cita -> EstadoCita.COMPLETADO.equals(cita.getEstado()))
                 .filter(cita -> cita.getServicios() != null)
                 .collect(Collectors.groupingBy(
@@ -82,6 +88,14 @@ public class FinanzasDashboardService {
                             Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)
                         )
                 ));
+        Map<Integer, BigDecimal> ingresosProductosPorDia = ventasProductosDelMes.stream()
+                .collect(Collectors.groupingBy(
+                        venta -> venta.getFechaVenta().getDayOfMonth(),
+                        Collectors.reducing(BigDecimal.ZERO, VentaProductoEntity::getTotal, BigDecimal::add)
+                ));
+        Map<Integer, BigDecimal> ingresosPorDia = new HashMap<>(ingresosServiciosPorDia);
+        ingresosProductosPorDia.forEach((dia, total) ->
+                ingresosPorDia.merge(dia, total, BigDecimal::add));
 
         // 3. Métricas globales de citas
         List<Cita> citasCompletadas = citasDelMes.stream()
@@ -146,13 +160,17 @@ public class FinanzasDashboardService {
 
         // 5. Stats de Productos e Inventario
         List<Producto> todosLosProductos = productoRepository.findAll();
+        Map<UUID, List<VentaProductoEntity>> ventasPorProducto = ventasProductosDelMes.stream()
+                .collect(Collectors.groupingBy(venta -> venta.getProducto().getId()));
 
         // Convierte cada producto a su DTO de ranking
         List<DashboardStats.ProductoRanking> rankingGeneral = todosLosProductos.stream()
                 .map(p -> {
-                    int consumidos = Math.max(0, p.getStockMinimo() - p.getStock());
-                    BigDecimal precio = p.getPrecio() != null ? p.getPrecio() : BigDecimal.ZERO;
-                    BigDecimal ganancia = precio.multiply(java.math.BigDecimal.valueOf(consumidos));
+                    List<VentaProductoEntity> ventasProducto = ventasPorProducto.getOrDefault(p.getId(), List.of());
+                    int consumidos = ventasProducto.stream().mapToInt(VentaProductoEntity::getCantidad).sum();
+                    BigDecimal ganancia = ventasProducto.stream()
+                            .map(VentaProductoEntity::getTotal)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
                     String genero = p.getGenero() != null ? p.getGenero().name() : "UNISEX";
                     return DashboardStats.ProductoRanking.builder()
                             .nombre(p.getNombre())
@@ -247,10 +265,12 @@ public class FinanzasDashboardService {
                 .filter(c -> EstadoCita.COMPLETADO.equals(c.getEstado())).collect(Collectors.toList());
         List<Cita> canceladasPeriodo  = citasPeriodo.stream()
                 .filter(c -> EstadoCita.CANCELADO.equals(c.getEstado())).collect(Collectors.toList());
+        List<VentaProductoEntity> ventasPeriodo = ventaProductoRepository.findByFechaVentaBetween(inicio, ahora);
 
-        double ingresosPeriodo = sumarIngresos(completadasPeriodo);
+        double ingresosServiciosPeriodo = sumarIngresos(completadasPeriodo);
+        double ingresosPeriodo = ingresosServiciosPeriodo + sumarIngresosVentasDouble(ventasPeriodo);
         int citasCompletadas   = completadasPeriodo.size();
-        double ticketMedio     = citasCompletadas > 0 ? ingresosPeriodo / citasCompletadas : 0;
+        double ticketMedio     = citasCompletadas > 0 ? ingresosServiciosPeriodo / citasCompletadas : 0;
         double tasaCancelacion = citasPeriodo.isEmpty() ? 0
                 : (double) canceladasPeriodo.size() / citasPeriodo.size() * 100;
 
@@ -263,25 +283,32 @@ public class FinanzasDashboardService {
         List<Cita> citasAnio = citaRepository.findByCriteria(anioInicio, ahora, null);
         List<Cita> completadasAnio = citasAnio.stream()
                 .filter(c -> EstadoCita.COMPLETADO.equals(c.getEstado())).collect(Collectors.toList());
+        List<VentaProductoEntity> ventasAnio = ventaProductoRepository.findByFechaVentaBetween(anioInicio, ahora);
 
         double ingresosDia    = sumarIngresos(completadasAnio.stream()
-                .filter(c -> !c.getFechaHora().isBefore(hoyInicio)).collect(Collectors.toList()));
+                .filter(c -> !c.getFechaHora().isBefore(hoyInicio)).collect(Collectors.toList()))
+                + sumarIngresosVentasDouble(filtrarVentasDesde(ventasAnio, hoyInicio));
         double ingresosSemana = sumarIngresos(completadasAnio.stream()
-                .filter(c -> !c.getFechaHora().isBefore(semanaInicio)).collect(Collectors.toList()));
+                .filter(c -> !c.getFechaHora().isBefore(semanaInicio)).collect(Collectors.toList()))
+                + sumarIngresosVentasDouble(filtrarVentasDesde(ventasAnio, semanaInicio));
         double ingresosMes    = sumarIngresos(completadasAnio.stream()
-                .filter(c -> !c.getFechaHora().isBefore(mesInicio)).collect(Collectors.toList()));
-        double ingresosAnio   = sumarIngresos(completadasAnio);
+                .filter(c -> !c.getFechaHora().isBefore(mesInicio)).collect(Collectors.toList()))
+                + sumarIngresosVentasDouble(filtrarVentasDesde(ventasAnio, mesInicio));
+        double ingresosAnio   = sumarIngresos(completadasAnio)
+                + sumarIngresosVentasDouble(ventasAnio);
 
         // Variación vs mes anterior
         LocalDateTime mesAnteriorInicio = mesInicio.minusMonths(1);
         List<Cita> citasMesAnterior = citaRepository.findByCriteria(mesAnteriorInicio, mesInicio.minusNanos(1), null);
+        List<VentaProductoEntity> ventasMesAnterior = ventaProductoRepository.findByFechaVentaBetween(mesAnteriorInicio, mesInicio.minusNanos(1));
         double ingresosMesAnterior  = sumarIngresos(citasMesAnterior.stream()
-                .filter(c -> EstadoCita.COMPLETADO.equals(c.getEstado())).collect(Collectors.toList()));
+                .filter(c -> EstadoCita.COMPLETADO.equals(c.getEstado())).collect(Collectors.toList()))
+                + sumarIngresosVentasDouble(ventasMesAnterior);
         double variacionMes = ingresosMesAnterior == 0 ? 0
                 : (ingresosMes - ingresosMesAnterior) / ingresosMesAnterior * 100;
 
         // Evolución temporal
-        ResultadosDTO.Evolucion evolucion = construirEvolucion(completadasPeriodo, periodo, inicio, ahora);
+        ResultadosDTO.Evolucion evolucion = construirEvolucion(completadasPeriodo, ventasPeriodo, periodo, inicio, ahora);
 
         // Top servicios
         Map<String, double[]> serviciosAcum = new LinkedHashMap<>();
@@ -330,6 +357,7 @@ public class FinanzasDashboardService {
 
         return ResultadosDTO.builder()
                 .kpis(ResultadosDTO.Kpis.builder()
+                        .ingresosPeriodo(ingresosPeriodo)
                         .ingresosDia(ingresosDia)
                         .ingresosSemana(ingresosSemana)
                         .ingresosMes(ingresosMes)
@@ -353,7 +381,26 @@ public class FinanzasDashboardService {
                 .sum();
     }
 
-    private ResultadosDTO.Evolucion construirEvolucion(List<Cita> completadas, String periodo,
+    private BigDecimal sumarIngresosVentas(List<VentaProductoEntity> ventas) {
+        return ventas.stream()
+                .map(VentaProductoEntity::getTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private double sumarIngresosVentasDouble(List<VentaProductoEntity> ventas) {
+        return ventas.stream()
+                .mapToDouble(venta -> venta.getTotal() != null ? venta.getTotal().doubleValue() : 0)
+                .sum();
+    }
+
+    private List<VentaProductoEntity> filtrarVentasDesde(List<VentaProductoEntity> ventas, LocalDateTime inicio) {
+        return ventas.stream()
+                .filter(venta -> !venta.getFechaVenta().isBefore(inicio))
+                .collect(Collectors.toList());
+    }
+
+    private ResultadosDTO.Evolucion construirEvolucion(List<Cita> completadas, List<VentaProductoEntity> ventas,
+                                                        String periodo,
                                                         LocalDateTime inicio, LocalDateTime fin) {
         List<String> labels = new ArrayList<>();
         List<Double> valores = new ArrayList<>();
@@ -363,37 +410,56 @@ public class FinanzasDashboardService {
                 LocalDateTime diaInicio = inicio.plusDays(dia);
                 LocalDateTime diaFin    = diaInicio.plusDays(1);
                 labels.add(diaInicio.getDayOfWeek().getDisplayName(TextStyle.SHORT, new java.util.Locale("es")));
-                valores.add(sumarIngresos(completadas.stream()
+                double ingresosServicios = sumarIngresos(completadas.stream()
                         .filter(c -> !c.getFechaHora().isBefore(diaInicio) && c.getFechaHora().isBefore(diaFin))
-                        .collect(Collectors.toList())));
+                        .collect(Collectors.toList()));
+                double ingresosProductos = sumarIngresosVentasDouble(ventas.stream()
+                        .filter(v -> !v.getFechaVenta().isBefore(diaInicio) && v.getFechaVenta().isBefore(diaFin))
+                        .collect(Collectors.toList()));
+                valores.add(ingresosServicios + ingresosProductos);
             }
         } else if ("mes".equals(periodo)) {
             int diasMes = fin.getMonth().length(fin.toLocalDate().isLeapYear());
             for (int dia = 1; dia <= diasMes; dia++) {
                 int diaFinal = dia;
                 labels.add(String.valueOf(dia));
-                valores.add(sumarIngresos(completadas.stream()
+                double ingresosServicios = sumarIngresos(completadas.stream()
                         .filter(c -> c.getFechaHora().getDayOfMonth() == diaFinal)
-                        .collect(Collectors.toList())));
+                        .collect(Collectors.toList()));
+                double ingresosProductos = sumarIngresosVentasDouble(ventas.stream()
+                        .filter(v -> v.getFechaVenta().getDayOfMonth() == diaFinal
+                                  && v.getFechaVenta().getMonthValue() == fin.getMonthValue()
+                                  && v.getFechaVenta().getYear() == fin.getYear())
+                        .collect(Collectors.toList()));
+                valores.add(ingresosServicios + ingresosProductos);
             }
         } else if ("trimestre".equals(periodo)) {
             for (int mes = 0; mes < 3; mes++) {
                 LocalDateTime mesInicio = inicio.plusMonths(mes);
                 LocalDateTime mesFin    = mesInicio.plusMonths(1);
                 labels.add(mesInicio.getMonth().getDisplayName(TextStyle.SHORT, new java.util.Locale("es")));
-                valores.add(sumarIngresos(completadas.stream()
+                double ingresosServicios = sumarIngresos(completadas.stream()
                         .filter(c -> !c.getFechaHora().isBefore(mesInicio) && c.getFechaHora().isBefore(mesFin))
-                        .collect(Collectors.toList())));
+                        .collect(Collectors.toList()));
+                double ingresosProductos = sumarIngresosVentasDouble(ventas.stream()
+                        .filter(v -> !v.getFechaVenta().isBefore(mesInicio) && v.getFechaVenta().isBefore(mesFin))
+                        .collect(Collectors.toList()));
+                valores.add(ingresosServicios + ingresosProductos);
             }
         } else {
             for (int mes = 1; mes <= 12; mes++) {
                 int mesFinal = mes;
                 labels.add(LocalDateTime.of(fin.getYear(), mes, 1, 0, 0)
                         .getMonth().getDisplayName(TextStyle.SHORT, new java.util.Locale("es")));
-                valores.add(sumarIngresos(completadas.stream()
+                double ingresosServicios = sumarIngresos(completadas.stream()
                         .filter(c -> c.getFechaHora().getMonthValue() == mesFinal
                                   && c.getFechaHora().getYear() == fin.getYear())
-                        .collect(Collectors.toList())));
+                        .collect(Collectors.toList()));
+                double ingresosProductos = sumarIngresosVentasDouble(ventas.stream()
+                        .filter(v -> v.getFechaVenta().getMonthValue() == mesFinal
+                                  && v.getFechaVenta().getYear() == fin.getYear())
+                        .collect(Collectors.toList()));
+                valores.add(ingresosServicios + ingresosProductos);
             }
         }
 

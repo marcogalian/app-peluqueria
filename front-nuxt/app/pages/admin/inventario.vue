@@ -3,13 +3,13 @@
  * Inventario — gestión de productos con alertas de stock bajo.
  * KPIs + alertas de stock + tabla con filtros por categoría.
  */
-import { Plus, AlertTriangle, Package, Loader2, X, Save } from 'lucide-vue-next'
+import { Plus, AlertTriangle, Package, Loader2, X, Save, ShoppingCart } from 'lucide-vue-next'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
 
 // ── Tipos ─────────────────────────────────────────────────
 interface Producto {
-  id: number
+  id: string
   nombre: string
   categoria: string
   precio: number
@@ -19,6 +19,27 @@ interface Producto {
   activo: boolean
 }
 
+interface ResumenVentas {
+  ingresosSemana: number
+  ingresosMes: number
+  ingresosAnio: number
+  unidadesSemana: number
+  unidadesMes: number
+  unidadesAnio: number
+}
+
+interface VentaProductoResponse {
+  producto: Producto
+  venta: {
+    id: string
+    cantidad: number
+    precioUnitario: number
+    total: number
+    fechaVenta: string
+  }
+  resumen: ResumenVentas
+}
+
 // ── Estado ────────────────────────────────────────────────
 const productos      = ref<Producto[]>([])
 const cargando       = ref(true)
@@ -26,6 +47,19 @@ const filtroCategoria = ref('TODOS')
 const drawerAbierto  = ref(false)
 const guardando      = ref(false)
 const productoEditar = ref<Partial<Producto>>({})
+const resumenVentas = ref<ResumenVentas>({
+  ingresosSemana: 0,
+  ingresosMes: 0,
+  ingresosAnio: 0,
+  unidadesSemana: 0,
+  unidadesMes: 0,
+  unidadesAnio: 0,
+})
+const modalVentaAbierto = ref(false)
+const vendiendo = ref(false)
+const productoVenta = ref<Producto | null>(null)
+const cantidadVenta = ref(1)
+const errorVenta = ref('')
 
 const categorias = ['TODOS', 'CERA', 'CHAMPU', 'ACONDICIONADOR', 'COLORACION', 'HERRAMIENTA', 'OTRO']
 const labelCat: Record<string, string> = {
@@ -49,8 +83,12 @@ const valorInventario = computed(() =>
 onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
-    const { data } = await api.get('/v1/productos')
-    productos.value = data
+    const [productosResponse, resumenResponse] = await Promise.all([
+      api.get('/v1/productos'),
+      api.get('/v1/productos/ventas/resumen'),
+    ])
+    productos.value = productosResponse.data
+    resumenVentas.value = resumenResponse.data
   } catch {
     // vacío si falla
   } finally {
@@ -94,10 +132,60 @@ async function eliminar(id: number) {
   productos.value = productos.value.filter(p => p.id !== id)
 }
 
+function abrirVenta(producto: Producto) {
+  productoVenta.value = producto
+  cantidadVenta.value = 1
+  errorVenta.value = ''
+  modalVentaAbierto.value = true
+}
+
+function cerrarVenta() {
+  modalVentaAbierto.value = false
+  productoVenta.value = null
+  cantidadVenta.value = 1
+  errorVenta.value = ''
+}
+
+const totalVentaEstimado = computed(() => {
+  if (!productoVenta.value) return 0
+  return precioVenta(productoVenta.value) * cantidadVenta.value
+})
+
+async function venderProducto() {
+  if (!productoVenta.value) return
+
+  vendiendo.value = true
+  errorVenta.value = ''
+
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    const { data } = await api.post<VentaProductoResponse>(`/v1/productos/${productoVenta.value.id}/vender`, {
+      cantidad: cantidadVenta.value,
+    })
+
+    const idx = productos.value.findIndex(p => p.id === data.producto.id)
+    if (idx !== -1) {
+      productos.value[idx] = data.producto
+    }
+    resumenVentas.value = data.resumen
+    cerrarVenta()
+  } catch (error) {
+    errorVenta.value = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      ?? 'No se pudo registrar la venta.'
+  } finally {
+    vendiendo.value = false
+  }
+}
+
 function badgeStock(p: Producto): string {
   if (p.stock === 0) return 'bg-error/10 text-error font-bold'
   if (p.stock <= p.stockMinimo) return 'bg-amber-100 text-amber-700 font-bold'
   return 'bg-green-100 text-green-700'
+}
+
+function precioVenta(p: Producto): number {
+  if (p.precioDescuento && p.precioDescuento > 0) return p.precioDescuento
+  return p.precio
 }
 
 function formatEur(n: number): string {
@@ -115,7 +203,7 @@ function formatEur(n: number): string {
     </div>
 
     <!-- ── KPI Cards ─────────────────────────────────────── -->
-    <div class="grid grid-cols-3 gap-6">
+    <div class="grid grid-cols-2 xl:grid-cols-3 gap-6">
 
       <div class="bg-primary-container text-white p-6 rounded-2xl shadow-lg shadow-primary-container/20">
         <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-1">Valor del Inventario</p>
@@ -133,6 +221,24 @@ function formatEur(n: number): string {
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Sin stock</p>
         <h3 class="text-4xl font-extrabold text-primary">{{ productos.filter(p => p.stock === 0).length }}</h3>
         <p class="text-xs text-on-surface-variant mt-2">Agotados actualmente</p>
+      </div>
+
+      <div class="card-kpi">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ventas Semana</p>
+        <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(resumenVentas.ingresosSemana) }}</h3>
+        <p class="text-xs text-on-surface-variant mt-2">{{ resumenVentas.unidadesSemana }} uds vendidas</p>
+      </div>
+
+      <div class="card-kpi">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ventas Mes</p>
+        <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(resumenVentas.ingresosMes) }}</h3>
+        <p class="text-xs text-on-surface-variant mt-2">{{ resumenVentas.unidadesMes }} uds vendidas</p>
+      </div>
+
+      <div class="card-kpi">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ventas Año</p>
+        <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(resumenVentas.ingresosAnio) }}</h3>
+        <p class="text-xs text-on-surface-variant mt-2">{{ resumenVentas.unidadesAnio }} uds vendidas</p>
       </div>
 
     </div>
@@ -218,9 +324,9 @@ function formatEur(n: number): string {
                 </span>
               </td>
               <td class="py-4 px-4 font-bold">
-                {{ formatEur(p.precio) }}
-                <span v-if="p.precioDescuento" class="ml-2 text-xs text-green-600 font-normal line-through">
-                  {{ formatEur(p.precioDescuento) }}
+                {{ formatEur(precioVenta(p)) }}
+                <span v-if="p.precioDescuento && p.precioDescuento < p.precio" class="ml-2 text-xs text-on-surface-variant font-normal line-through">
+                  {{ formatEur(p.precio) }}
                 </span>
               </td>
               <td class="py-4 px-4">
@@ -230,6 +336,14 @@ function formatEur(n: number): string {
               </td>
               <td class="py-4 px-4 text-right rounded-r-xl" @click.stop>
                 <div class="flex justify-end gap-2">
+                  <button
+                    class="h-8 px-3 rounded-full bg-primary-container text-white flex items-center justify-center gap-1 transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                    :disabled="p.stock === 0"
+                    @click="abrirVenta(p)"
+                  >
+                    <ShoppingCart class="w-3.5 h-3.5" />
+                    <span class="text-[11px] font-bold">Vender</span>
+                  </button>
                   <button
                     class="w-8 h-8 rounded-full hover:bg-primary-container hover:text-white flex items-center justify-center transition-all text-primary-container"
                     @click="abrirEditar(p)"
@@ -261,6 +375,69 @@ function formatEur(n: number): string {
       </div>
     </div>
   </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       MODAL — Venta de producto
+       ════════════════════════════════════════════════════ -->
+  <Teleport to="body">
+    <Transition name="modal-overlay">
+      <div v-if="modalVentaAbierto" class="fixed inset-0 z-40 bg-black/25 backdrop-blur-sm" @click.self="cerrarVenta" />
+    </Transition>
+
+    <Transition name="slide-right">
+      <div v-if="modalVentaAbierto" class="fixed inset-0 z-50 flex items-center justify-center p-6">
+        <div class="w-full max-w-md rounded-[28px] bg-white shadow-2xl border border-outline-variant/10 p-8 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h3 class="text-xl font-bold text-primary">Registrar venta</h3>
+              <p v-if="productoVenta" class="text-sm text-on-surface-variant mt-1">
+                {{ productoVenta.nombre }} · Stock actual: {{ productoVenta.stock }} uds
+              </p>
+            </div>
+            <button class="p-2 hover:bg-surface-container-low rounded-full text-on-surface-variant" @click="cerrarVenta">
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Cantidad</label>
+            <input
+              v-model.number="cantidadVenta"
+              type="number"
+              min="1"
+              :max="productoVenta?.stock ?? 1"
+              class="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container"
+            />
+          </div>
+
+          <div class="rounded-2xl bg-surface-container-low px-5 py-4 space-y-2">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-on-surface-variant">Precio unitario</span>
+              <strong class="text-primary">{{ formatEur(productoVenta ? precioVenta(productoVenta) : 0) }}</strong>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-on-surface-variant">Total estimado</span>
+              <strong class="text-primary text-lg">{{ formatEur(totalVentaEstimado) }}</strong>
+            </div>
+          </div>
+
+          <div v-if="errorVenta" class="rounded-2xl border border-error/10 bg-error/5 px-4 py-3 text-sm text-error">
+            {{ errorVenta }}
+          </div>
+
+          <button
+            class="w-full bg-primary-container text-white py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-primary-container/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            :disabled="vendiendo || !productoVenta || cantidadVenta < 1 || cantidadVenta > (productoVenta?.stock ?? 0)"
+            @click="venderProducto"
+          >
+            <Loader2 v-if="vendiendo" class="w-4 h-4 animate-spin" />
+            <ShoppingCart v-else class="w-4 h-4" />
+            {{ vendiendo ? 'Registrando venta...' : 'Confirmar venta' }}
+          </button>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 
   <!-- ══════════════════════════════════════════════════════
        DRAWER — Crear / Editar producto

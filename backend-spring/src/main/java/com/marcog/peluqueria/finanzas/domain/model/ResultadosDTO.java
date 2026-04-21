@@ -13,6 +13,7 @@ public class ResultadosDTO {
 
     @Data @Builder @AllArgsConstructor @NoArgsConstructor
     public static class Kpis {
+        private double ingresosPeriodo;
         private double ingresosDia;
         private double ingresosSemana;
         private double ingresosMes;
