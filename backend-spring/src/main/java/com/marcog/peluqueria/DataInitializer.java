@@ -52,9 +52,7 @@ public class DataInitializer implements CommandLineRunner {
         if (clienteRepository.count() == 0) {
             crearClientes();
         }
-        if (servicioRepository.count() == 0) {
-            crearServicios();
-        }
+        crearServicios();
         if (productoRepository.count() == 0) {
             crearProductos();
         }
@@ -118,26 +116,41 @@ public class DataInitializer implements CommandLineRunner {
             new S("Mechas californianas",    "Técnica de iluminación degradada sin raíz marcada",     75.00, 120, TipoGenero.FEMENINO,  CategoriaServicio.SENORA),
             new S("Coloración completa",     "Tinte de raíz a puntas con fórmula personalizada",     55.00, 90,  TipoGenero.FEMENINO,  CategoriaServicio.SENORA),
             new S("Balayage",                "Coloración a mano alzada para efecto natural",          85.00, 150, TipoGenero.FEMENINO,  CategoriaServicio.SENORA),
-            new S("Alisado brasileño",       "Tratamiento de alisado duradero con keratina",         90.00, 180, TipoGenero.UNISEX,    CategoriaServicio.TRATAMIENTO),
-            new S("Tratamiento hidratación", "Mascarilla nutritiva profesional con vapor",            35.00, 60,  TipoGenero.UNISEX,    CategoriaServicio.TRATAMIENTO),
+            new S("Alisado brasileño",       "Tratamiento de alisado duradero con keratina",         90.00, 180, TipoGenero.FEMENINO,  CategoriaServicio.SENORA),
+            new S("Tratamiento hidratación", "Mascarilla nutritiva profesional con vapor",            35.00, 60,  TipoGenero.MASCULINO, CategoriaServicio.CABALLERO),
             new S("Peinado de novia",        "Recogido o semirecogido para eventos especiales",       80.00, 90,  TipoGenero.FEMENINO,  CategoriaServicio.SENORA),
-            new S("Lavado y secado",         "Lavado con champú profesional y secado con moldeado",  18.00, 30,  TipoGenero.UNISEX,    CategoriaServicio.TRATAMIENTO),
+            new S("Lavado y secado",         "Lavado con champú profesional y secado con moldeado",  18.00, 30,  TipoGenero.FEMENINO,  CategoriaServicio.SENORA),
             new S("Permanente",              "Ondulación duradera con fijación en frío o calor",     60.00, 120, TipoGenero.FEMENINO,  CategoriaServicio.SENORA),
-            new S("Depilación facial",       "Depilación de labio superior, cejas o patillas",       12.00, 20,  TipoGenero.UNISEX,    CategoriaServicio.TRATAMIENTO),
-            new S("Tinte de barba",          "Coloración y perfilado profesional de barba",          20.00, 30,  TipoGenero.MASCULINO, CategoriaServicio.CABALLERO)
+            new S("Depilación facial",       "Perfilado de cejas, orejas o pómulos con acabado limpio", 12.00, 20, TipoGenero.MASCULINO, CategoriaServicio.CABALLERO),
+            new S("Tinte de barba",          "Coloración y perfilado profesional de barba",          20.00, 30,  TipoGenero.MASCULINO, CategoriaServicio.CABALLERO),
+            new S("Corte degradado premium", "Fade con contornos definidos y acabado de precisión",  19.00, 35,  TipoGenero.MASCULINO, CategoriaServicio.CABALLERO),
+            new S("Arreglo de barba",        "Diseño, perfilado y acabado con toalla caliente",      14.00, 25,  TipoGenero.MASCULINO, CategoriaServicio.CABALLERO),
+            new S("Lavado detox hombre",     "Lavado profundo con masaje capilar y producto detox",  16.00, 20,  TipoGenero.MASCULINO, CategoriaServicio.CABALLERO),
+            new S("Cobertura de canas",      "Aplicación express de color para cubrir canas",        24.00, 35,  TipoGenero.MASCULINO, CategoriaServicio.CABALLERO)
         );
 
+        int creados = 0;
         for (S s : datos) {
-            servicioRepository.save(ServicioEntity.builder()
-                    .nombre(s.nombre())
-                    .descripcion(s.descripcion())
-                    .precio(BigDecimal.valueOf(s.precio()))
-                    .duracionMinutos(s.minutos())
-                    .genero(s.genero())
-                    .categoria(s.categoria())
-                    .build());
+            ServicioEntity servicio = servicioRepository.findByNombreIgnoreCase(s.nombre())
+                    .orElseGet(() -> {
+                        ServicioEntity nuevo = new ServicioEntity();
+                        nuevo.setNombre(s.nombre());
+                        return nuevo;
+                    });
+
+            boolean esNuevo = servicio.getId() == null;
+            servicio.setDescripcion(s.descripcion());
+            servicio.setPrecio(BigDecimal.valueOf(s.precio()));
+            servicio.setDuracionMinutos(s.minutos());
+            servicio.setGenero(s.genero());
+            servicio.setCategoria(s.categoria());
+            servicioRepository.save(servicio);
+
+            if (esNuevo) {
+                creados++;
+            }
         }
-        log.info("DataInitializer: 12 servicios creados.");
+        log.info("DataInitializer: catálogo de servicios sincronizado. {} nuevos, {} total esperado.", creados, datos.size());
     }
 
     private void crearProductos() {
