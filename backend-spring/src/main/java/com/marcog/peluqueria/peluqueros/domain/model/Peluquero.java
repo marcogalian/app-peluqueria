@@ -17,4 +17,5 @@ public class Peluquero {
     private String especialidades;
     private String telefono;
     private String fotoUrl;
+    private double porcentajeComision;
 }

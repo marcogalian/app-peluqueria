@@ -42,5 +42,6 @@ public class ResultadosDTO {
         private String nombre;
         private int citas;
         private double ingresos;
+        private double comision;
     }
 }

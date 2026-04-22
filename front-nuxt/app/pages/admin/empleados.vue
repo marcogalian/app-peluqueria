@@ -29,6 +29,7 @@ interface Empleado {
   citasMes: number
   iniciales: string
   fotoUrl?: string
+  porcentajeComision: number
 }
 
 // ── Estado ────────────────────────────────────────────────
@@ -43,7 +44,7 @@ const mesCalendario     = ref(new Date())
 
 const formBaja   = reactive({ fechaInicio: '', fechaFin: '', motivo: '' })
 const formNuevo  = reactive({ nombre: '', apellidos: '', email: '', telefono: '', especialidades: '' })
-const formEditar = reactive({ nombre: '', telefono: '', especialidades: '', horarioBase: '' })
+const formEditar = reactive({ nombre: '', telefono: '', especialidades: '', horarioBase: '', porcentajeComision: 0 })
 
 // ── Computed ──────────────────────────────────────────────
 const enTurnoHoy     = computed(() => empleados.value.filter(e => e.disponible && !e.enBaja && !e.enVacaciones).length)
@@ -76,13 +77,14 @@ onMounted(async () => {
         apellidos:     partes.slice(1).join(' '),
         email:         p.user?.email || '',
         telefono:      p.telefono || '',
-        especialidades: p.especialidades || p.especialidad || '',
-        disponible:    p.disponible,
-        enBaja:        p.enBaja,
-        enVacaciones:  p.enVacaciones,
-        citasMes:      0,
-        iniciales:     partes.map((n: string) => n[0]).slice(0, 2).join('').toUpperCase(),
-        fotoUrl:       p.fotoUrl || undefined,
+        especialidades:     p.especialidades || p.especialidad || '',
+        disponible:         p.disponible,
+        enBaja:             p.enBaja,
+        enVacaciones:       p.enVacaciones,
+        citasMes:           0,
+        iniciales:          partes.map((n: string) => n[0]).slice(0, 2).join('').toUpperCase(),
+        fotoUrl:            p.fotoUrl || undefined,
+        porcentajeComision: p.porcentajeComision ?? 0,
       }
     })
   } catch {
@@ -139,10 +141,11 @@ async function crearEmpleado() {
 function abrirEditar() {
   if (!empleadoSeleccionado.value) return
   const e = empleadoSeleccionado.value
-  formEditar.nombre        = e.nombre + (e.apellidos ? ' ' + e.apellidos : '')
-  formEditar.telefono      = e.telefono
-  formEditar.especialidades = e.especialidades
-  formEditar.horarioBase   = ''
+  formEditar.nombre              = e.nombre + (e.apellidos ? ' ' + e.apellidos : '')
+  formEditar.telefono            = e.telefono
+  formEditar.especialidades      = e.especialidades
+  formEditar.horarioBase         = ''
+  formEditar.porcentajeComision  = e.porcentajeComision
   modalEditar.value = true
 }
 
@@ -152,18 +155,20 @@ async function guardarEdicion() {
   try {
     const { api } = await import('~/infrastructure/http/api')
     const { data } = await api.put(`/peluqueros/${empleadoSeleccionado.value.id}`, {
-      nombre:        formEditar.nombre,
-      telefono:      formEditar.telefono,
-      especialidades: formEditar.especialidades,
-      especialidad:  formEditar.especialidades,
-      horarioBase:   formEditar.horarioBase,
+      nombre:              formEditar.nombre,
+      telefono:            formEditar.telefono,
+      especialidades:      formEditar.especialidades,
+      especialidad:        formEditar.especialidades,
+      horarioBase:         formEditar.horarioBase,
+      porcentajeComision:  formEditar.porcentajeComision,
     })
     // Actualizar local
     const partes = (data.nombre || '').trim().split(' ')
-    empleadoSeleccionado.value.nombre       = partes[0] || ''
-    empleadoSeleccionado.value.apellidos    = partes.slice(1).join(' ')
-    empleadoSeleccionado.value.telefono     = data.telefono || ''
-    empleadoSeleccionado.value.especialidades = data.especialidades || ''
+    empleadoSeleccionado.value.nombre              = partes[0] || ''
+    empleadoSeleccionado.value.apellidos           = partes.slice(1).join(' ')
+    empleadoSeleccionado.value.telefono            = data.telefono || ''
+    empleadoSeleccionado.value.especialidades      = data.especialidades || ''
+    empleadoSeleccionado.value.porcentajeComision  = data.porcentajeComision ?? 0
     const idx = empleados.value.findIndex(e => e.id === empleadoSeleccionado.value!.id)
     if (idx !== -1) empleados.value[idx] = { ...empleadoSeleccionado.value }
     modalEditar.value = false
@@ -355,6 +360,10 @@ function abrirEmail(empleado: Empleado) {
             <Mail class="w-4 h-4 text-on-surface-variant flex-shrink-0" />
             <span class="text-on-surface-variant truncate">{{ empleadoSeleccionado.email }}</span>
           </div>
+          <div class="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2 text-sm">
+            <span class="text-on-surface-variant font-medium">Comisión</span>
+            <span class="font-bold text-primary-container">{{ empleadoSeleccionado.porcentajeComision }}%</span>
+          </div>
         </div>
 
         <!-- Mini-calendario del mes -->
@@ -544,6 +553,10 @@ function abrirEmail(empleado: Empleado) {
             <div>
               <label class="label">Horario base</label>
               <input v-model="formEditar.horarioBase" type="text" class="input" placeholder="Ej. L-V 09:00-17:00" />
+            </div>
+            <div>
+              <label class="label">Comisión (%)</label>
+              <input v-model.number="formEditar.porcentajeComision" type="number" min="0" max="100" step="0.5" class="input" placeholder="Ej. 30" />
             </div>
           </div>
 

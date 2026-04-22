@@ -34,6 +34,7 @@ public class PeluqueroService {
         existing.setEspecialidades(peluqueroDetails.getEspecialidades());
         existing.setHorarioBase(peluqueroDetails.getHorarioBase());
         existing.setTelefono(peluqueroDetails.getTelefono());
+        existing.setPorcentajeComision(peluqueroDetails.getPorcentajeComision());
         return repositoryPort.save(existing);
     }
 

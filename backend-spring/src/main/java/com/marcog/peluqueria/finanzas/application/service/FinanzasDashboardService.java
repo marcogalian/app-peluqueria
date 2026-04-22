@@ -345,12 +345,18 @@ public class FinanzasDashboardService {
                         .sum();
             }
         }
+        Map<String, Double> comisionPorNombre = peluqueroRepository.findAll().stream()
+                .collect(Collectors.toMap(Peluquero::getNombre, Peluquero::getPorcentajeComision, (a, b) -> a));
         List<ResultadosDTO.TopEmpleado> topEmpleados = empleadosAcum.entrySet().stream()
-                .map(e -> ResultadosDTO.TopEmpleado.builder()
-                        .nombre(e.getKey())
-                        .citas((int) e.getValue()[0])
-                        .ingresos(e.getValue()[1])
-                        .build())
+                .map(e -> {
+                    double pct = comisionPorNombre.getOrDefault(e.getKey(), 0.0);
+                    return ResultadosDTO.TopEmpleado.builder()
+                            .nombre(e.getKey())
+                            .citas((int) e.getValue()[0])
+                            .ingresos(e.getValue()[1])
+                            .comision(e.getValue()[1] * pct / 100)
+                            .build();
+                })
                 .sorted((a, b) -> Integer.compare(b.getCitas(), a.getCitas()))
                 .limit(5)
                 .collect(Collectors.toList());
