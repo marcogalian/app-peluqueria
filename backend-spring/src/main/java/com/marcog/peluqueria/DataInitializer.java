@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.marcog.peluqueria.clientes.domain.model.Genero;
 import com.marcog.peluqueria.clientes.infrastructure.out.persistence.ClienteEntity;
 import com.marcog.peluqueria.clientes.infrastructure.out.persistence.JpaClienteRepository;
+import com.marcog.peluqueria.ofertas.domain.model.TipoOferta;
+import com.marcog.peluqueria.ofertas.infrastructure.out.persistence.JpaOfertaRepository;
+import com.marcog.peluqueria.ofertas.infrastructure.out.persistence.OfertaEntity;
 import com.marcog.peluqueria.peluqueros.infrastructure.out.persistence.JpaPeluqueroRepository;
 import com.marcog.peluqueria.peluqueros.infrastructure.out.persistence.PeluqueroEntity;
 import com.marcog.peluqueria.productos.domain.model.CategoriaProducto;
@@ -27,6 +30,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Component
@@ -39,6 +43,7 @@ public class DataInitializer implements CommandLineRunner {
     private final JpaClienteRepository   clienteRepository;
     private final JpaServicioRepository  servicioRepository;
     private final JpaProductoRepository  productoRepository;
+    private final JpaOfertaRepository    ofertaRepository;
     private final PasswordEncoder        passwordEncoder;
     @Value("${app.seed.remote-clients.enabled:true}")
     private boolean remoteClientsEnabled;
@@ -55,6 +60,9 @@ public class DataInitializer implements CommandLineRunner {
         crearServicios();
         if (productoRepository.count() == 0) {
             crearProductos();
+        }
+        if (ofertaRepository.count() == 0) {
+            crearOfertas();
         }
     }
 
@@ -259,6 +267,31 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         log.info("DataInitializer: {} clientes locales de respaldo creados.", datos.size());
+    }
+
+    private void crearOfertas() {
+        record O(String nombre, String descripcion, int pct, LocalDate inicio, LocalDate fin,
+                 TipoOferta tipo, boolean activa) {}
+
+        List<O> datos = List.of(
+            new O("Martes de Color",     "20% de descuento en coloraciones cada martes",          20, LocalDate.of(2026, 4, 1),  LocalDate.of(2026, 4, 30), TipoOferta.SERVICIO, true),
+            new O("Pack Primavera",      "15% en cortes y tratamientos durante toda la primavera", 15, LocalDate.of(2026, 3, 20), LocalDate.of(2026, 6, 20), TipoOferta.SERVICIO, true),
+            new O("Descuento Fidelidad", "10% de descuento en productos para clientes habituales", 10, LocalDate.of(2026, 1, 1),  LocalDate.of(2026, 12, 31), TipoOferta.PRODUCTO, true),
+            new O("Promo San Valentín",  "25% en peinados y recogidos para la ocasión especial",  25, LocalDate.of(2026, 2, 1),  LocalDate.of(2026, 2, 14), TipoOferta.SERVICIO, false)
+        );
+
+        for (O o : datos) {
+            ofertaRepository.save(OfertaEntity.builder()
+                    .nombre(o.nombre())
+                    .descripcion(o.descripcion())
+                    .descuentoPorcentaje(o.pct())
+                    .fechaInicio(o.inicio())
+                    .fechaFin(o.fin())
+                    .tipo(o.tipo())
+                    .activa(o.activa())
+                    .build());
+        }
+        log.info("DataInitializer: 4 ofertas demo creadas.");
     }
 
     private String capitalize(String s) {
