@@ -48,7 +48,7 @@ public class ProductoController {
         return ResponseEntity.ok(useCase.ajustarStock(id, body.get("cantidad")));
     }
 
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     @PostMapping("/{id}/vender")
     public ResponseEntity<VentaProductoResponseDTO> vender(
             @PathVariable UUID id,
