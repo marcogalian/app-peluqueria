@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Gestión de Personal — lista de empleados con panel lateral de detalle.
- * WhatsApp y Email por empleado. Registro de bajas y vacaciones.
+ * Email por empleado y registro de bajas/vacaciones.
  * Solo admin puede ver todos; panel lateral con mini-calendario del mes.
  */
 import {
@@ -9,12 +9,15 @@ import {
 } from 'lucide-vue-next'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useAuthStore } from '~/modules/auth/store/auth.store'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
 
+const authStore = useAuthStore()
+
 // ── Tipos ─────────────────────────────────────────────────
 interface Empleado {
-  id: number
+  id: string
   nombre: string
   apellidos: string
   email: string
@@ -25,6 +28,8 @@ interface Empleado {
   enVacaciones: boolean
   citasMes: number
   iniciales: string
+  fotoUrl?: string
+  porcentajeComision: number
 }
 
 // ── Estado ────────────────────────────────────────────────
@@ -33,13 +38,13 @@ const cargando          = ref(true)
 const empleadoSeleccionado = ref<Empleado | null>(null)
 const modalBaja         = ref(false)
 const modalNuevo        = ref(false)
+const modalEditar       = ref(false)
 const guardando         = ref(false)
 const mesCalendario     = ref(new Date())
 
-// Form nueva baja
-const formBaja = reactive({ fechaInicio: '', fechaFin: '', motivo: '' })
-// Form nuevo empleado
-const formNuevo = reactive({ nombre: '', apellidos: '', email: '', telefono: '', especialidades: '' })
+const formBaja   = reactive({ fechaInicio: '', fechaFin: '', motivo: '' })
+const formNuevo  = reactive({ nombre: '', apellidos: '', email: '', telefono: '', especialidades: '' })
+const formEditar = reactive({ nombre: '', telefono: '', especialidades: '', horarioBase: '', porcentajeComision: 0 })
 
 // ── Computed ──────────────────────────────────────────────
 const enTurnoHoy     = computed(() => empleados.value.filter(e => e.disponible && !e.enBaja && !e.enVacaciones).length)
@@ -64,7 +69,24 @@ onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
     const { data } = await api.get('/peluqueros')
-    empleados.value = data
+    empleados.value = data.map((p: any) => {
+      const partes = (p.nombre || '').trim().split(' ')
+      return {
+        id:            p.id,
+        nombre:        partes[0] || '',
+        apellidos:     partes.slice(1).join(' '),
+        email:         p.user?.email || '',
+        telefono:      p.telefono || '',
+        especialidades:     p.especialidades || p.especialidad || '',
+        disponible:         p.disponible,
+        enBaja:             p.enBaja,
+        enVacaciones:       p.enVacaciones,
+        citasMes:           0,
+        iniciales:          partes.map((n: string) => n[0]).slice(0, 2).join('').toUpperCase(),
+        fotoUrl:            p.fotoUrl || undefined,
+        porcentajeComision: p.porcentajeComision ?? 0,
+      }
+    })
   } catch {
     // vacío
   } finally {
@@ -116,6 +138,45 @@ async function crearEmpleado() {
   }
 }
 
+function abrirEditar() {
+  if (!empleadoSeleccionado.value) return
+  const e = empleadoSeleccionado.value
+  formEditar.nombre              = e.nombre + (e.apellidos ? ' ' + e.apellidos : '')
+  formEditar.telefono            = e.telefono
+  formEditar.especialidades      = e.especialidades
+  formEditar.horarioBase         = ''
+  formEditar.porcentajeComision  = e.porcentajeComision
+  modalEditar.value = true
+}
+
+async function guardarEdicion() {
+  if (!empleadoSeleccionado.value) return
+  guardando.value = true
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    const { data } = await api.put(`/peluqueros/${empleadoSeleccionado.value.id}`, {
+      nombre:              formEditar.nombre,
+      telefono:            formEditar.telefono,
+      especialidades:      formEditar.especialidades,
+      especialidad:        formEditar.especialidades,
+      horarioBase:         formEditar.horarioBase,
+      porcentajeComision:  formEditar.porcentajeComision,
+    })
+    // Actualizar local
+    const partes = (data.nombre || '').trim().split(' ')
+    empleadoSeleccionado.value.nombre              = partes[0] || ''
+    empleadoSeleccionado.value.apellidos           = partes.slice(1).join(' ')
+    empleadoSeleccionado.value.telefono            = data.telefono || ''
+    empleadoSeleccionado.value.especialidades      = data.especialidades || ''
+    empleadoSeleccionado.value.porcentajeComision  = data.porcentajeComision ?? 0
+    const idx = empleados.value.findIndex(e => e.id === empleadoSeleccionado.value!.id)
+    if (idx !== -1) empleados.value[idx] = { ...empleadoSeleccionado.value }
+    modalEditar.value = false
+  } catch { /* toast */ } finally {
+    guardando.value = false
+  }
+}
+
 async function reactivarEmpleado(empleado: Empleado) {
   guardando.value = true
   try {
@@ -128,13 +189,29 @@ async function reactivarEmpleado(empleado: Empleado) {
   }
 }
 
-function abrirWhatsApp(telefono: string) {
-  const numero = telefono.replace(/\D/g, '')
-  window.open(`https://wa.me/34${numero}`, '_blank')
+const inputFoto = ref<HTMLInputElement | null>(null)
+
+async function subirFoto(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file || !empleadoSeleccionado.value) return
+  const form = new FormData()
+  form.append('file', file)
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    const { data } = await api.post(`/peluqueros/${empleadoSeleccionado.value.id}/foto`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    empleadoSeleccionado.value.fotoUrl = data.fotoUrl
+    const idx = empleados.value.findIndex(e => e.id === empleadoSeleccionado.value!.id)
+    if (idx !== -1) empleados.value[idx].fotoUrl = data.fotoUrl
+  } catch { /* toast */ }
 }
 
-function abrirEmail(email: string) {
-  window.location.href = `mailto:${email}`
+function abrirEmail(empleado: Empleado) {
+  navigateTo({
+    path: '/mensajes',
+    query: { contacto: empleado.id },
+  })
 }
 </script>
 
@@ -237,31 +314,38 @@ function abrirEmail(email: string) {
         <!-- Avatar grande + nombre -->
         <div class="text-center mb-6">
           <div
-            class="w-20 h-20 rounded-full mx-auto flex items-center justify-center text-white text-2xl font-bold mb-3"
-            :class="empleadoSeleccionado.enBaja ? 'bg-red-400' : 'bg-primary-container'"
+            class="relative w-20 h-20 rounded-full mx-auto mb-3"
+            :class="authStore.isAdmin ? 'cursor-pointer group' : ''"
+            @click="authStore.isAdmin && inputFoto?.click()"
           >
-            {{ (empleadoSeleccionado.nombre[0] + empleadoSeleccionado.apellidos[0]).toUpperCase() }}
+            <img
+              v-if="empleadoSeleccionado.fotoUrl"
+              :src="`${$config.public.uploadsBase}/${empleadoSeleccionado.fotoUrl}`"
+              class="w-20 h-20 rounded-full object-cover"
+              alt="Foto empleado"
+            />
+            <div
+              v-else
+              class="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold"
+              :class="empleadoSeleccionado.enBaja ? 'bg-red-400' : 'bg-primary-container'"
+            >
+              {{ (empleadoSeleccionado.nombre[0] + (empleadoSeleccionado.apellidos[0] || '')).toUpperCase() }}
+            </div>
+            <div class="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <span class="text-white text-[10px] font-bold">Cambiar</span>
+            </div>
           </div>
+          <input ref="inputFoto" type="file" accept="image/*" class="hidden" @change="subirFoto" />
           <h3 class="text-lg font-bold text-on-surface">{{ empleadoSeleccionado.nombre }} {{ empleadoSeleccionado.apellidos }}</h3>
           <p class="text-sm text-on-surface-variant">{{ empleadoSeleccionado.especialidades || 'Sin especialidad' }}</p>
 
-          <!-- Botones WhatsApp + Email -->
           <div class="flex gap-3 mt-4">
             <button
               class="flex-1 bg-white hover:bg-surface-container text-on-surface font-bold py-2.5 px-4 rounded-xl text-[11px] flex items-center justify-center gap-2 transition-colors border border-outline-variant/20 shadow-sm"
-              @click="abrirWhatsApp(empleadoSeleccionado.telefono)"
-            >
-              <svg class="w-4 h-4 text-[#25D366]" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-              WhatsApp
-            </button>
-            <button
-              class="flex-1 bg-white hover:bg-surface-container text-on-surface font-bold py-2.5 px-4 rounded-xl text-[11px] flex items-center justify-center gap-2 transition-colors border border-outline-variant/20 shadow-sm"
-              @click="abrirEmail(empleadoSeleccionado.email)"
+              @click="abrirEmail(empleadoSeleccionado)"
             >
               <Mail class="w-4 h-4 text-primary-container" />
-              Email
+              Ir a email
             </button>
           </div>
         </div>
@@ -275,6 +359,10 @@ function abrirEmail(email: string) {
           <div class="flex items-center gap-3 text-sm">
             <Mail class="w-4 h-4 text-on-surface-variant flex-shrink-0" />
             <span class="text-on-surface-variant truncate">{{ empleadoSeleccionado.email }}</span>
+          </div>
+          <div class="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2 text-sm">
+            <span class="text-on-surface-variant font-medium">Comisión</span>
+            <span class="font-bold text-primary-container">{{ empleadoSeleccionado.porcentajeComision }}%</span>
           </div>
         </div>
 
@@ -309,8 +397,14 @@ function abrirEmail(email: string) {
           </div>
         </div>
 
-        <!-- Acciones -->
-        <div class="space-y-2">
+        <!-- Acciones — solo admin -->
+        <div v-if="authStore.isAdmin" class="space-y-2">
+          <button
+            class="w-full bg-primary-container/10 hover:bg-primary-container/20 text-primary-container font-bold py-2.5 rounded-xl text-sm transition-colors"
+            @click="abrirEditar"
+          >
+            Editar empleado
+          </button>
           <button
             v-if="!empleadoSeleccionado.enBaja"
             class="w-full bg-red-50 hover:bg-red-100 text-red-700 font-bold py-2.5 rounded-xl text-sm transition-colors"
@@ -423,6 +517,54 @@ function abrirEmail(email: string) {
             <button class="btn-primary flex-1" :disabled="guardando" @click="crearEmpleado">
               <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" />
               <span>{{ guardando ? 'Creando...' : 'Crear empleado' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+    <!-- Modal editar empleado -->
+    <Transition name="modal-overlay">
+      <div
+        v-if="modalEditar"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+        @click.self="modalEditar = false"
+      >
+        <div class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold text-primary">Editar Empleado</h3>
+            <button class="p-1 rounded hover:bg-surface-container-low" @click="modalEditar = false">
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="label">Nombre completo</label>
+              <input v-model="formEditar.nombre" type="text" class="input" />
+            </div>
+            <div>
+              <label class="label">Teléfono</label>
+              <input v-model="formEditar.telefono" type="tel" class="input" placeholder="Ej. 600123456" />
+            </div>
+            <div>
+              <label class="label">Especialidades</label>
+              <input v-model="formEditar.especialidades" type="text" class="input" placeholder="Ej. Colorimetría, Corte, Alisados" />
+            </div>
+            <div>
+              <label class="label">Horario base</label>
+              <input v-model="formEditar.horarioBase" type="text" class="input" placeholder="Ej. L-V 09:00-17:00" />
+            </div>
+            <div>
+              <label class="label">Comisión (%)</label>
+              <input v-model.number="formEditar.porcentajeComision" type="number" min="0" max="100" step="0.5" class="input" placeholder="Ej. 30" />
+            </div>
+          </div>
+
+          <div class="flex gap-3 mt-5">
+            <button class="btn-secondary flex-1" @click="modalEditar = false">Cancelar</button>
+            <button class="btn-primary flex-1" :disabled="guardando" @click="guardarEdicion">
+              <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" />
+              <span>{{ guardando ? 'Guardando...' : 'Guardar cambios' }}</span>
             </button>
           </div>
         </div>

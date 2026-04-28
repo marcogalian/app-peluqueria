@@ -31,8 +31,31 @@ public class PeluqueroService {
         Peluquero existing = getPeluqueroById(id);
         existing.setNombre(peluqueroDetails.getNombre());
         existing.setEspecialidad(peluqueroDetails.getEspecialidad());
+        existing.setEspecialidades(peluqueroDetails.getEspecialidades());
         existing.setHorarioBase(peluqueroDetails.getHorarioBase());
+        existing.setTelefono(peluqueroDetails.getTelefono());
+        existing.setPorcentajeComision(peluqueroDetails.getPorcentajeComision());
         return repositoryPort.save(existing);
+    }
+
+    public void actualizarFoto(UUID id, String rutaRelativa) {
+        Peluquero p = getPeluqueroById(id);
+        p.setFotoUrl(rutaRelativa);
+        repositoryPort.save(p);
+    }
+
+    public Peluquero registrarBaja(UUID id) {
+        Peluquero peluquero = getPeluqueroById(id);
+        peluquero.setEnBaja(true);
+        peluquero.setDisponible(false);
+        return repositoryPort.save(peluquero);
+    }
+
+    public Peluquero reactivar(UUID id) {
+        Peluquero peluquero = getPeluqueroById(id);
+        peluquero.setEnBaja(false);
+        peluquero.setDisponible(true);
+        return repositoryPort.save(peluquero);
     }
 
     public void deletePeluquero(UUID id) {

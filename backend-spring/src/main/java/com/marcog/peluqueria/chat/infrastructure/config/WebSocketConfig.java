@@ -37,7 +37,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // Se permite SockJS como un Fallback brutal si el navegador del cliente no
         // soporta WebSockets estándar
         registry.addEndpoint("/chat-websocket")
-                .setAllowedOrigins("http://localhost:5173") // Permitimos conectar a React (Vite)
+                .setAllowedOrigins(
+                        "http://localhost:5173",
+                        "http://localhost:3000",
+                        "http://localhost:4000"
+                )
                 .withSockJS();
     }
 }

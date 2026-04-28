@@ -24,6 +24,10 @@ public class ServicioService implements CrearServicioUseCase {
         return repository.findAll();
     }
 
+    public void eliminar(UUID id) {
+        repository.deleteById(id);
+    }
+
     public Servicio updateServicio(UUID id, Servicio detalles) {
         Servicio existente = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Servicio no encontrado"));
@@ -38,6 +42,8 @@ public class ServicioService implements CrearServicioUseCase {
             existente.setDuracionMinutos(detalles.getDuracionMinutos());
         if (detalles.getGenero() != null)
             existente.setGenero(detalles.getGenero());
+        if (detalles.getCategoria() != null)
+            existente.setCategoria(detalles.getCategoria());
         if (detalles.getImageUrl() != null)
             existente.setImageUrl(detalles.getImageUrl());
 

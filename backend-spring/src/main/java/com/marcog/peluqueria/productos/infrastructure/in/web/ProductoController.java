@@ -1,13 +1,20 @@
 package com.marcog.peluqueria.productos.infrastructure.in.web;
 
+import com.marcog.peluqueria.productos.application.dto.ResumenVentasProductosDTO;
+import com.marcog.peluqueria.productos.application.dto.VentaProductoRequestDTO;
+import com.marcog.peluqueria.productos.application.dto.VentaProductoResponseDTO;
 import com.marcog.peluqueria.productos.domain.model.CategoriaProducto;
 import com.marcog.peluqueria.productos.domain.model.Producto;
 import com.marcog.peluqueria.productos.domain.port.in.GestionarProductoUseCase;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import java.util.List; import java.util.Map; import java.util.UUID;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController @RequestMapping("/api/v1/productos") @RequiredArgsConstructor
 public class ProductoController {
@@ -18,17 +25,34 @@ public class ProductoController {
         return ResponseEntity.ok(useCase.listar(categoria));
     }
 
-    @PreAuthorize("hasRole('ADMIN')") @PostMapping
+    @GetMapping("/ventas/resumen")
+    public ResponseEntity<ResumenVentasProductosDTO> resumenVentas() {
+        return ResponseEntity.ok(useCase.obtenerResumenVentas());
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PostMapping
     public ResponseEntity<Producto> crear(@RequestBody Producto producto) { return ResponseEntity.ok(useCase.crear(producto)); }
 
-    @PreAuthorize("hasRole('ADMIN')") @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping("/{id}")
     public ResponseEntity<Producto> actualizar(@PathVariable UUID id, @RequestBody Producto producto) { return ResponseEntity.ok(useCase.actualizar(id, producto)); }
 
-    @PreAuthorize("hasRole('ADMIN')") @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable UUID id) { useCase.eliminar(id); return ResponseEntity.noContent().build(); }
 
-    @PreAuthorize("hasRole('ADMIN')") @PatchMapping("/{id}/stock")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PatchMapping("/{id}/stock")
     public ResponseEntity<Producto> ajustarStock(@PathVariable UUID id, @RequestBody Map<String, Integer> body) {
         return ResponseEntity.ok(useCase.ajustarStock(id, body.get("cantidad")));
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PostMapping("/{id}/vender")
+    public ResponseEntity<VentaProductoResponseDTO> vender(
+            @PathVariable UUID id,
+            @Valid @RequestBody VentaProductoRequestDTO body) {
+        return ResponseEntity.ok(useCase.vender(id, body.getCantidad()));
     }
 }

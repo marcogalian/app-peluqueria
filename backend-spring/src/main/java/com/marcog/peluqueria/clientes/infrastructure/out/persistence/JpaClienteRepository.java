@@ -9,11 +9,15 @@ import java.util.UUID;
 
 public interface JpaClienteRepository extends JpaRepository<ClienteEntity, UUID> {
 
+    List<ClienteEntity> findByArchivadoOrderByNombreAscApellidosAsc(boolean archivado);
+
     @Query("SELECT c FROM ClienteEntity c WHERE " +
            "(:nombre IS NULL OR LOWER(CONCAT(c.nombre, ' ', c.apellidos)) LIKE LOWER(CONCAT('%', :nombre, '%'))) AND " +
-           "(:esVip IS NULL OR c.esVip = :esVip)")
+           "(:esVip IS NULL OR c.esVip = :esVip) AND " +
+           "c.archivado = :archivado")
     List<ClienteEntity> findByFiltros(
             @Param("nombre") String nombre,
-            @Param("esVip") Boolean esVip
+            @Param("esVip") Boolean esVip,
+            @Param("archivado") boolean archivado
     );
 }

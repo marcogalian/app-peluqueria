@@ -29,6 +29,7 @@ public class ActualizarClienteService {
             cliente.setNotas(clienteDetails.getNotas());
         if (clienteDetails.getGenero() != null)
             cliente.setGenero(clienteDetails.getGenero());
+        cliente.setEsVip(clienteDetails.isEsVip());
 
         // Actualización de historial clínico (HU11)
         if (clienteDetails.getNotasMedicas() != null)
@@ -36,6 +37,20 @@ public class ActualizarClienteService {
         if (clienteDetails.getFormulasTinte() != null)
             cliente.setFormulasTinte(clienteDetails.getFormulasTinte());
 
+        return clienteRepository.save(cliente);
+    }
+
+    public Cliente actualizarConsentimiento(UUID clienteId, boolean consentimientoFotos) {
+        Cliente cliente = clienteRepository.findById(clienteId)
+                .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+        cliente.setConsentimientoFotos(consentimientoFotos);
+        return clienteRepository.save(cliente);
+    }
+
+    public Cliente actualizarArchivado(UUID clienteId, boolean archivado) {
+        Cliente cliente = clienteRepository.findById(clienteId)
+                .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+        cliente.setArchivado(archivado);
         return clienteRepository.save(cliente);
     }
 }

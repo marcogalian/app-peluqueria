@@ -20,6 +20,7 @@ type Periodo = 'semana' | 'mes' | 'trimestre' | 'anio'
 
 interface ResultadosData {
   kpis: {
+    ingresosPeriodo: number
     ingresosDia: number
     ingresosSemana: number
     ingresosMes: number
@@ -31,7 +32,7 @@ interface ResultadosData {
   }
   evolucion: { labels: string[]; valores: number[] }
   topServicios: Array<{ nombre: string; ingresos: number; citas: number }>
-  topEmpleados: Array<{ nombre: string; citas: number; ingresos: number }>
+  topEmpleados: Array<{ nombre: string; citas: number; ingresos: number; comision: number }>
 }
 
 // ── Estado ────────────────────────────────────────────────
@@ -146,7 +147,7 @@ function formatEur(n: number): string {
         <!-- Ingresos del período -->
         <div class="card-kpi relative overflow-hidden">
           <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ingresos del período</p>
-          <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(datos.kpis.ingresosMes) }}</h3>
+          <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(datos.kpis.ingresosPeriodo) }}</h3>
           <div class="flex items-center gap-1 mt-2">
             <TrendingUp v-if="datos.kpis.variacionMes >= 0" class="w-3 h-3 text-green-600" />
             <TrendingDown v-else class="w-3 h-3 text-red-600" />
@@ -231,10 +232,11 @@ function formatEur(n: number): string {
               />
             </div>
 
-            <!-- Citas + ingresos -->
-            <div class="text-right w-28 flex-shrink-0">
+            <!-- Citas + ingresos + comisión -->
+            <div class="text-right w-36 flex-shrink-0">
               <p class="text-sm font-bold text-primary">{{ formatEur(emp.ingresos) }}</p>
               <p class="text-[10px] text-on-surface-variant">{{ emp.citas }} citas</p>
+              <p v-if="emp.comision > 0" class="text-[10px] font-bold text-amber-600">Comisión: {{ formatEur(emp.comision) }}</p>
             </div>
           </div>
           <div v-if="datos.topEmpleados.length === 0" class="text-center py-6 text-sm text-on-surface-variant">
