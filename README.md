@@ -19,6 +19,7 @@ Desarrollada como Trabajo de Fin de Grado (DAM/DAW).
 | Lombok | — | Reducción de boilerplate |
 | WebSocket STOMP | — | Chat en tiempo real |
 | Twilio | — | Notificaciones WhatsApp |
+| Spring Mail + Mailtrap | — | Notificaciones por email |
 
 ### Frontend (`front-nuxt/`)
 | Tecnología | Versión | Uso |
@@ -73,6 +74,7 @@ backend-spring/src/main/java/com/marcog/peluqueria/
 - `ofertas` — Promociones temporales y días especiales
 - `finanzas` — Dashboard de ingresos, gastos y KPIs
 - `chat` — Mensajería interna en tiempo real (WebSocket + AES-256)
+- `shared/notification` — Servicio de notificaciones transversal (email + WhatsApp)
 
 ### Frontend — Screaming Architecture
 
@@ -150,26 +152,57 @@ npm run dev
 
 ---
 
+## Sistema de notificaciones
+
+El sistema envía notificaciones automáticas por **email** (Mailtrap) y **WhatsApp** (Twilio):
+
+| Evento | Destinatario | Canal |
+|--------|-------------|-------|
+| Ausencia aprobada | Peluquero | Email |
+| Ausencia rechazada | Peluquero | Email |
+| Stock bajo al ajustar | Administrador | Email + WhatsApp |
+| Resumen diario de stock bajo | Administrador | Email + WhatsApp (08:00) |
+| Recordatorio de cita (24h antes) | Cliente | Email + WhatsApp |
+
+Sin credenciales configuradas, las notificaciones se simulan en los logs sin errores.
+
+---
+
 ## Variables de entorno
 
-Crea un archivo `.env` en `docker/` con las siguientes variables opcionales:
+Crea un archivo `.env` en `docker/` con las siguientes variables:
 
 ```env
+# Email (Mailtrap sandbox)
+MAILTRAP_HOST=sandbox.smtp.mailtrap.io
+MAILTRAP_PORT=2525
 MAILTRAP_USERNAME=tu_usuario
 MAILTRAP_PASSWORD=tu_password
+
+# WhatsApp (Twilio)
 TWILIO_ACCOUNT_SID=tu_sid
 TWILIO_AUTH_TOKEN=tu_token
-TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+TWILIO_WHATSAPP_FROM=whatsapp:+1XXXXXXXXXX
+
+# Contacto del administrador para alertas
+APP_ADMIN_EMAIL=admin@peluqueria.com
+APP_ADMIN_PHONE=+34600000000
 ```
 
 ---
 
-## Credenciales por defecto (desarrollo)
+## Datos demo
+
+En el primer arranque se crean datos de ejemplo para facilitar pruebas y defensa:
 
 | Usuario | Contraseña | Rol |
 |---|---|---|
 | `admin` | `1234` | Administrador |
-| `maria` | `1234` | Empleada |
+| `sofia` | `1234` | Empleada |
+| `carmen` | `1234` | Empleada |
+| `lucia` | `1234` | Empleada |
+
+También se generan servicios, productos y clientes de muestra. Si `randomuser.me` no está disponible, el backend usa un conjunto local de clientes de respaldo para no depender de internet.
 
 ---
 

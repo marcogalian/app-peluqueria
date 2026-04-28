@@ -80,7 +80,7 @@ onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
     // Admin ve todas; empleado solo las suyas (el backend filtra según JWT)
-    const { data } = await api.get('/ausencias')
+    const { data } = await api.get('/v1/ausencias')
     solicitudes.value = data
   } catch { /* vacío */ }
   finally { cargando.value = false }
@@ -107,7 +107,7 @@ async function enviarSolicitud() {
   enviando.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
-    const { data } = await api.post('/ausencias', form)
+    const { data } = await api.post('/v1/ausencias', form)
     solicitudes.value.unshift(data)
     modalAbierto.value = false
     Object.assign(form, { tipo: 'VACACIONES', fechaInicio: '', fechaFin: '', motivo: '' })
@@ -120,7 +120,7 @@ async function aprobar(id: number) {
   procesando.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
-    await api.patch(`/ausencias/${id}/aprobar`)
+    await api.patch(`/v1/ausencias/${id}/aprobar`)
     const sol = solicitudes.value.find(s => s.id === id)
     if (sol) sol.estado = 'APROBADA'
   } catch { /* toast */ } finally { procesando.value = false }
@@ -131,11 +131,21 @@ async function rechazar() {
   procesando.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
-    await api.patch(`/ausencias/${solicitudId.value}/rechazar`, { motivo: motivoRechazo.value })
+    await api.patch(`/v1/ausencias/${solicitudId.value}/rechazar`, { motivo: motivoRechazo.value })
     const sol = solicitudes.value.find(s => s.id === solicitudId.value)
     if (sol) { sol.estado = 'RECHAZADA'; sol.motivoRechazo = motivoRechazo.value }
     modalRechazo.value = false
     motivoRechazo.value = ''
+  } catch { /* toast */ } finally { procesando.value = false }
+}
+
+// ── Cancelar solicitud propia (empleado, solo si está PENDIENTE) ─────────────
+async function cancelarSolicitud(id: number) {
+  procesando.value = true
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.patch(`/v1/ausencias/${id}/cancelar`)
+    solicitudes.value = solicitudes.value.filter(s => s.id !== id)
   } catch { /* toast */ } finally { procesando.value = false }
 }
 

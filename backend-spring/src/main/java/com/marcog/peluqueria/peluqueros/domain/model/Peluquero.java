@@ -15,4 +15,7 @@ public class Peluquero {
     private boolean enBaja;
     private boolean enVacaciones;
     private String especialidades;
+    private String telefono;
+    private String fotoUrl;
+    private double porcentajeComision;
 }

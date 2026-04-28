@@ -1,75 +1,34 @@
-# Nuxt Minimal Starter
+# Frontend Peluquería
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Frontend del sistema de gestión de peluquería construido con Nuxt 4, Vue 3, TypeScript, Pinia y Tailwind CSS.
 
-## Setup
+## Stack
 
-Make sure to install dependencies:
+- Nuxt 4
+- Vue 3
+- TypeScript
+- Pinia
+- Tailwind CSS
+- Axios
+- Vitest + Vue Test Utils
+
+## Estructura
+
+- `app/pages`: rutas y pantallas
+- `app/components`: layout y componentes reutilizables
+- `app/modules`: código organizado por dominio
+- `app/middleware`: protección por autenticación y rol
+- `app/infrastructure/http`: cliente API centralizado
+
+## Comandos
 
 ```bash
-# npm
 npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
-```
-
-## Production
-
-Build the application for production:
-
-```bash
-# npm
 npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+npm test
 ```
 
-Locally preview production build:
+## Integración con backend
 
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+La URL base de la API se resuelve desde runtime config de Nuxt y, en local, usa `http://localhost:8080/api`.

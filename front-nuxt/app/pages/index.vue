@@ -3,18 +3,18 @@
  * Página raíz — solo redirige según el rol del usuario.
  * Admin → /admin/dashboard, Empleado → /agenda
  */
-definePageMeta({ middleware: 'auth' })
-
-const authStore = useAuthStore()
-
-// En Nuxt 4, navigateTo en setup se ejecuta durante la hidratación
-// Por eso usamos onMounted para esperar a que el store esté listo
-onMounted(() => {
-  if (authStore.isAdmin) {
-    navigateTo('/admin/dashboard')
-  } else {
-    navigateTo('/agenda')
-  }
+definePageMeta({
+  middleware: [
+    'auth',
+    function (to, from) {
+      const authStore = useAuthStore()
+      if (authStore.isAdmin) {
+        return navigateTo('/admin/dashboard')
+      } else {
+        return navigateTo('/agenda')
+      }
+    }
+  ]
 })
 </script>
 

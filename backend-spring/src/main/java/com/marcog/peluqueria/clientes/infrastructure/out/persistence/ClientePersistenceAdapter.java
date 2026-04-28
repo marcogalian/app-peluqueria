@@ -29,8 +29,15 @@ public class ClientePersistenceAdapter implements ClienteRepository {
     }
 
     @Override
-    public java.util.List<Cliente> findAll() {
-        return jpaRepository.findAll().stream()
+    public java.util.List<Cliente> findAllByArchivado(boolean archivado) {
+        return jpaRepository.findByArchivadoOrderByNombreAscApellidosAsc(archivado).stream()
+                .map(mapper::toDomain)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Override
+    public java.util.List<Cliente> findByFiltros(String nombre, Boolean esVip, boolean archivado) {
+        return jpaRepository.findByFiltros(nombre, esVip, archivado).stream()
                 .map(mapper::toDomain)
                 .collect(java.util.stream.Collectors.toList());
     }

@@ -3,76 +3,162 @@
  * Header superior — diseño Atelier Sapphire.
  *
  * Izquierda: búsqueda global (rounded-full, fondo gris)
- * Derecha: notificaciones (punto rojo), ajustes, divisor, nombre usuario + avatar
- *
- * Fondo semitransparente con blur (glass effect del diseño)
+ * Derecha: notificaciones (campana con contador WS), ajustes, divisor, nombre usuario + avatar
  */
 import { Bell, Settings } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
-const route = useRoute()
+const route     = useRoute()
+const router    = useRouter()
 
-// Placeholder del buscador según la sección activa
-const placeholderBusqueda = computed(() => {
-  if (route.path.includes('servicios'))  return 'Buscar servicios o categorías...'
-  if (route.path.includes('clientes'))   return 'Buscar clientes...'
-  if (route.path.includes('empleados'))  return 'Buscar empleados...'
-  if (route.path.includes('inventario')) return 'Buscar productos, ventas...'
-  if (route.path.includes('resultados')) return 'Buscar métrica...'
-  return 'Buscar...'
+const { noLeidos, conteo, conectar, limpiarConteo } = useNotificacionesChat()
+
+// Conectar al WebSocket al montar el header
+onMounted(() => conectar())
+
+// Limpiar conteo al entrar a mensajes
+watch(() => route.path, (path) => {
+  if (path === '/mensajes') limpiarConteo()
 })
+
+// Dropdown de notificaciones
+const dropdownAbierto = ref(false)
+const campanaRef      = ref<HTMLElement | null>(null)
+
+onClickOutside(campanaRef, () => { dropdownAbierto.value = false })
+
+function toggleDropdown() {
+  dropdownAbierto.value = !dropdownAbierto.value
+}
+
+function irAMensajes() {
+  limpiarConteo()
+  dropdownAbierto.value = false
+  router.push('/mensajes')
+}
+
 
 const iniciales = computed(() => {
   const u = authStore.usuario?.username ?? ''
   return u.slice(0, 2).toUpperCase()
 })
+
+function irAConfiguracion() {
+  router.push('/admin/configuracion')
+}
+
+function formatHora(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+}
 </script>
 
 <template>
-  <!--
-    Header con glass effect: fondo #FAF9FD semitransparente + backdrop-blur.
-    Posición sticky para que quede sobre el contenido al hacer scroll.
-  -->
-  <header class="h-16 flex-shrink-0 flex items-center justify-between px-8
-                 bg-surface/70 backdrop-blur-md sticky top-0 z-10
-                 border-b border-outline-variant/10 transition-all">
+  <header class="h-16 flex-shrink-0 flex items-center justify-between px-8">
 
-    <!-- ── Búsqueda global ──────────────────────────────── -->
-    <div class="flex items-center gap-4 flex-1 max-w-md">
-      <div class="relative w-full">
-        <!-- Icono de búsqueda -->
-        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/60"
-             fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
-          type="search"
-          :placeholder="placeholderBusqueda"
-          class="w-full pl-10 pr-4 py-2 rounded-full border-none
-                 bg-surface-container-highest text-sm text-on-surface
-                 placeholder:text-on-surface-variant/50
-                 focus:outline-none focus:ring-2 focus:ring-primary-container/20
-                 focus:bg-white transition-all"
-        />
-      </div>
-    </div>
+    <div class="flex-1" />
 
     <!-- ── Acciones + Usuario ───────────────────────────── -->
     <div class="flex items-center gap-2">
 
-      <!-- Notificaciones con punto rojo -->
-      <button class="relative p-2 rounded-lg text-on-surface-variant
-                     hover:text-primary-container hover:bg-surface-container-low
-                     transition-colors">
-        <Bell class="w-5 h-5" />
-        <span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full" />
-      </button>
+      <!-- Campana de notificaciones -->
+      <div ref="campanaRef" class="relative">
+        <button
+          class="relative p-2 rounded-lg text-on-surface-variant
+                 hover:text-primary-container hover:bg-surface-container-low
+                 transition-colors"
+          @click="toggleDropdown"
+        >
+          <Bell class="w-5 h-5" />
+          <!-- Badge con conteo -->
+          <span
+            v-if="conteo > 0"
+            class="absolute top-1 right-1 min-w-[16px] h-4 px-0.5
+                   bg-error text-white text-[9px] font-bold
+                   rounded-full flex items-center justify-center leading-none"
+          >
+            {{ conteo > 9 ? '9+' : conteo }}
+          </span>
+          <!-- Punto rojo cuando no hay conteo pero sí hay mensajes previos -->
+          <span
+            v-else
+            class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"
+          />
+        </button>
+
+        <!-- Dropdown de notificaciones -->
+        <Transition
+          enter-active-class="transition ease-out duration-150"
+          enter-from-class="opacity-0 scale-95 -translate-y-1"
+          enter-to-class="opacity-100 scale-100 translate-y-0"
+          leave-active-class="transition ease-in duration-100"
+          leave-from-class="opacity-100 scale-100 translate-y-0"
+          leave-to-class="opacity-0 scale-95 -translate-y-1"
+        >
+          <div
+            v-show="dropdownAbierto"
+            class="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-lg
+                   border border-outline-variant/20 z-50 overflow-hidden"
+          >
+            <!-- Cabecera -->
+            <div class="px-4 py-3 border-b border-surface-container flex items-center justify-between">
+              <p class="text-sm font-bold text-on-surface">Notificaciones</p>
+              <button
+                v-if="conteo > 0"
+                class="text-[10px] text-primary-container hover:underline"
+                @click="limpiarConteo"
+              >
+                Marcar todo leído
+              </button>
+            </div>
+
+            <!-- Lista de mensajes no leídos -->
+            <div v-if="noLeidos.length > 0" class="max-h-64 overflow-y-auto">
+              <button
+                v-for="(m, i) in noLeidos"
+                :key="i"
+                class="w-full flex items-start gap-3 px-4 py-3
+                       hover:bg-surface-container-low transition-colors text-left"
+                @click="irAMensajes"
+              >
+                <div class="w-8 h-8 rounded-full bg-primary-container text-white
+                            flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                  {{ m.emisor.slice(0, 2).toUpperCase() }}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-bold text-on-surface truncate">{{ m.emisor }}</p>
+                  <p class="text-xs text-on-surface-variant">Nuevo mensaje</p>
+                </div>
+                <p class="text-[10px] text-on-surface-variant flex-shrink-0 mt-1">{{ formatHora(m.timestamp) }}</p>
+              </button>
+            </div>
+
+            <!-- Sin notificaciones -->
+            <div v-else class="px-4 py-8 text-center">
+              <Bell class="w-8 h-8 text-on-surface-variant/30 mx-auto mb-2" />
+              <p class="text-sm text-on-surface-variant">Sin mensajes nuevos</p>
+            </div>
+
+            <!-- Pie -->
+            <div class="px-4 py-3 border-t border-surface-container">
+              <button
+                class="w-full text-center text-xs font-bold text-primary-container
+                       hover:underline transition-colors"
+                @click="irAMensajes"
+              >
+                Ver todos los mensajes
+              </button>
+            </div>
+          </div>
+        </Transition>
+      </div>
 
       <!-- Ajustes rápidos -->
-      <button class="p-2 rounded-lg text-on-surface-variant
-                     hover:text-primary-container hover:bg-surface-container-low
-                     transition-colors">
+      <button
+        class="p-2 rounded-lg text-on-surface-variant
+               hover:text-primary-container hover:bg-surface-container-low
+               transition-colors"
+        @click="irAConfiguracion"
+      >
         <Settings class="w-5 h-5" />
       </button>
 
@@ -89,7 +175,6 @@ const iniciales = computed(() => {
             {{ authStore.isAdmin ? 'Administrador' : 'Empleado' }}
           </p>
         </div>
-        <!-- Avatar — placeholder con iniciales -->
         <div class="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center
                     text-white text-xs font-bold border-2 border-primary-fixed shadow-sm flex-shrink-0">
           {{ iniciales }}

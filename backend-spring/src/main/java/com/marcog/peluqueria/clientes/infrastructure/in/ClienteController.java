@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import com.marcog.peluqueria.clientes.application.actualizar.ActualizarClienteService;
 import com.marcog.peluqueria.clientes.application.consultar.ConsultarClienteService;
 import com.marcog.peluqueria.clientes.domain.model.HistorialClinicoDTO;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,15 +17,20 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/clientes")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class ClienteController {
     private final RegistrarClienteUseCase registrarClienteUseCase;
     private final ConsultarClienteService consultarClienteService;
     private final ActualizarClienteService actualizarClienteService;
 
     @GetMapping
-    public ResponseEntity<List<Cliente>> getAllClientes() {
-        return ResponseEntity.ok(consultarClienteService.getAllClientes());
+    public ResponseEntity<List<Cliente>> getAllClientes(
+            @RequestParam(required = false) String nombre,
+            @RequestParam(required = false) Boolean esVip,
+            @RequestParam(defaultValue = "false") boolean archivado) {
+        if (nombre != null || esVip != null) {
+            return ResponseEntity.ok(consultarClienteService.buscarClientes(nombre, esVip, archivado));
+        }
+        return ResponseEntity.ok(consultarClienteService.getAllClientes(archivado));
     }
 
     @GetMapping("/{id}/historial")
@@ -41,5 +47,24 @@ public class ClienteController {
     @PutMapping("/{id}")
     public ResponseEntity<Cliente> actualizar(@PathVariable UUID id, @RequestBody Cliente cliente) {
         return ResponseEntity.ok(actualizarClienteService.actualizarCliente(id, cliente));
+    }
+
+    @PostMapping("/{id}/archivar")
+    public ResponseEntity<Cliente> archivar(@PathVariable UUID id) {
+        return ResponseEntity.ok(actualizarClienteService.actualizarArchivado(id, true));
+    }
+
+    @PostMapping("/{id}/reactivar")
+    public ResponseEntity<Cliente> reactivar(@PathVariable UUID id) {
+        return ResponseEntity.ok(actualizarClienteService.actualizarArchivado(id, false));
+    }
+
+    @PostMapping("/{id}/consentimiento")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Cliente> actualizarConsentimiento(
+            @PathVariable UUID id,
+            @RequestBody java.util.Map<String, Boolean> body) {
+        boolean valor = Boolean.TRUE.equals(body.get("consentimientoFotos"));
+        return ResponseEntity.ok(actualizarClienteService.actualizarConsentimiento(id, valor));
     }
 }

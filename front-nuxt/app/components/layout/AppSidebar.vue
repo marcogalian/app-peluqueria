@@ -14,11 +14,12 @@
 import {
   LayoutDashboard, Calendar, Users, Scissors,
   Package, UserCog, BarChart3, Settings, LogOut,
-  MessageCircle, Palmtree,
+  MessageCircle, Palmtree, ShoppingBag,
 } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 
 // Estructura de items según rol
 const itemsAdmin = [
@@ -27,12 +28,15 @@ const itemsAdmin = [
   { path: '/admin/clientes',   label: 'Clientes',         icon: Users },
   { path: '/admin/servicios',  label: 'Servicios',        icon: Scissors },
   { path: '/admin/inventario', label: 'Inventario',       icon: Package },
+  { path: '/ventas',           label: 'Ventas',           icon: ShoppingBag },
   { path: '/admin/empleados',  label: 'Empleados',        icon: UserCog },
+  { path: '/mensajes',         label: 'Mensajes',         icon: MessageCircle },
   { path: '/admin/resultados', label: 'Resultados',       icon: BarChart3 },
 ]
 
 const itemsEmpleado = [
   { path: '/agenda',     label: 'Agenda',     icon: Calendar },
+  { path: '/ventas',     label: 'Ventas',     icon: ShoppingBag },
   { path: '/mensajes',   label: 'Mensajes',   icon: MessageCircle },
   { path: '/vacaciones', label: 'Vacaciones', icon: Palmtree },
 ]
@@ -44,9 +48,9 @@ function esActivo(path: string): boolean {
   return route.path.startsWith(path)
 }
 
-async function cerrarSesion() {
+function cerrarSesion() {
   authStore.cerrarSesion()
-  await navigateTo('/login')
+  router.push('/login')
 }
 </script>
 
@@ -56,15 +60,15 @@ async function cerrarSesion() {
     Fondo: bg-surface-container-low = #F4F3F7 (gris muy claro del diseño)
     w-sidebar = 256px (w-64 del stitch original)
   -->
-  <aside class="w-sidebar flex-shrink-0 h-screen flex flex-col bg-surface-container-low select-none border-r border-outline-variant/10">
+  <aside class="w-sidebar flex-shrink-0 h-screen flex flex-col bg-surface-container-low select-none">
 
     <!-- ── Logo ─────────────────────────────────────────── -->
     <div class="px-6 pt-8 pb-6">
       <h1 class="text-xl font-extrabold tracking-tighter text-primary leading-none">
-        Atelier Sapphire
+        Peluquería Isabella
       </h1>
       <p class="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant/60 mt-0.5">
-        {{ authStore.isAdmin ? 'Management Suite' : 'Portal Empleado' }}
+        {{ authStore.isAdmin ? 'Panel de administración' : 'Portal Empleado' }}
       </p>
     </div>
 
@@ -98,10 +102,10 @@ async function cerrarSesion() {
       <!-- Info de versión (igual que en el stitch) -->
       <div class="flex items-center gap-3 px-2">
         <div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-          AS
+          PI
         </div>
         <div>
-          <p class="text-xs font-bold text-primary leading-none">Atelier Sapphire</p>
+          <p class="text-xs font-bold text-primary leading-none">Peluquería Isabella</p>
           <p class="text-[10px] text-on-surface-variant">v1.0.0</p>
         </div>
       </div>

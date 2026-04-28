@@ -9,4 +9,5 @@ public interface GestionarAusenciaUseCase {
     SolicitudAusencia rechazar(UUID id, String motivo);
     List<SolicitudAusencia> listarTodas();
     List<SolicitudAusencia> listarPorPeluquero(UUID peluqueroId);
+    SolicitudAusencia cancelar(UUID id);
 }

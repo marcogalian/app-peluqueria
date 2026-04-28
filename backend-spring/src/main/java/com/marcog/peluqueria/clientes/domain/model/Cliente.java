@@ -16,6 +16,7 @@ public class Cliente {
     private String formulasTinte;
     private Genero genero;
     private boolean esVip;
+    private boolean archivado;
     private Integer descuentoPorcentaje;
     private UUID agregadoPorPeluqueroId;
     private LocalDateTime fechaRegistro;

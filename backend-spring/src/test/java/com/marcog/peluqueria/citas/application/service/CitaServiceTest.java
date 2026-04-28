@@ -139,23 +139,23 @@ class CitaServiceTest {
 
         Cita updateRequest = new Cita();
         updateRequest.setPeluquero(peluquero);
-        updateRequest.setFechaHora(originalStart.plusMinutes(15)); // Move start time slightly inside previous time
+        updateRequest.setFechaHora(originalStart.plusMinutes(15)); // Mover la hora de inicio ligeramente al horario anterior
         updateRequest.setDuracionTotal(60);
         updateRequest.setEstado(EstadoCita.PENDIENTE);
 
         when(repositoryPort.findById(citaId)).thenReturn(java.util.Optional.of(existingCita));
-        // Simulate that the repository will return the existing record when searching
-        // by criteria
+        // Simular que el repositorio devolverá el registro existente al buscar
+        // por criterios
         when(repositoryPort.findByCriteria(any(), any(), eq(peluquero.getId())))
                 .thenReturn(List.of(existingCita));
         when(repositoryPort.save(any())).thenReturn(existingCita);
 
-        // Act
-        // This should not throw CitaSuperpuestaException because the overlapping cita
-        // has the exact same ID.
+        // Actuar
+        // Esto no debería lanzar CitaSuperpuestaException porque la cita superpuesta
+        // tiene exactamente el mismo ID.
         Cita updated = citaService.updateCita(citaId, updateRequest);
 
-        // Assert
+        // Verificar
         assertEquals(originalStart.plusMinutes(15), updated.getFechaHora());
         verify(repositoryPort, times(1)).save(existingCita);
     }

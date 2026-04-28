@@ -8,25 +8,19 @@
  */
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 
-// La URL base viene del runtime config de Nuxt (nuxt.config.ts)
-// En desarrollo: http://localhost:8080/api
-// En producción: se inyecta por variable de entorno NUXT_PUBLIC_API_BASE
 const getBaseURL = (): string => {
-  // useRuntimeConfig solo funciona dentro de composables/componentes Vue
-  // Para el cliente HTTP estático usamos la variable directamente
-  if (import.meta.env.NUXT_PUBLIC_API_BASE) {
-    return import.meta.env.NUXT_PUBLIC_API_BASE
+  if (typeof window !== 'undefined' && (window as any).__NUXT__?.config?.public?.apiBase) {
+    return (window as any).__NUXT__.config.public.apiBase
   }
   return 'http://localhost:8080/api'
 }
 
-// Instancia única de Axios compartida por todos los módulos
 export const api: AxiosInstance = axios.create({
   baseURL: getBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000, // 15 segundos — suficiente para peticiones normales
+  timeout: 15000,
 })
 
 // ── Interceptor de REQUEST ───────────────────────────────────

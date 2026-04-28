@@ -18,6 +18,7 @@ docker/postgres_data/
 *.env
 
 # ── Archivos de desarrollo/scripts locales ─────────────────
+scripts/
 create_modules.py
 task.md.resolved
 implementation_plan.md.resolved
@@ -27,6 +28,7 @@ stitch/
 .claude/
 
 # ── Documentación interna / TFG (no subir al repo público) ─
+documentacion-no-github/
 MEMORANDUM_DEFENSA_TFG.md
 MEMORANDUM_DEFENSA_TFG.pdf
 MEMORANDUM_FRONTEND_TFG.md

@@ -8,13 +8,14 @@ import { Plus, Save, X, Loader2 } from 'lucide-vue-next'
 definePageMeta({ middleware: ['auth', 'admin'] })
 
 interface Servicio {
-  id: number
+  id: string
   nombre: string
+  genero: 'FEMENINO' | 'MASCULINO' | 'UNISEX'
   categoria: 'CABALLERO' | 'SENORA' | 'TRATAMIENTO'
   duracionMinutos: number
   precio: number
   descripcion: string
-  activo: boolean
+  activo?: boolean
 }
 
 const servicios      = ref<Servicio[]>([])
@@ -24,35 +25,35 @@ const drawerAbierto  = ref(false)
 const guardando      = ref(false)
 const servicioEditar = ref<Partial<Servicio>>({})
 
-const filtros = ['TODOS', 'CABALLERO', 'SENORA', 'TRATAMIENTO']
+const filtros = ['TODOS', 'FEMENINO', 'MASCULINO']
 const labelFiltro: Record<string, string> = {
-  TODOS: 'Todos', CABALLERO: 'Caballero', SENORA: 'Señora', TRATAMIENTO: 'Tratamientos',
+  TODOS: 'Todos', FEMENINO: 'Mujer', MASCULINO: 'Hombre',
 }
 
 const serviciosFiltrados = computed(() =>
   filtroActivo.value === 'TODOS'
     ? servicios.value
-    : servicios.value.filter(s => s.categoria === filtroActivo.value),
+    : servicios.value.filter(s => s.genero === filtroActivo.value),
 )
 
-const totalCaballero    = computed(() => servicios.value.filter(s => s.categoria === 'CABALLERO').length)
-const totalSenora       = computed(() => servicios.value.filter(s => s.categoria === 'SENORA').length)
+const totalHombre = computed(() => servicios.value.filter(s => s.genero === 'MASCULINO').length)
+const totalMujer = computed(() => servicios.value.filter(s => s.genero === 'FEMENINO').length)
 
 onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
-    const { data } = await api.get('/servicios')
+    const { data } = await api.get('/v1/servicios')
     servicios.value = data
   } catch { /* vacío */ } finally { cargando.value = false }
 })
 
 function abrirCrear() {
-  servicioEditar.value = { categoria: 'CABALLERO', duracionMinutos: 30, precio: 0, activo: true }
+  servicioEditar.value = { genero: 'FEMENINO', categoria: 'SENORA', duracionMinutos: 30, precio: 0, activo: true }
   drawerAbierto.value = true
 }
 
 function abrirEditar(s: Servicio) {
-  servicioEditar.value = { ...s }
+  servicioEditar.value = { ...s, activo: s.activo ?? true }
   drawerAbierto.value = true
 }
 
@@ -61,11 +62,11 @@ async function guardar() {
   try {
     const { api } = await import('~/infrastructure/http/api')
     if (servicioEditar.value.id) {
-      const { data } = await api.put(`/servicios/${servicioEditar.value.id}`, servicioEditar.value)
+      const { data } = await api.put(`/v1/servicios/${servicioEditar.value.id}`, servicioEditar.value)
       const idx = servicios.value.findIndex(s => s.id === data.id)
       if (idx !== -1) servicios.value[idx] = data
     } else {
-      const { data } = await api.post('/servicios', servicioEditar.value)
+      const { data } = await api.post('/v1/servicios', servicioEditar.value)
       servicios.value.unshift(data)
     }
     drawerAbierto.value = false
@@ -75,21 +76,25 @@ async function guardar() {
 async function eliminar(id: number) {
   if (!confirm('¿Eliminar este servicio?')) return
   const { api } = await import('~/infrastructure/http/api')
-  await api.delete(`/servicios/${id}`)
+  await api.delete(`/v1/servicios/${id}`)
   servicios.value = servicios.value.filter(s => s.id !== id)
   if (servicioEditar.value.id === id) drawerAbierto.value = false
 }
 
-function badgeClase(cat: string): string {
+function badgeClase(genero: string): string {
   return {
-    CABALLERO:  'bg-secondary-fixed text-on-secondary-fixed-variant',
-    SENORA:     'bg-tertiary-fixed text-on-tertiary-fixed-variant',
-    TRATAMIENTO:'bg-primary-fixed text-on-primary-fixed-variant',
-  }[cat] ?? 'bg-surface-container text-on-surface-variant'
+    MASCULINO: 'bg-secondary-fixed text-on-secondary-fixed-variant',
+    FEMENINO: 'bg-tertiary-fixed text-on-tertiary-fixed-variant',
+    UNISEX: 'bg-primary-fixed text-on-primary-fixed-variant',
+  }[genero] ?? 'bg-surface-container text-on-surface-variant'
 }
 
 function labelCategoria(cat: string): string {
   return { CABALLERO: 'Caballero', SENORA: 'Señora', TRATAMIENTO: 'Tratamiento' }[cat] ?? cat
+}
+
+function labelGenero(genero: string): string {
+  return { MASCULINO: 'Hombre', FEMENINO: 'Mujer', UNISEX: 'Unisex' }[genero] ?? genero
 }
 
 function formatEur(n: number): string {
@@ -117,15 +122,15 @@ function formatEur(n: number): string {
       </div>
       <div class="card-kpi flex items-center justify-between">
         <div>
-          <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">Servicios Caballero</p>
-          <h3 class="text-4xl font-extrabold text-primary">{{ totalCaballero }}</h3>
+          <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">Servicios Hombre</p>
+          <h3 class="text-4xl font-extrabold text-primary">{{ totalHombre }}</h3>
         </div>
         <div class="p-3 bg-secondary-fixed rounded-xl text-on-secondary-fixed-variant text-2xl">♂</div>
       </div>
       <div class="card-kpi flex items-center justify-between">
         <div>
-          <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">Servicios Señora</p>
-          <h3 class="text-4xl font-extrabold text-primary">{{ totalSenora }}</h3>
+          <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">Servicios Mujer</p>
+          <h3 class="text-4xl font-extrabold text-primary">{{ totalMujer }}</h3>
         </div>
         <div class="p-3 bg-tertiary-fixed rounded-xl text-on-tertiary-fixed-variant text-2xl">♀</div>
       </div>
@@ -166,7 +171,7 @@ function formatEur(n: number): string {
           <thead>
             <tr class="text-on-surface-variant/60 text-[10px] uppercase tracking-[0.15em] font-bold">
               <th class="pb-4 px-4">Servicio</th>
-              <th class="pb-4 px-4">Categoría</th>
+              <th class="pb-4 px-4">Público</th>
               <th class="pb-4 px-4">Duración</th>
               <th class="pb-4 px-4">Precio</th>
               <th class="pb-4 px-4 text-right">Acciones</th>
@@ -181,9 +186,12 @@ function formatEur(n: number): string {
             >
               <td class="py-4 px-4 font-bold text-primary rounded-l-xl">{{ s.nombre }}</td>
               <td class="py-4 px-4">
-                <span class="px-3 py-1 rounded-full text-[10px] font-bold" :class="badgeClase(s.categoria)">
-                  {{ labelCategoria(s.categoria) }}
-                </span>
+                <div class="flex flex-col gap-1">
+                  <span class="w-fit px-3 py-1 rounded-full text-[10px] font-bold" :class="badgeClase(s.genero)">
+                    {{ labelGenero(s.genero) }}
+                  </span>
+                  <span class="text-[11px] text-on-surface-variant">{{ labelCategoria(s.categoria) }}</span>
+                </div>
               </td>
               <td class="py-4 px-4 text-on-surface-variant">{{ s.duracionMinutos }} min</td>
               <td class="py-4 px-4 font-bold">{{ formatEur(s.precio) }}</td>
@@ -212,7 +220,7 @@ function formatEur(n: number): string {
             </tr>
             <tr v-if="serviciosFiltrados.length === 0">
               <td colspan="5" class="py-12 text-center text-on-surface-variant text-sm">
-                No hay servicios en esta categoría
+                No hay servicios en este filtro
               </td>
             </tr>
           </tbody>
@@ -249,13 +257,24 @@ function formatEur(n: number): string {
             <input v-model="servicioEditar.nombre" type="text" class="input font-bold" placeholder="Ej. Balayage Premium" />
           </div>
 
-          <div class="space-y-2">
-            <label class="label">Categoría</label>
-            <select v-model="servicioEditar.categoria" class="input">
-              <option value="SENORA">Señora</option>
-              <option value="CABALLERO">Caballero</option>
-              <option value="TRATAMIENTO">Tratamientos</option>
-            </select>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <label class="label">Público</label>
+              <select v-model="servicioEditar.genero" class="input">
+                <option value="FEMENINO">Mujer</option>
+                <option value="MASCULINO">Hombre</option>
+                <option value="UNISEX">Unisex</option>
+              </select>
+            </div>
+
+            <div class="space-y-2">
+              <label class="label">Categoría</label>
+              <select v-model="servicioEditar.categoria" class="input">
+                <option value="SENORA">Señora</option>
+                <option value="CABALLERO">Caballero</option>
+                <option value="TRATAMIENTO">Tratamientos</option>
+              </select>
+            </div>
           </div>
 
           <div class="grid grid-cols-2 gap-4">
@@ -277,11 +296,11 @@ function formatEur(n: number): string {
           <label class="flex items-center gap-3 cursor-pointer">
             <div
               class="relative w-10 h-6 rounded-full transition-colors"
-              :class="servicioEditar.activo ? 'bg-primary-container' : 'bg-surface-container-high'"
-              @click="servicioEditar.activo = !servicioEditar.activo"
+              :class="(servicioEditar.activo ?? true) ? 'bg-primary-container' : 'bg-surface-container-high'"
+              @click="servicioEditar.activo = !(servicioEditar.activo ?? true)"
             >
               <div class="absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform"
-                   :class="servicioEditar.activo ? 'translate-x-5' : 'translate-x-1'" />
+                   :class="(servicioEditar.activo ?? true) ? 'translate-x-5' : 'translate-x-1'" />
             </div>
             <span class="text-sm font-medium text-on-surface">Servicio activo</span>
           </label>

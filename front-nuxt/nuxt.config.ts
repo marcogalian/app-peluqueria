@@ -45,6 +45,16 @@ export default defineNuxtConfig({
   // CSS global con el design system
   css: ['~/assets/css/main.css'],
 
+  // En desarrollo queremos usar siempre el 3000 y fallar si está ocupado,
+  // para no acabar en 3001 sin darnos cuenta.
+  vite: {
+    server: {
+      host: 'localhost',
+      port: 3000,
+      strictPort: true,
+    },
+  },
+
   // Alias útiles para imports
   alias: {
     '~modules': '/app/modules',
@@ -52,10 +62,9 @@ export default defineNuxtConfig({
     '~infra':   '/app/infrastructure',
   },
 
-  // Transiciones de página
+  // Configuración de la app sin transiciones de página para evitar
+  // el bug de "pantalla en blanco" al navegar entre layouts en Nuxt
   app: {
-    pageTransition:   { name: 'page',   mode: 'out-in' },
-    layoutTransition: { name: 'layout', mode: 'out-in' },
     head: {
       title: 'Atelier Sapphire — Gestión',
       meta: [
@@ -72,6 +81,8 @@ export default defineNuxtConfig({
       ],
     },
   },
+
+  ssr: false,
 
   typescript: {
     strict: true,

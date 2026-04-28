@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List; import java.util.UUID;
 
 @RestController @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class OfertaController {
     private final GestionarOfertaUseCase useCase;
 
@@ -20,24 +19,37 @@ public class OfertaController {
     @GetMapping("/api/v1/ofertas/activas")
     public ResponseEntity<List<Oferta>> activas() { return ResponseEntity.ok(useCase.listarOfertasActivas()); }
 
-    @PreAuthorize("hasRole('ADMIN')") @PostMapping("/api/v1/ofertas")
-    public ResponseEntity<Oferta> crear(@RequestBody Oferta o) { return ResponseEntity.ok(useCase.crearOferta(o)); }
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PostMapping("/api/v1/ofertas")
+    public ResponseEntity<Oferta> crear(@RequestBody Oferta oferta) { return ResponseEntity.ok(useCase.crearOferta(oferta)); }
 
-    @PreAuthorize("hasRole('ADMIN')") @PutMapping("/api/v1/ofertas/{id}")
-    public ResponseEntity<Oferta> actualizar(@PathVariable UUID id, @RequestBody Oferta o) { return ResponseEntity.ok(useCase.actualizarOferta(id, o)); }
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping("/api/v1/ofertas/{id}")
+    public ResponseEntity<Oferta> actualizar(@PathVariable UUID id, @RequestBody Oferta oferta) { return ResponseEntity.ok(useCase.actualizarOferta(id, oferta)); }
 
-    @PreAuthorize("hasRole('ADMIN')") @PatchMapping("/api/v1/ofertas/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PatchMapping("/api/v1/ofertas/{id}")
     public ResponseEntity<Oferta> toggle(@PathVariable UUID id) { return ResponseEntity.ok(useCase.toggleActiva(id)); }
 
-    @PreAuthorize("hasRole('ADMIN')") @DeleteMapping("/api/v1/ofertas/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @DeleteMapping("/api/v1/ofertas/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable UUID id) { useCase.eliminarOferta(id); return ResponseEntity.noContent().build(); }
 
     @GetMapping("/api/v1/dias-especiales")
     public ResponseEntity<List<DiaEspecial>> listarDias() { return ResponseEntity.ok(useCase.listarDias()); }
 
-    @PreAuthorize("hasRole('ADMIN')") @PostMapping("/api/v1/dias-especiales")
-    public ResponseEntity<DiaEspecial> crearDia(@RequestBody DiaEspecial d) { return ResponseEntity.ok(useCase.crearDia(d)); }
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PostMapping("/api/v1/dias-especiales")
+    public ResponseEntity<DiaEspecial> crearDia(@RequestBody DiaEspecial diaEspecial) { return ResponseEntity.ok(useCase.crearDia(diaEspecial)); }
 
-    @PreAuthorize("hasRole('ADMIN')") @DeleteMapping("/api/v1/dias-especiales/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping("/api/v1/dias-especiales/{id}")
+    public ResponseEntity<DiaEspecial> actualizarDia(@PathVariable UUID id, @RequestBody DiaEspecial diaEspecial) {
+        diaEspecial.setId(id);
+        return ResponseEntity.ok(useCase.crearDia(diaEspecial));
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @DeleteMapping("/api/v1/dias-especiales/{id}")
     public ResponseEntity<Void> eliminarDia(@PathVariable UUID id) { useCase.eliminarDia(id); return ResponseEntity.noContent().build(); }
 }

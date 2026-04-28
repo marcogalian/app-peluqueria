@@ -14,3 +14,12 @@ export interface CitaResumen {
   estado: string
   peluqueroNombre: string
 }
+
+/** Payload mínimo para crear una cita desde el calendario */
+export interface NuevaCitaPayload {
+  fechaHora: string        // ISO: "2026-04-07T10:00:00"
+  peluquero: { id: string }
+  cliente: { id: string }
+  servicios: { id: string }[]
+  estado: string
+}

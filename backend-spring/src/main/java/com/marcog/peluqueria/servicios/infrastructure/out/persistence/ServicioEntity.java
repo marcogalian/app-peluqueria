@@ -1,5 +1,6 @@
 package com.marcog.peluqueria.servicios.infrastructure.out.persistence;
 
+import com.marcog.peluqueria.servicios.domain.model.CategoriaServicio;
 import com.marcog.peluqueria.servicios.domain.model.TipoGenero;
 import jakarta.persistence.*;
 import lombok.*;
@@ -38,6 +39,10 @@ public class ServicioEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TipoGenero genero;
+
+    @Enumerated(EnumType.STRING)
+    @Column
+    private CategoriaServicio categoria;
 
     @Column(name = "image_url", length = 500)
     private String imageUrl;

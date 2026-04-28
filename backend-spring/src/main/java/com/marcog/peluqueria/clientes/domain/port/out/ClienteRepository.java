@@ -10,5 +10,7 @@ public interface ClienteRepository {
 
     Optional<Cliente> findById(UUID id);
 
-    java.util.List<Cliente> findAll();
+    java.util.List<Cliente> findAllByArchivado(boolean archivado);
+
+    java.util.List<Cliente> findByFiltros(String nombre, Boolean esVip, boolean archivado);
 }
