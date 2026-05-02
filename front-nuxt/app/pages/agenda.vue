@@ -229,7 +229,7 @@ function cancelarEdicion() {
 
 // Clases CSS de cada celda del calendario
 function claseCelda(dia: Date): string {
-  const base  = 'min-h-[110px] p-2 border-r border-b border-surface-container cursor-pointer transition-colors group'
+  const base  = 'min-h-[70px] sm:min-h-[110px] p-1 sm:p-2 border-r border-b border-surface-container cursor-pointer transition-colors group'
   const esHoy = isToday(dia)
   const selec = isSameDay(dia, diaSeleccionado.value)
   const fuera = !isSameMonth(dia, mesActual.value)
@@ -251,7 +251,7 @@ onMounted(async () => {
 
 <template>
   <!-- Layout de dos columnas: calendario izquierda + panel derecha -->
-  <div class="flex gap-6 h-full overflow-hidden">
+  <div class="flex flex-col lg:flex-row gap-6 h-full overflow-hidden">
 
     <!-- ══════════════════════════════════════════════════════
          CALENDARIO MENSUAL — columna principal
@@ -306,7 +306,7 @@ onMounted(async () => {
       </div>
 
       <!-- Grid del calendario -->
-      <div class="flex-1 grid grid-cols-7 overflow-auto" style="grid-template-rows: repeat(auto-fill, minmax(110px, 1fr))">
+      <div class="flex-1 grid grid-cols-7 overflow-auto" style="grid-template-rows: repeat(auto-fill, minmax(70px, 1fr))">
         <div
           v-for="dia in diasDelCalendario"
           :key="dia.toISOString()"
@@ -368,7 +368,7 @@ onMounted(async () => {
     <!-- ══════════════════════════════════════════════════════
          PANEL DERECHO — Detalle del Día seleccionado
          ════════════════════════════════════════════════════ -->
-    <aside class="w-80 bg-surface-container-low rounded-2xl p-6 overflow-y-auto flex flex-col gap-6 border border-outline-variant/10">
+    <aside class="w-full lg:w-80 bg-surface-container-low rounded-2xl p-4 sm:p-6 overflow-y-auto flex flex-col gap-6 border border-outline-variant/10">
 
       <!-- Etiqueta "Detalle del Día" -->
       <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
