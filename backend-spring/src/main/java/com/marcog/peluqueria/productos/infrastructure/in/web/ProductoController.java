@@ -1,6 +1,8 @@
 package com.marcog.peluqueria.productos.infrastructure.in.web;
 
 import com.marcog.peluqueria.productos.application.dto.ResumenVentasProductosDTO;
+import com.marcog.peluqueria.productos.application.dto.VentaAgrupadaRequestDTO;
+import com.marcog.peluqueria.productos.application.dto.VentaAgrupadaResponseDTO;
 import com.marcog.peluqueria.productos.application.dto.VentaProductoRequestDTO;
 import com.marcog.peluqueria.productos.application.dto.VentaProductoResponseDTO;
 import com.marcog.peluqueria.productos.domain.model.CategoriaProducto;
@@ -10,6 +12,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -46,6 +50,14 @@ public class ProductoController {
     @PatchMapping("/{id}/stock")
     public ResponseEntity<Producto> ajustarStock(@PathVariable UUID id, @RequestBody Map<String, Integer> body) {
         return ResponseEntity.ok(useCase.ajustarStock(id, body.get("cantidad")));
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
+    @PostMapping("/ventas")
+    public ResponseEntity<VentaAgrupadaResponseDTO> venderAgrupado(
+            @Valid @RequestBody VentaAgrupadaRequestDTO body,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(useCase.venderAgrupado(body, userDetails.getUsername()));
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")

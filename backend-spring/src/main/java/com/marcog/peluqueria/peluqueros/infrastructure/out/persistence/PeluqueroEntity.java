@@ -54,7 +54,7 @@ public class PeluqueroEntity {
     @Column(name = "foto_url", length = 500)
     private String fotoUrl;
 
-    @Column(name = "porcentaje_comision", nullable = false)
+    @Column(name = "porcentaje_comision", nullable = false, columnDefinition = "double precision default 0")
     @Builder.Default
     private double porcentajeComision = 0.0;
 }

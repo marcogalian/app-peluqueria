@@ -1,7 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth' })
 
-import { ShoppingCart, X, Loader2, Search } from 'lucide-vue-next'
+import { ShoppingCart, X, Loader2, Search, Plus, Minus, Trash2, CheckCircle2 } from 'lucide-vue-next'
 
 interface Producto {
   id: string
@@ -15,30 +15,47 @@ interface Producto {
   activo: boolean
 }
 
-interface VentaProductoResponse {
+interface LineaCarrito {
   producto: Producto
-  venta: { id: string; cantidad: number; precioUnitario: number; total: number; fechaVenta: string }
-  resumen: { ingresosSemana: number; ingresosMes: number; ingresosAnio: number; unidadesSemana: number; unidadesMes: number; unidadesAnio: number }
+  cantidad: number
 }
 
-const productos     = ref<Producto[]>([])
-const cargando      = ref(true)
-const busqueda      = ref('')
-const categoriaFiltro = ref('TODOS')
-const categorias    = ['TODOS', 'CERA', 'CHAMPU', 'ACONDICIONADOR', 'COLORACION', 'HERRAMIENTA', 'OTRO']
+interface VentaAgrupadaResponse {
+  id: string
+  numero: string
+  vendedorNombre: string
+  metodoPago: MetodoPago
+  total: number
+  lineas: Array<{ id: string; productoId: string; productoNombre: string; cantidad: number; precioUnitario: number; total: number }>
+  productosActualizados: Producto[]
+}
 
-const modalAbierto  = ref(false)
-const vendiendo     = ref(false)
-const productoVenta = ref<Producto | null>(null)
-const cantidad      = ref(1)
-const errorVenta    = ref('')
-const confirmado    = ref(false)
+type MetodoPago = 'EFECTIVO' | 'TARJETA' | 'BIZUM' | 'OTRO'
+
+const productos       = ref<Producto[]>([])
+const cargando        = ref(true)
+const busqueda        = ref('')
+const categoriaFiltro = ref('TODOS')
+const categorias      = ['TODOS', 'CERA', 'CHAMPU', 'ACONDICIONADOR', 'COLORACION', 'HERRAMIENTA', 'OTRO']
+
+const carrito         = ref<LineaCarrito[]>([])
+const procesando      = ref(false)
+const errorVenta      = ref('')
+const ventaOk         = ref(false)
+const carritoAbierto  = ref(false)
+const metodoPago      = ref<MetodoPago>('TARJETA')
+const ultimaVenta     = ref<VentaAgrupadaResponse | null>(null)
+
+const metodosPago: Array<{ key: MetodoPago; label: string }> = [
+  { key: 'TARJETA', label: 'Tarjeta' },
+  { key: 'EFECTIVO', label: 'Efectivo' },
+  { key: 'BIZUM', label: 'Bizum' },
+  { key: 'OTRO', label: 'Otro' },
+]
 
 const productosFiltrados = computed(() => {
   let lista = productos.value.filter(p => p.activo && p.stock > 0)
-  if (categoriaFiltro.value !== 'TODOS') {
-    lista = lista.filter(p => p.categoria === categoriaFiltro.value)
-  }
+  if (categoriaFiltro.value !== 'TODOS') lista = lista.filter(p => p.categoria === categoriaFiltro.value)
   if (busqueda.value.trim()) {
     const q = busqueda.value.toLowerCase()
     lista = lista.filter(p => p.nombre.toLowerCase().includes(q))
@@ -50,9 +67,11 @@ function precioFinal(p: Producto): number {
   return p.precioDescuento && p.precioDescuento > 0 ? p.precioDescuento : p.precio
 }
 
-const totalEstimado = computed(() =>
-  productoVenta.value ? precioFinal(productoVenta.value) * cantidad.value : 0,
+const totalCarrito = computed(() =>
+  carrito.value.reduce((acc, l) => acc + precioFinal(l.producto) * l.cantidad, 0),
 )
+
+const totalUnidades = computed(() => carrito.value.reduce((acc, l) => acc + l.cantidad, 0))
 
 function formatEur(v: number) {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v)
@@ -66,6 +85,42 @@ function etiCategoria(cat: string) {
   return mapa[cat] ?? cat
 }
 
+function cantidadEnCarrito(productoId: string): number {
+  return carrito.value.find(l => l.producto.id === productoId)?.cantidad ?? 0
+}
+
+function stockDisponible(p: Producto): number {
+  return p.stock - cantidadEnCarrito(p.id)
+}
+
+function agregarAlCarrito(p: Producto) {
+  if (stockDisponible(p) <= 0) return
+  const linea = carrito.value.find(l => l.producto.id === p.id)
+  if (linea) linea.cantidad++
+  else carrito.value.push({ producto: p, cantidad: 1 })
+  carritoAbierto.value = true
+}
+
+function cambiarCantidad(productoId: string, delta: number) {
+  const idx = carrito.value.findIndex(l => l.producto.id === productoId)
+  if (idx === -1) return
+  const linea = carrito.value[idx]
+  const nueva = linea.cantidad + delta
+  if (nueva <= 0) carrito.value.splice(idx, 1)
+  else if (nueva <= linea.producto.stock) linea.cantidad = nueva
+}
+
+function quitarLinea(productoId: string) {
+  carrito.value = carrito.value.filter(l => l.producto.id !== productoId)
+}
+
+function vaciarCarrito() {
+  carrito.value = []
+  ventaOk.value = false
+  errorVenta.value = ''
+  ultimaVenta.value = null
+}
+
 onMounted(async () => {
   const { api } = await import('~/infrastructure/http/api')
   try {
@@ -76,215 +131,308 @@ onMounted(async () => {
   }
 })
 
-function abrirVenta(p: Producto) {
-  productoVenta.value = p
-  cantidad.value = 1
-  errorVenta.value = ''
-  confirmado.value = false
-  modalAbierto.value = true
-}
-
-function cerrarModal() {
-  modalAbierto.value = false
-  productoVenta.value = null
-  confirmado.value = false
-  errorVenta.value = ''
-}
-
 async function confirmarVenta() {
-  if (!productoVenta.value) return
-  vendiendo.value = true
+  if (!carrito.value.length) return
+  procesando.value = true
   errorVenta.value = ''
   try {
     const { api } = await import('~/infrastructure/http/api')
-    const { data } = await api.post<VentaProductoResponse>(
-      `/v1/productos/${productoVenta.value.id}/vender`,
-      { cantidad: cantidad.value },
-    )
-    const idx = productos.value.findIndex(p => p.id === data.producto.id)
-    if (idx !== -1) productos.value[idx] = data.producto
-    confirmado.value = true
-  } catch (error) {
-    errorVenta.value = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+    const { data } = await api.post<VentaAgrupadaResponse>('/v1/productos/ventas', {
+      metodoPago: metodoPago.value,
+      lineas: carrito.value.map(linea => ({
+        productoId: linea.producto.id,
+        cantidad: linea.cantidad,
+      })),
+    })
+    for (const productoActualizado of data.productosActualizados || []) {
+      const idx = productos.value.findIndex(p => p.id === productoActualizado.id)
+      if (idx !== -1) productos.value[idx] = productoActualizado
+    }
+    ultimaVenta.value = data
+    ventaOk.value = true
+    carrito.value = []
+  } catch (err) {
+    errorVenta.value = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       ?? 'No se pudo registrar la venta.'
   } finally {
-    vendiendo.value = false
+    procesando.value = false
   }
 }
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="flex gap-6 min-h-0" :class="carritoAbierto ? 'pr-0' : ''">
 
-    <div>
-      <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Ventas</h2>
-      <p class="text-on-surface-variant text-sm">Registrar venta de productos al cliente</p>
-    </div>
+    <!-- ── Productos ───────────────────────────────────────── -->
+    <div class="flex-1 min-w-0 space-y-6">
 
-    <!-- Filtros -->
-    <div class="flex flex-col sm:flex-row gap-3">
-      <div class="relative flex-1">
-        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
-        <input
-          v-model="busqueda"
-          type="text"
-          placeholder="Buscar producto..."
-          class="w-full pl-9 pr-4 py-2.5 rounded-full bg-surface-container text-sm border-none focus:ring-2 focus:ring-primary-container"
-        />
+      <div>
+        <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Ventas</h2>
+        <p class="text-on-surface-variant text-sm">Añade productos al carrito y confirma la venta</p>
       </div>
-      <div class="flex gap-2 flex-wrap">
-        <button
-          v-for="cat in categorias"
-          :key="cat"
-          class="px-4 py-2 rounded-full text-xs font-bold transition-colors"
-          :class="categoriaFiltro === cat
-            ? 'bg-primary-container text-white'
-            : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'"
-          @click="categoriaFiltro = cat"
-        >
-          {{ cat === 'TODOS' ? 'Todos' : etiCategoria(cat) }}
-        </button>
-      </div>
-    </div>
 
-    <!-- Spinner -->
-    <div v-if="cargando" class="flex items-center justify-center py-20">
-      <Loader2 class="w-6 h-6 animate-spin text-primary" />
-    </div>
-
-    <!-- Grid de productos -->
-    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      <div
-        v-for="p in productosFiltrados"
-        :key="p.id"
-        class="card p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
-      >
-        <!-- Categoría badge -->
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant bg-surface-container px-2 py-1 rounded-full">
-            {{ etiCategoria(p.categoria) }}
-          </span>
-          <span
-            class="text-[10px] font-bold"
-            :class="p.stock <= p.stockMinimo ? 'text-amber-500' : 'text-green-600'"
-          >
-            Stock: {{ p.stock }}
-          </span>
+      <!-- Filtros -->
+      <div class="flex flex-col sm:flex-row gap-3">
+        <div class="relative flex-1">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+          <input
+            v-model="busqueda"
+            type="text"
+            placeholder="Buscar producto..."
+            class="w-full pl-9 pr-4 py-2.5 rounded-full bg-surface-container text-sm border-none focus:ring-2 focus:ring-primary-container"
+          />
         </div>
-
-        <div class="flex-1">
-          <h4 class="font-bold text-primary text-sm leading-snug">{{ p.nombre }}</h4>
-          <p v-if="p.descripcion" class="text-xs text-on-surface-variant mt-1 line-clamp-2">{{ p.descripcion }}</p>
-        </div>
-
-        <div class="flex items-center justify-between pt-2 border-t border-outline-variant/10">
-          <div>
-            <span class="text-lg font-extrabold text-primary">{{ formatEur(precioFinal(p)) }}</span>
-            <span
-              v-if="p.precioDescuento && p.precioDescuento < p.precio"
-              class="ml-2 text-xs text-on-surface-variant line-through"
-            >
-              {{ formatEur(p.precio) }}
-            </span>
-          </div>
+        <div class="flex gap-2 flex-wrap">
           <button
-            class="flex items-center gap-1.5 bg-primary-container text-white px-4 py-2 rounded-full text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="p.stock === 0"
-            @click="abrirVenta(p)"
+            v-for="cat in categorias"
+            :key="cat"
+            class="px-4 py-2 rounded-full text-xs font-bold transition-colors"
+            :class="categoriaFiltro === cat
+              ? 'bg-primary-container text-white'
+              : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'"
+            @click="categoriaFiltro = cat"
           >
-            <ShoppingCart class="w-3.5 h-3.5" />
-            Vender
+            {{ cat === 'TODOS' ? 'Todos' : etiCategoria(cat) }}
           </button>
         </div>
       </div>
 
-      <div v-if="productosFiltrados.length === 0" class="col-span-full text-center py-16 text-sm text-on-surface-variant">
-        No hay productos disponibles con stock
+      <!-- Spinner -->
+      <div v-if="cargando" class="flex items-center justify-center py-20">
+        <Loader2 class="w-6 h-6 animate-spin text-primary" />
       </div>
-    </div>
-  </div>
 
-  <!-- Modal venta -->
-  <Teleport to="body">
-    <Transition name="modal-overlay">
-      <div v-if="modalAbierto" class="fixed inset-0 z-40 bg-black/25 backdrop-blur-sm" @click.self="cerrarModal" />
-    </Transition>
-    <Transition name="slide-right">
-      <div v-if="modalAbierto" class="fixed inset-0 z-50 flex items-center justify-center p-6">
-        <div class="w-full max-w-sm rounded-[28px] bg-white shadow-2xl border border-outline-variant/10 p-8 space-y-5">
+      <!-- Grid de productos -->
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div
+          v-for="p in productosFiltrados"
+          :key="p.id"
+          class="card p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
+        >
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant bg-surface-container px-2 py-1 rounded-full">
+              {{ etiCategoria(p.categoria) }}
+            </span>
+            <span class="text-[10px] font-bold" :class="p.stock <= p.stockMinimo ? 'text-amber-500' : 'text-green-600'">
+              Stock: {{ p.stock }}
+            </span>
+          </div>
 
-          <!-- Confirmación -->
-          <template v-if="confirmado">
-            <div class="text-center space-y-3">
-              <div class="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-                <ShoppingCart class="w-6 h-6 text-green-600" />
-              </div>
-              <h3 class="text-xl font-bold text-primary">¡Venta registrada!</h3>
-              <p class="text-sm text-on-surface-variant">
-                {{ cantidad }} ud{{ cantidad > 1 ? 's' : '' }} de <strong>{{ productoVenta?.nombre }}</strong>
-              </p>
+          <div class="flex-1">
+            <h4 class="font-bold text-primary text-sm leading-snug">{{ p.nombre }}</h4>
+            <p v-if="p.descripcion" class="text-xs text-on-surface-variant mt-1 line-clamp-2">{{ p.descripcion }}</p>
+          </div>
+
+          <div class="flex items-center justify-between pt-2 border-t border-outline-variant/10">
+            <div>
+              <span class="text-lg font-extrabold text-primary">{{ formatEur(precioFinal(p)) }}</span>
+              <span
+                v-if="p.precioDescuento && p.precioDescuento < p.precio"
+                class="ml-2 text-xs text-on-surface-variant line-through"
+              >
+                {{ formatEur(p.precio) }}
+              </span>
             </div>
-            <button
-              class="w-full bg-primary-container text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity"
-              @click="cerrarModal"
-            >
-              Cerrar
-            </button>
-          </template>
 
-          <!-- Formulario venta -->
-          <template v-else>
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <h3 class="text-xl font-bold text-primary">Registrar venta</h3>
-                <p v-if="productoVenta" class="text-sm text-on-surface-variant mt-1">
-                  {{ productoVenta.nombre }} · Stock: {{ productoVenta.stock }} uds
-                </p>
-              </div>
-              <button class="p-2 hover:bg-surface-container-low rounded-full text-on-surface-variant" @click="cerrarModal">
-                <X class="w-5 h-5" />
+            <!-- Control cantidad en carrito o botón añadir -->
+            <div v-if="cantidadEnCarrito(p.id) > 0" class="flex items-center gap-1">
+              <button
+                class="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors"
+                @click="cambiarCantidad(p.id, -1)"
+              >
+                <Minus class="w-3.5 h-3.5 text-on-surface-variant" />
+              </button>
+              <span class="w-6 text-center text-sm font-bold text-primary">{{ cantidadEnCarrito(p.id) }}</span>
+              <button
+                class="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                :class="stockDisponible(p) > 0
+                  ? 'bg-primary-container hover:opacity-90'
+                  : 'bg-surface-container cursor-not-allowed opacity-40'"
+                :disabled="stockDisponible(p) <= 0"
+                @click="cambiarCantidad(p.id, 1)"
+              >
+                <Plus class="w-3.5 h-3.5 text-white" />
               </button>
             </div>
-
-            <div class="space-y-1">
-              <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Cantidad</label>
-              <input
-                v-model.number="cantidad"
-                type="number"
-                min="1"
-                :max="productoVenta?.stock ?? 1"
-                class="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container"
-              />
-            </div>
-
-            <div class="space-y-2 bg-surface-container-low rounded-2xl px-4 py-3 text-sm">
-              <div class="flex items-center justify-between">
-                <span class="text-on-surface-variant">Precio unitario</span>
-                <strong class="text-primary">{{ formatEur(productoVenta ? precioFinal(productoVenta) : 0) }}</strong>
-              </div>
-              <div class="flex items-center justify-between border-t border-outline-variant/10 pt-2">
-                <span class="text-on-surface-variant">Total</span>
-                <strong class="text-primary text-lg">{{ formatEur(totalEstimado) }}</strong>
-              </div>
-            </div>
-
-            <div v-if="errorVenta" class="rounded-2xl border border-error/10 bg-error/5 px-4 py-3 text-sm text-error">
-              {{ errorVenta }}
-            </div>
-
             <button
-              class="w-full bg-primary-container text-white py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-primary-container/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-              :disabled="vendiendo || !productoVenta || cantidad < 1 || cantidad > (productoVenta?.stock ?? 0)"
-              @click="confirmarVenta"
+              v-else
+              class="flex items-center gap-1.5 bg-primary-container text-white px-4 py-2 rounded-full text-xs font-bold hover:opacity-90 transition-opacity"
+              @click="agregarAlCarrito(p)"
             >
-              <Loader2 v-if="vendiendo" class="w-4 h-4 animate-spin" />
-              <ShoppingCart v-else class="w-4 h-4" />
-              {{ vendiendo ? 'Registrando...' : 'Confirmar venta' }}
+              <Plus class="w-3.5 h-3.5" />
+              Añadir
             </button>
+          </div>
+        </div>
+
+        <div v-if="productosFiltrados.length === 0" class="col-span-full text-center py-16 text-sm text-on-surface-variant">
+          No hay productos disponibles con stock
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Panel carrito ────────────────────────────────────── -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out"
+      enter-from-class="opacity-0 translate-x-8"
+      enter-to-class="opacity-100 translate-x-0"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="opacity-100 translate-x-0"
+      leave-to-class="opacity-0 translate-x-8"
+    >
+      <div
+        v-if="carritoAbierto"
+        class="w-80 flex-shrink-0 self-start sticky top-6"
+      >
+        <div class="card p-0 overflow-hidden flex flex-col" style="max-height: calc(100vh - 7rem)">
+
+          <!-- Cabecera carrito -->
+          <div class="flex items-center justify-between px-5 py-4 border-b border-outline-variant/10">
+            <div class="flex items-center gap-2">
+              <ShoppingCart class="w-4 h-4 text-primary" />
+              <span class="font-bold text-on-surface text-sm">Carrito</span>
+              <span
+                v-if="totalUnidades > 0"
+                class="min-w-[20px] h-5 px-1 bg-primary-container text-white text-[10px] font-bold rounded-full flex items-center justify-center"
+              >
+                {{ totalUnidades }}
+              </span>
+            </div>
+            <button
+              class="p-1.5 rounded-full hover:bg-surface-container-low text-on-surface-variant transition-colors"
+              @click="carritoAbierto = false"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Éxito -->
+          <div v-if="ventaOk" class="flex flex-col items-center justify-center gap-3 px-5 py-10 text-center flex-1">
+            <CheckCircle2 class="w-12 h-12 text-green-500" />
+            <p class="font-bold text-on-surface">¡Venta registrada!</p>
+            <p class="text-xs text-on-surface-variant">
+              {{ ultimaVenta?.numero }} · {{ ultimaVenta?.vendedorNombre }} · {{ formatEur(ultimaVenta?.total || 0) }}
+            </p>
+            <button
+              class="mt-2 px-6 py-2 rounded-full bg-primary-container text-white text-sm font-bold hover:opacity-90 transition-opacity"
+              @click="vaciarCarrito"
+            >
+              Nueva venta
+            </button>
+          </div>
+
+          <template v-else>
+            <!-- Lista de líneas -->
+            <div class="flex-1 overflow-y-auto divide-y divide-outline-variant/10">
+              <div
+                v-for="linea in carrito"
+                :key="linea.producto.id"
+                class="flex items-start gap-3 px-5 py-3"
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-xs font-bold text-on-surface leading-snug truncate">{{ linea.producto.nombre }}</p>
+                  <p class="text-[10px] text-on-surface-variant mt-0.5">{{ formatEur(precioFinal(linea.producto)) }} / ud</p>
+                </div>
+
+                <div class="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    class="w-6 h-6 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors"
+                    @click="cambiarCantidad(linea.producto.id, -1)"
+                  >
+                    <Minus class="w-3 h-3 text-on-surface-variant" />
+                  </button>
+                  <span class="w-5 text-center text-xs font-bold text-primary">{{ linea.cantidad }}</span>
+                  <button
+                    class="w-6 h-6 rounded-full flex items-center justify-center transition-colors"
+                    :class="stockDisponible(linea.producto) > 0
+                      ? 'bg-primary-container hover:opacity-90'
+                      : 'bg-surface-container cursor-not-allowed opacity-40'"
+                    :disabled="stockDisponible(linea.producto) <= 0"
+                    @click="cambiarCantidad(linea.producto.id, 1)"
+                  >
+                    <Plus class="w-3 h-3 text-white" />
+                  </button>
+                  <button
+                    class="ml-1 w-6 h-6 rounded-full hover:bg-error/10 flex items-center justify-center transition-colors"
+                    @click="quitarLinea(linea.producto.id)"
+                  >
+                    <Trash2 class="w-3 h-3 text-error" />
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="carrito.length === 0" class="px-5 py-8 text-center text-xs text-on-surface-variant">
+                Carrito vacío
+              </div>
+            </div>
+
+            <!-- Total y acciones -->
+            <div class="border-t border-outline-variant/10 px-5 py-4 space-y-3">
+              <div class="space-y-1">
+                <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Método de pago</p>
+                <div class="grid grid-cols-2 gap-1 bg-surface-container-low p-1 rounded-xl">
+                  <button
+                    v-for="metodo in metodosPago"
+                    :key="metodo.key"
+                    class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all"
+                    :class="metodoPago === metodo.key
+                      ? 'bg-white shadow-sm text-primary'
+                      : 'text-on-surface-variant hover:text-on-surface'"
+                    @click="metodoPago = metodo.key"
+                  >
+                    {{ metodo.label }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-on-surface-variant">Total</span>
+                <span class="text-xl font-extrabold text-primary">{{ formatEur(totalCarrito) }}</span>
+              </div>
+
+              <div v-if="errorVenta" class="rounded-xl bg-error/5 border border-error/10 px-3 py-2 text-xs text-error">
+                {{ errorVenta }}
+              </div>
+
+              <button
+                class="w-full flex items-center justify-center gap-2 bg-primary-container text-white py-3 rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-primary-container/30 transition-all disabled:opacity-50"
+                :disabled="procesando || carrito.length === 0"
+                @click="confirmarVenta"
+              >
+                <Loader2 v-if="procesando" class="w-4 h-4 animate-spin" />
+                <ShoppingCart v-else class="w-4 h-4" />
+                {{ procesando ? 'Procesando...' : 'Confirmar venta' }}
+              </button>
+
+              <button
+                class="w-full text-center text-xs text-on-surface-variant hover:text-error transition-colors"
+                @click="vaciarCarrito"
+              >
+                Vaciar carrito
+              </button>
+            </div>
           </template>
 
         </div>
       </div>
     </Transition>
-  </Teleport>
+
+  </div>
+
+  <!-- Botón flotante carrito (cuando está oculto) -->
+  <Transition name="fade">
+    <button
+      v-if="!carritoAbierto && totalUnidades > 0"
+      class="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-primary-container text-white px-5 py-3 rounded-full shadow-lg hover:shadow-xl hover:shadow-primary-container/30 font-bold text-sm transition-all"
+      @click="carritoAbierto = true"
+    >
+      <ShoppingCart class="w-4 h-4" />
+      {{ totalUnidades }} producto{{ totalUnidades > 1 ? 's' : '' }} · {{ formatEur(totalCarrito) }}
+    </button>
+  </Transition>
 </template>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(8px); }
+</style>

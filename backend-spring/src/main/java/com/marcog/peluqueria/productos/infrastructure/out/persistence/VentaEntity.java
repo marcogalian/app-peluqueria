@@ -1,7 +1,11 @@
 package com.marcog.peluqueria.productos.infrastructure.out.persistence;
 
+import com.marcog.peluqueria.productos.domain.model.MetodoPago;
+import com.marcog.peluqueria.security.infrastructure.out.persistence.UserEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -22,38 +26,31 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "ventas_producto")
+@Table(name = "ventas")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class VentaProductoEntity {
+public class VentaEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @JdbcTypeCode(SqlTypes.UUID)
     @Column(columnDefinition = "UUID", updatable = false, nullable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "venta_id")
-    private VentaEntity venta;
-
-    @JdbcTypeCode(SqlTypes.UUID)
-    @Column(name = "venta_id", insertable = false, updatable = false)
-    private UUID ventaId;
+    @Column(name = "numero", nullable = false, unique = true, length = 32)
+    private String numero;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "producto_id", nullable = false)
-    private ProductoEntity producto;
+    @JoinColumn(name = "usuario_id", nullable = false)
+    private UserEntity usuario;
 
-    @Column(name = "producto_nombre", nullable = false, length = 150)
-    private String productoNombre;
+    @Column(name = "vendedor_nombre", nullable = false, length = 150)
+    private String vendedorNombre;
 
-    @Column(nullable = false)
-    private Integer cantidad;
-
-    @Column(name = "precio_unitario", nullable = false, precision = 10, scale = 2)
-    private BigDecimal precioUnitario;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "metodo_pago", nullable = false, length = 20)
+    private MetodoPago metodoPago;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal total;

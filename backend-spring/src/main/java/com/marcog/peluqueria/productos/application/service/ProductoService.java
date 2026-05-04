@@ -1,6 +1,8 @@
 package com.marcog.peluqueria.productos.application.service;
 
 import com.marcog.peluqueria.productos.application.dto.ResumenVentasProductosDTO;
+import com.marcog.peluqueria.productos.application.dto.VentaAgrupadaRequestDTO;
+import com.marcog.peluqueria.productos.application.dto.VentaAgrupadaResponseDTO;
 import com.marcog.peluqueria.productos.application.dto.VentaProductoResponseDTO;
 import com.marcog.peluqueria.productos.domain.model.CategoriaProducto;
 import com.marcog.peluqueria.productos.domain.model.Producto;
@@ -8,7 +10,12 @@ import com.marcog.peluqueria.productos.domain.port.in.GestionarProductoUseCase;
 import com.marcog.peluqueria.productos.domain.port.out.ProductoRepositoryPort;
 import com.marcog.peluqueria.productos.infrastructure.out.persistence.JpaProductoRepository;
 import com.marcog.peluqueria.productos.infrastructure.out.persistence.JpaVentaProductoRepository;
+import com.marcog.peluqueria.productos.infrastructure.out.persistence.JpaVentaRepository;
+import com.marcog.peluqueria.productos.infrastructure.out.persistence.VentaEntity;
 import com.marcog.peluqueria.productos.infrastructure.out.persistence.VentaProductoEntity;
+import com.marcog.peluqueria.peluqueros.infrastructure.out.persistence.JpaPeluqueroRepository;
+import com.marcog.peluqueria.security.infrastructure.out.persistence.UserEntity;
+import com.marcog.peluqueria.security.infrastructure.out.persistence.JpaUserRepository;
 import com.marcog.peluqueria.shared.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,8 +25,13 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -31,6 +43,9 @@ public class ProductoService implements GestionarProductoUseCase {
     private final ProductoRepositoryPort repository;
     private final JpaProductoRepository jpaProductoRepository;
     private final JpaVentaProductoRepository ventaProductoRepository;
+    private final JpaVentaRepository ventaRepository;
+    private final JpaUserRepository userRepository;
+    private final JpaPeluqueroRepository peluqueroRepository;
     private final NotificationService notificationService;
 
     @Override
@@ -125,6 +140,103 @@ public class ProductoService implements GestionarProductoUseCase {
     }
 
     @Override
+    @Transactional
+    public VentaAgrupadaResponseDTO venderAgrupado(VentaAgrupadaRequestDTO request, String username) {
+        if (request.getLineas() == null || request.getLineas().isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST, "La venta debe tener al menos una línea");
+        }
+
+        UserEntity usuario = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Usuario no encontrado"));
+        String vendedorNombre = peluqueroRepository.findByUserId(usuario.getId())
+                .map(p -> p.getNombre())
+                .orElse(usuario.getUsername());
+
+        Map<UUID, Integer> cantidadesPorProducto = request.getLineas().stream()
+                .collect(Collectors.groupingBy(
+                        VentaAgrupadaRequestDTO.Linea::getProductoId,
+                        Collectors.summingInt(VentaAgrupadaRequestDTO.Linea::getCantidad)
+                ));
+
+        List<Producto> productosActualizados = new ArrayList<>();
+        List<VentaProductoEntity> lineasPendientes = new ArrayList<>();
+        BigDecimal totalVenta = BigDecimal.ZERO;
+
+        for (Map.Entry<UUID, Integer> entry : cantidadesPorProducto.entrySet()) {
+            UUID productoId = entry.getKey();
+            int cantidad = entry.getValue();
+            if (cantidad <= 0) {
+                throw new ResponseStatusException(BAD_REQUEST, "La cantidad debe ser mayor que cero");
+            }
+
+            Producto producto = repository.findById(productoId)
+                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producto no encontrado: " + productoId));
+            int stockActual = producto.getStock() != null ? producto.getStock() : 0;
+            if (stockActual < cantidad) {
+                throw new ResponseStatusException(
+                        BAD_REQUEST,
+                        "No hay suficiente stock para vender " + cantidad + " unidades de " + producto.getNombre()
+                );
+            }
+
+            BigDecimal precioAplicado = obtenerPrecioVenta(producto);
+            BigDecimal totalLinea = precioAplicado.multiply(BigDecimal.valueOf(cantidad));
+            totalVenta = totalVenta.add(totalLinea);
+
+            producto.setStock(stockActual - cantidad);
+            Producto guardado = repository.guardar(producto);
+            productosActualizados.add(guardado);
+
+            var productoEntity = jpaProductoRepository.findById(productoId)
+                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producto no encontrado: " + productoId));
+
+            lineasPendientes.add(VentaProductoEntity.builder()
+                    .producto(productoEntity)
+                    .productoNombre(guardado.getNombre())
+                    .cantidad(cantidad)
+                    .precioUnitario(precioAplicado)
+                    .total(totalLinea)
+                    .build());
+
+            notificarStockBajoSiHaceFalta(guardado);
+        }
+
+        VentaEntity venta = ventaRepository.save(VentaEntity.builder()
+                .numero(generarNumeroVenta())
+                .usuario(usuario)
+                .vendedorNombre(vendedorNombre)
+                .metodoPago(request.getMetodoPago())
+                .total(totalVenta)
+                .build());
+
+        List<VentaProductoEntity> lineasGuardadas = lineasPendientes.stream()
+                .peek(linea -> linea.setVenta(venta))
+                .map(ventaProductoRepository::save)
+                .collect(Collectors.toList());
+
+        return VentaAgrupadaResponseDTO.builder()
+                .id(venta.getId())
+                .numero(venta.getNumero())
+                .vendedorNombre(venta.getVendedorNombre())
+                .metodoPago(venta.getMetodoPago())
+                .total(venta.getTotal())
+                .fechaVenta(venta.getFechaVenta())
+                .lineas(lineasGuardadas.stream()
+                        .map(linea -> VentaAgrupadaResponseDTO.Linea.builder()
+                                .id(linea.getId())
+                                .productoId(linea.getProducto().getId())
+                                .productoNombre(linea.getProductoNombre())
+                                .cantidad(linea.getCantidad())
+                                .precioUnitario(linea.getPrecioUnitario())
+                                .total(linea.getTotal())
+                                .build())
+                        .collect(Collectors.toList()))
+                .productosActualizados(productosActualizados)
+                .resumen(obtenerResumenVentas())
+                .build();
+    }
+
+    @Override
     public ResumenVentasProductosDTO obtenerResumenVentas() {
         LocalDateTime ahora = LocalDateTime.now();
         LocalDateTime inicioSemana = ahora.with(DayOfWeek.MONDAY).withHour(0).withMinute(0).withSecond(0).withNano(0);
@@ -150,6 +262,12 @@ public class ProductoService implements GestionarProductoUseCase {
             return producto.getPrecioDescuento();
         }
         return producto.getPrecio() != null ? producto.getPrecio() : BigDecimal.ZERO;
+    }
+
+    private String generarNumeroVenta() {
+        String prefijo = "V-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd", Locale.ROOT)) + "-";
+        long siguiente = ventaRepository.countByNumeroStartingWith(prefijo) + 1;
+        return prefijo + String.format("%04d", siguiente);
     }
 
     private BigDecimal sumarTotales(List<VentaProductoEntity> ventas) {
