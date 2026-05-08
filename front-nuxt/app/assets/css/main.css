@@ -20,6 +20,11 @@
     color: #1a1c1e;
   }
 
+  :focus-visible {
+    outline: 3px solid rgba(0, 32, 69, 0.35);
+    outline-offset: 3px;
+  }
+
   /* Scrollbar fino y elegante */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -58,6 +63,17 @@
 /* Overlay de modales */
 .modal-overlay-enter-active, .modal-overlay-leave-active { transition: opacity 180ms ease; }
 .modal-overlay-enter-from, .modal-overlay-leave-to { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 /* ── Componentes del design system ──────────────────────── */
 @layer components {
@@ -133,6 +149,22 @@
            focus:outline-none focus:ring-2 focus:ring-primary-container/20
            focus:border-primary-container focus:bg-white
            disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  .select-field {
+    @apply w-full min-h-11 rounded-xl
+           border border-outline-variant/40 bg-surface-container-highest
+           text-on-surface text-sm font-medium
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-primary-container/20
+           focus:border-primary-container focus:bg-white
+           disabled:opacity-60 disabled:cursor-not-allowed;
+    appearance: none;
+    padding: 0.75rem 3.25rem 0.75rem 1rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23686f7a' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 1.125rem center;
+    background-repeat: no-repeat;
+    background-size: 1rem;
   }
 
   .label {

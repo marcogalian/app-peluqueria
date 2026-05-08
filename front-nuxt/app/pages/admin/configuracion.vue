@@ -4,8 +4,11 @@
  * Diseño en bento grid de 12 columnas: 2 bloques grandes + 2 laterales.
  */
 import { Plus, Save, X, Loader2, Trash2 } from 'lucide-vue-next'
+import { useToast } from '~/modules/shared/composables/useToast'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
+
+const toast = useToast()
 
 // ── Tipos ─────────────────────────────────────────────────
 interface Oferta {
@@ -80,14 +83,19 @@ async function guardarConfigCentro() {
   try {
     const { api } = await import('~/infrastructure/http/api')
     await api.put('/configuracion/centro', configCentro.value)
-  } catch { /* toast */ } finally {
+    toast.success('Configuración guardada')
+  } catch { toast.error('Error al guardar configuración') } finally {
     guardando.value = false
   }
 }
 
 async function guardarConfigComun() {
-  const { api } = await import('~/infrastructure/http/api')
-  await api.put('/configuracion/comunicacion', configComun.value)
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.put('/configuracion/comunicacion', configComun.value)
+  } catch {
+    toast.error('Error al guardar preferencias de comunicación')
+  }
 }
 
 // ── Ofertas ───────────────────────────────────────────────
@@ -109,7 +117,8 @@ async function guardarOferta() {
       ofertas.value.unshift(data)
     }
     modalOferta.value = false
-  } catch { /* toast */ } finally {
+    toast.success(ofertaEditar.value.id ? 'Oferta actualizada' : 'Oferta creada')
+  } catch { toast.error('Error al guardar oferta') } finally {
     guardandoModal.value = false
   }
 }
@@ -145,7 +154,8 @@ async function guardarDia() {
       dias.value.push(data)
     }
     modalDia.value = false
-  } catch { /* toast */ } finally {
+    toast.success(diaEditar.value.id ? 'Día actualizado' : 'Día especial creado')
+  } catch { toast.error('Error al guardar día especial') } finally {
     guardandoModal.value = false
   }
 }
@@ -340,7 +350,7 @@ async function eliminarDia(id: number) {
               <label class="label">Horas de antelación para recordatorio</label>
               <select
                 v-model.number="configComun.horasAntelacionRecordatorio"
-                class="input mt-1"
+                class="select-field mt-1"
                 @change="guardarConfigComun"
               >
                 <option :value="12">12 horas antes</option>
@@ -387,11 +397,16 @@ async function eliminarDia(id: number) {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
         @click.self="modalOferta = false"
       >
-        <div class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-oferta-titulo"
+          class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
+        >
           <div class="flex items-center justify-between mb-5">
-            <h3 class="text-lg font-bold text-primary">{{ ofertaEditar.id ? 'Editar Oferta' : 'Nueva Oferta' }}</h3>
-            <button class="p-1 rounded hover:bg-surface-container-low" @click="modalOferta = false">
-              <X class="w-4 h-4" />
+            <h3 id="modal-oferta-titulo" class="text-lg font-bold text-primary">{{ ofertaEditar.id ? 'Editar Oferta' : 'Nueva Oferta' }}</h3>
+            <button class="p-1 rounded hover:bg-surface-container-low" aria-label="Cerrar" @click="modalOferta = false">
+              <X class="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
           <div class="space-y-4">
@@ -438,11 +453,16 @@ async function eliminarDia(id: number) {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
         @click.self="modalDia = false"
       >
-        <div class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-dia-titulo"
+          class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
+        >
           <div class="flex items-center justify-between mb-5">
-            <h3 class="text-lg font-bold text-primary">Día Especial</h3>
-            <button class="p-1 rounded hover:bg-surface-container-low" @click="modalDia = false">
-              <X class="w-4 h-4" />
+            <h3 id="modal-dia-titulo" class="text-lg font-bold text-primary">Día Especial</h3>
+            <button class="p-1 rounded hover:bg-surface-container-low" aria-label="Cerrar" @click="modalDia = false">
+              <X class="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
           <div class="space-y-4">

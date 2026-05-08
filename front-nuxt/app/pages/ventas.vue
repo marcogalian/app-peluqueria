@@ -1,7 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth' })
 
-import { ShoppingCart, X, Loader2, Search, Plus, Minus, Trash2, CheckCircle2 } from 'lucide-vue-next'
+import { ShoppingCart, X, Loader2, Search, Plus, Minus, Trash2 } from 'lucide-vue-next'
+import { useToast } from '~/modules/shared/composables/useToast'
 
 interface Producto {
   id: string
@@ -38,10 +39,10 @@ const busqueda        = ref('')
 const categoriaFiltro = ref('TODOS')
 const categorias      = ['TODOS', 'CERA', 'CHAMPU', 'ACONDICIONADOR', 'COLORACION', 'HERRAMIENTA', 'OTRO']
 
+const toast = useToast()
 const carrito         = ref<LineaCarrito[]>([])
 const procesando      = ref(false)
 const errorVenta      = ref('')
-const ventaOk         = ref(false)
 const carritoAbierto  = ref(false)
 const metodoPago      = ref<MetodoPago>('TARJETA')
 const ultimaVenta     = ref<VentaAgrupadaResponse | null>(null)
@@ -79,6 +80,7 @@ function formatEur(v: number) {
 
 function etiCategoria(cat: string) {
   const mapa: Record<string, string> = {
+    TODOS: 'Todas las categorias',
     CHAMPU: 'Champú', ACONDICIONADOR: 'Acond.', COLORACION: 'Color',
     CERA: 'Cera', HERRAMIENTA: 'Herramienta', OTRO: 'Otro',
   }
@@ -116,7 +118,6 @@ function quitarLinea(productoId: string) {
 
 function vaciarCarrito() {
   carrito.value = []
-  ventaOk.value = false
   errorVenta.value = ''
   ultimaVenta.value = null
 }
@@ -149,8 +150,9 @@ async function confirmarVenta() {
       if (idx !== -1) productos.value[idx] = productoActualizado
     }
     ultimaVenta.value = data
-    ventaOk.value = true
+    toast.success(`Venta ${data.numero} registrada · ${formatEur(data.total)}`)
     carrito.value = []
+    carritoAbierto.value = false
   } catch (err) {
     errorVenta.value = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       ?? 'No se pudo registrar la venta.'
@@ -161,7 +163,7 @@ async function confirmarVenta() {
 </script>
 
 <template>
-  <div class="flex gap-6 min-h-0" :class="carritoAbierto ? 'pr-0' : ''">
+  <div class="flex flex-col lg:flex-row gap-6 min-h-0" :class="carritoAbierto ? 'pr-0' : ''">
 
     <!-- ── Productos ───────────────────────────────────────── -->
     <div class="flex-1 min-w-0 space-y-6">
@@ -172,28 +174,33 @@ async function confirmarVenta() {
       </div>
 
       <!-- Filtros -->
-      <div class="flex flex-col sm:flex-row gap-3">
+      <div class="flex flex-col xl:flex-row gap-3">
         <div class="relative flex-1">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+          <div class="absolute left-3 inset-y-0 flex items-center pointer-events-none">
+            <Search class="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
+          </div>
+          <label for="ventas-busqueda" class="sr-only">Buscar producto</label>
           <input
+            id="ventas-busqueda"
             v-model="busqueda"
             type="text"
             placeholder="Buscar producto..."
+            aria-label="Buscar producto por nombre"
             class="w-full pl-9 pr-4 py-2.5 rounded-full bg-surface-container text-sm border-none focus:ring-2 focus:ring-primary-container"
           />
         </div>
-        <div class="flex gap-2 flex-wrap">
-          <button
-            v-for="cat in categorias"
-            :key="cat"
-            class="px-4 py-2 rounded-full text-xs font-bold transition-colors"
-            :class="categoriaFiltro === cat
-              ? 'bg-primary-container text-white'
-              : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'"
-            @click="categoriaFiltro = cat"
+        <div class="xl:w-64">
+          <label for="ventas-categoria" class="sr-only">Filtrar por categoría</label>
+          <select
+            id="ventas-categoria"
+            v-model="categoriaFiltro"
+            class="select-field rounded-full bg-surface-container font-semibold text-on-surface-variant border-none focus:ring-2 focus:ring-primary-container"
+            aria-label="Filtrar productos por categoría"
           >
-            {{ cat === 'TODOS' ? 'Todos' : etiCategoria(cat) }}
-          </button>
+            <option v-for="cat in categorias" :key="cat" :value="cat">
+              {{ etiCategoria(cat) }}
+            </option>
+          </select>
         </div>
       </div>
 
@@ -235,31 +242,34 @@ async function confirmarVenta() {
             </div>
 
             <!-- Control cantidad en carrito o botón añadir -->
-            <div v-if="cantidadEnCarrito(p.id) > 0" class="flex items-center gap-1">
+            <div v-if="cantidadEnCarrito(p.id) > 0" class="flex items-center gap-1" :aria-label="`${p.nombre} en carrito: ${cantidadEnCarrito(p.id)}`">
               <button
-                class="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors"
+                class="min-w-10 min-h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors"
+                :aria-label="`Quitar uno de ${p.nombre}`"
                 @click="cambiarCantidad(p.id, -1)"
               >
-                <Minus class="w-3.5 h-3.5 text-on-surface-variant" />
+                <Minus class="w-3.5 h-3.5 text-on-surface-variant" aria-hidden="true" />
               </button>
-              <span class="w-6 text-center text-sm font-bold text-primary">{{ cantidadEnCarrito(p.id) }}</span>
+              <span class="w-7 text-center text-sm font-bold text-primary" aria-live="polite">{{ cantidadEnCarrito(p.id) }}</span>
               <button
-                class="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                class="min-w-10 min-h-10 rounded-full flex items-center justify-center transition-colors"
                 :class="stockDisponible(p) > 0
                   ? 'bg-primary-container hover:opacity-90'
                   : 'bg-surface-container cursor-not-allowed opacity-40'"
                 :disabled="stockDisponible(p) <= 0"
+                :aria-label="`Añadir uno más de ${p.nombre}`"
                 @click="cambiarCantidad(p.id, 1)"
               >
-                <Plus class="w-3.5 h-3.5 text-white" />
+                <Plus class="w-3.5 h-3.5 text-white" aria-hidden="true" />
               </button>
             </div>
             <button
               v-else
-              class="flex items-center gap-1.5 bg-primary-container text-white px-4 py-2 rounded-full text-xs font-bold hover:opacity-90 transition-opacity"
+              class="min-h-11 flex items-center gap-1.5 bg-primary-container text-white px-4 rounded-full text-xs font-bold hover:opacity-90 transition-opacity"
+              :aria-label="`Añadir ${p.nombre} al carrito`"
               @click="agregarAlCarrito(p)"
             >
-              <Plus class="w-3.5 h-3.5" />
+              <Plus class="w-3.5 h-3.5" aria-hidden="true" />
               Añadir
             </button>
           </div>
@@ -282,46 +292,33 @@ async function confirmarVenta() {
     >
       <div
         v-if="carritoAbierto"
-        class="w-80 flex-shrink-0 self-start sticky top-6"
+        class="w-full lg:w-80 flex-shrink-0 self-start lg:sticky lg:top-6"
       >
         <div class="card p-0 overflow-hidden flex flex-col" style="max-height: calc(100vh - 7rem)">
 
           <!-- Cabecera carrito -->
           <div class="flex items-center justify-between px-5 py-4 border-b border-outline-variant/10">
             <div class="flex items-center gap-2">
-              <ShoppingCart class="w-4 h-4 text-primary" />
+              <ShoppingCart class="w-4 h-4 text-primary" aria-hidden="true" />
               <span class="font-bold text-on-surface text-sm">Carrito</span>
               <span
                 v-if="totalUnidades > 0"
                 class="min-w-[20px] h-5 px-1 bg-primary-container text-white text-[10px] font-bold rounded-full flex items-center justify-center"
+                aria-hidden="true"
               >
                 {{ totalUnidades }}
               </span>
             </div>
             <button
               class="p-1.5 rounded-full hover:bg-surface-container-low text-on-surface-variant transition-colors"
+              aria-label="Cerrar carrito"
               @click="carritoAbierto = false"
             >
-              <X class="w-4 h-4" />
+              <X class="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 
-          <!-- Éxito -->
-          <div v-if="ventaOk" class="flex flex-col items-center justify-center gap-3 px-5 py-10 text-center flex-1">
-            <CheckCircle2 class="w-12 h-12 text-green-500" />
-            <p class="font-bold text-on-surface">¡Venta registrada!</p>
-            <p class="text-xs text-on-surface-variant">
-              {{ ultimaVenta?.numero }} · {{ ultimaVenta?.vendedorNombre }} · {{ formatEur(ultimaVenta?.total || 0) }}
-            </p>
-            <button
-              class="mt-2 px-6 py-2 rounded-full bg-primary-container text-white text-sm font-bold hover:opacity-90 transition-opacity"
-              @click="vaciarCarrito"
-            >
-              Nueva venta
-            </button>
-          </div>
-
-          <template v-else>
+          <template v-if="carrito.length > 0">
             <!-- Lista de líneas -->
             <div class="flex-1 overflow-y-auto divide-y divide-outline-variant/10">
               <div
@@ -336,27 +333,30 @@ async function confirmarVenta() {
 
                 <div class="flex items-center gap-1 flex-shrink-0">
                   <button
-                    class="w-6 h-6 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors"
+                    class="min-w-9 min-h-9 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors"
+                    :aria-label="`Quitar uno de ${linea.producto.nombre}`"
                     @click="cambiarCantidad(linea.producto.id, -1)"
                   >
-                    <Minus class="w-3 h-3 text-on-surface-variant" />
+                    <Minus class="w-3 h-3 text-on-surface-variant" aria-hidden="true" />
                   </button>
                   <span class="w-5 text-center text-xs font-bold text-primary">{{ linea.cantidad }}</span>
                   <button
-                    class="w-6 h-6 rounded-full flex items-center justify-center transition-colors"
+                    class="min-w-9 min-h-9 rounded-full flex items-center justify-center transition-colors"
                     :class="stockDisponible(linea.producto) > 0
                       ? 'bg-primary-container hover:opacity-90'
                       : 'bg-surface-container cursor-not-allowed opacity-40'"
                     :disabled="stockDisponible(linea.producto) <= 0"
+                    :aria-label="`Añadir uno más de ${linea.producto.nombre}`"
                     @click="cambiarCantidad(linea.producto.id, 1)"
                   >
-                    <Plus class="w-3 h-3 text-white" />
+                    <Plus class="w-3 h-3 text-white" aria-hidden="true" />
                   </button>
                   <button
-                    class="ml-1 w-6 h-6 rounded-full hover:bg-error/10 flex items-center justify-center transition-colors"
+                    class="ml-1 min-w-9 min-h-9 rounded-full hover:bg-error/10 flex items-center justify-center transition-colors"
+                    :aria-label="`Eliminar ${linea.producto.nombre} del carrito`"
                     @click="quitarLinea(linea.producto.id)"
                   >
-                    <Trash2 class="w-3 h-3 text-error" />
+                    <Trash2 class="w-3 h-3 text-error" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -370,15 +370,16 @@ async function confirmarVenta() {
             <div class="border-t border-outline-variant/10 px-5 py-4 space-y-3">
               <div class="space-y-1">
                 <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Método de pago</p>
-                <div class="grid grid-cols-2 gap-1 bg-surface-container-low p-1 rounded-xl">
+                <div class="grid grid-cols-2 gap-1 bg-surface-container-low p-1 rounded-xl" role="group" aria-label="Método de pago">
                   <button
                     v-for="metodo in metodosPago"
                     :key="metodo.key"
-                    class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all"
+                    class="min-h-10 px-2 rounded-lg text-xs font-bold transition-all"
                     :class="metodoPago === metodo.key
                       ? 'bg-white shadow-sm text-primary'
                       : 'text-on-surface-variant hover:text-on-surface'"
                     @click="metodoPago = metodo.key"
+                    :aria-pressed="metodoPago === metodo.key"
                   >
                     {{ metodo.label }}
                   </button>
@@ -405,13 +406,17 @@ async function confirmarVenta() {
               </button>
 
               <button
-                class="w-full text-center text-xs text-on-surface-variant hover:text-error transition-colors"
+                class="w-full min-h-10 text-center text-xs text-on-surface-variant hover:text-error transition-colors"
                 @click="vaciarCarrito"
               >
                 Vaciar carrito
               </button>
             </div>
           </template>
+
+          <div v-else class="px-5 py-8 text-center text-sm text-on-surface-variant">
+            El carrito está vacío.
+          </div>
 
         </div>
       </div>
@@ -424,9 +429,10 @@ async function confirmarVenta() {
     <button
       v-if="!carritoAbierto && totalUnidades > 0"
       class="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-primary-container text-white px-5 py-3 rounded-full shadow-lg hover:shadow-xl hover:shadow-primary-container/30 font-bold text-sm transition-all"
+      :aria-label="`Abrir carrito, ${totalUnidades} producto${totalUnidades > 1 ? 's' : ''}, total ${formatEur(totalCarrito)}`"
       @click="carritoAbierto = true"
     >
-      <ShoppingCart class="w-4 h-4" />
+      <ShoppingCart class="w-4 h-4" aria-hidden="true" />
       {{ totalUnidades }} producto{{ totalUnidades > 1 ? 's' : '' }} · {{ formatEur(totalCarrito) }}
     </button>
   </Transition>

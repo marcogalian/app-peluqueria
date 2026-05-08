@@ -66,23 +66,21 @@ function formatHora(timestamp: number): string {
           class="relative p-2 rounded-lg text-on-surface-variant
                  hover:text-primary-container hover:bg-surface-container-low
                  transition-colors"
+          :aria-label="conteo > 0 ? `Notificaciones, ${conteo} sin leer` : 'Notificaciones'"
+          :aria-expanded="dropdownAbierto"
+          aria-haspopup="menu"
           @click="toggleDropdown"
         >
-          <Bell class="w-5 h-5" />
-          <!-- Badge con conteo -->
+          <Bell class="w-5 h-5" aria-hidden="true" />
           <span
             v-if="conteo > 0"
             class="absolute top-1 right-1 min-w-[16px] h-4 px-0.5
                    bg-error text-white text-[9px] font-bold
                    rounded-full flex items-center justify-center leading-none"
+            aria-hidden="true"
           >
             {{ conteo > 9 ? '9+' : conteo }}
           </span>
-          <!-- Punto rojo cuando no hay conteo pero sí hay mensajes previos -->
-          <span
-            v-else
-            class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"
-          />
         </button>
 
         <!-- Dropdown de notificaciones -->
@@ -96,6 +94,8 @@ function formatHora(timestamp: number): string {
         >
           <div
             v-show="dropdownAbierto"
+            role="menu"
+            aria-label="Notificaciones"
             class="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-lg
                    border border-outline-variant/20 z-50 overflow-hidden"
           >
@@ -105,6 +105,7 @@ function formatHora(timestamp: number): string {
               <button
                 v-if="conteo > 0"
                 class="text-[10px] text-primary-container hover:underline"
+                role="menuitem"
                 @click="limpiarConteo"
               >
                 Marcar todo leído
@@ -118,10 +119,13 @@ function formatHora(timestamp: number): string {
                 :key="i"
                 class="w-full flex items-start gap-3 px-4 py-3
                        hover:bg-surface-container-low transition-colors text-left"
+                role="menuitem"
+                :aria-label="`Mensaje de ${m.emisor} a las ${formatHora(m.timestamp)}`"
                 @click="irAMensajes"
               >
                 <div class="w-8 h-8 rounded-full bg-primary-container text-white
-                            flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                            flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                     aria-hidden="true">
                   {{ m.emisor.slice(0, 2).toUpperCase() }}
                 </div>
                 <div class="min-w-0 flex-1">
@@ -134,7 +138,7 @@ function formatHora(timestamp: number): string {
 
             <!-- Sin notificaciones -->
             <div v-else class="px-4 py-8 text-center">
-              <Bell class="w-8 h-8 text-on-surface-variant/30 mx-auto mb-2" />
+              <Bell class="w-8 h-8 text-on-surface-variant/30 mx-auto mb-2" aria-hidden="true" />
               <p class="text-sm text-on-surface-variant">Sin mensajes nuevos</p>
             </div>
 
@@ -143,6 +147,7 @@ function formatHora(timestamp: number): string {
               <button
                 class="w-full text-center text-xs font-bold text-primary-container
                        hover:underline transition-colors"
+                role="menuitem"
                 @click="irAMensajes"
               >
                 Ver todos los mensajes
@@ -157,9 +162,10 @@ function formatHora(timestamp: number): string {
         class="p-2 rounded-lg text-on-surface-variant
                hover:text-primary-container hover:bg-surface-container-low
                transition-colors"
+        aria-label="Configuración"
         @click="irAConfiguracion"
       >
-        <Settings class="w-5 h-5" />
+        <Settings class="w-5 h-5" aria-hidden="true" />
       </button>
 
       <!-- Divisor vertical -->

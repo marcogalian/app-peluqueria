@@ -4,8 +4,11 @@
  * KPIs + alertas de stock + tabla con filtros por categoría.
  */
 import { Plus, AlertTriangle, Package, Loader2, X, Save, ShoppingCart } from 'lucide-vue-next'
+import { useToast } from '~/modules/shared/composables/useToast'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
+
+const toast = useToast()
 
 // ── Tipos ─────────────────────────────────────────────────
 interface Producto {
@@ -75,6 +78,12 @@ const productosFiltrados = computed(() =>
 )
 
 const stockBajo      = computed(() => productos.value.filter(p => p.stock <= p.stockMinimo))
+const productosPorReponer = computed(() =>
+  [...stockBajo.value]
+    .sort((a, b) => a.stock - b.stock || a.nombre.localeCompare(b.nombre))
+    .slice(0, 3),
+)
+const sinStock = computed(() => productos.value.filter(p => p.stock === 0))
 const valorInventario = computed(() =>
   productos.value.reduce((acc, p) => acc + p.precio * p.stock, 0),
 )
@@ -120,16 +129,23 @@ async function guardar() {
       productos.value.unshift(data)
     }
     drawerAbierto.value = false
-  } catch { /* toast */ } finally {
+    toast.success(productoEditar.value.id ? 'Producto actualizado' : 'Producto creado')
+  } catch {
+    toast.error('Error al guardar el producto')
+  } finally {
     guardando.value = false
   }
 }
 
 async function eliminar(id: number) {
-  if (!confirm('¿Eliminar este producto?')) return
-  const { api } = await import('~/infrastructure/http/api')
-  await api.delete(`/v1/productos/${id}`)
-  productos.value = productos.value.filter(p => p.id !== id)
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.delete(`/v1/productos/${id}`)
+    productos.value = productos.value.filter(p => p.id !== id)
+    toast.success('Producto eliminado')
+  } catch {
+    toast.error('Error al eliminar el producto')
+  }
 }
 
 function abrirVenta(producto: Producto) {
@@ -212,14 +228,23 @@ function formatEur(n: number): string {
       </div>
 
       <div class="card-kpi">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Stock bajo</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Productos por reponer</p>
         <h3 class="text-4xl font-extrabold text-primary">{{ stockBajo.length }}</h3>
-        <p class="text-xs text-error mt-2 font-medium">Requieren reposición</p>
+        <div v-if="productosPorReponer.length" class="mt-3 space-y-1.5">
+          <p
+            v-for="producto in productosPorReponer"
+            :key="producto.id"
+            class="truncate text-xs font-medium text-on-surface-variant"
+          >
+            {{ producto.nombre }} · {{ producto.stock }} uds
+          </p>
+        </div>
+        <p v-else class="text-xs text-green-700 mt-2 font-medium">Todo el stock está controlado</p>
       </div>
 
       <div class="card-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Sin stock</p>
-        <h3 class="text-4xl font-extrabold text-primary">{{ productos.filter(p => p.stock === 0).length }}</h3>
+        <h3 class="text-4xl font-extrabold text-primary">{{ sinStock.length }}</h3>
         <p class="text-xs text-on-surface-variant mt-2">Agotados actualmente</p>
       </div>
 
@@ -247,7 +272,9 @@ function formatEur(n: number): string {
     <div v-if="stockBajo.length > 0" class="card p-5 !bg-amber-50 border-amber-200">
       <div class="flex items-center gap-2 mb-3">
         <AlertTriangle class="w-4 h-4 text-amber-600" />
-        <p class="text-sm font-bold text-amber-800">{{ stockBajo.length }} producto{{ stockBajo.length !== 1 ? 's' : '' }} con stock bajo</p>
+        <p class="text-sm font-bold text-amber-800">
+          {{ stockBajo.length }} producto{{ stockBajo.length !== 1 ? 's' : '' }} para reponer
+        </p>
       </div>
       <div class="flex flex-wrap gap-2">
         <span
@@ -259,6 +286,9 @@ function formatEur(n: number): string {
           {{ p.nombre }} ({{ p.stock }} uds)
         </span>
       </div>
+      <p class="mt-3 text-xs text-amber-800/80">
+        Pulsa en cualquier producto para editar stock o ajustar el mínimo.
+      </p>
     </div>
 
     <!-- ── Tabla principal ────────────────────────────────── -->
@@ -266,18 +296,18 @@ function formatEur(n: number): string {
 
       <!-- Filtros + acción -->
       <div class="flex items-center justify-between gap-4 mb-8 flex-wrap">
-        <div class="flex items-center gap-2 flex-wrap">
-          <button
-            v-for="cat in categorias"
-            :key="cat"
-            class="px-5 py-2 rounded-full text-xs font-bold transition-all"
-            :class="filtroCategoria === cat
-              ? 'bg-primary-container text-white shadow-md shadow-primary-container/20'
-              : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'"
-            @click="filtroCategoria = cat"
+        <div class="w-full sm:w-60">
+          <label for="inventario-categoria" class="sr-only">Filtrar productos por categoría</label>
+          <select
+            id="inventario-categoria"
+            v-model="filtroCategoria"
+            class="select-field rounded-full bg-surface-container-lowest border-outline-variant/30"
+            aria-label="Filtrar productos por categoría"
           >
-            {{ labelCat[cat] }}
-          </button>
+            <option v-for="cat in categorias" :key="cat" :value="cat">
+              {{ labelCat[cat] }}
+            </option>
+          </select>
         </div>
         <button
           class="flex items-center gap-2 bg-primary-container text-white px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all"
@@ -295,14 +325,14 @@ function formatEur(n: number): string {
 
       <!-- Tabla -->
       <div v-else class="overflow-x-auto">
-        <table class="w-full text-left border-separate border-spacing-y-3">
+        <table class="w-full text-left border-separate border-spacing-y-3" aria-label="Inventario de productos">
           <thead>
             <tr class="text-on-surface-variant/60 text-[10px] uppercase tracking-[0.15em] font-bold">
-              <th class="pb-4 px-4">Producto</th>
-              <th class="pb-4 px-4">Categoría</th>
-              <th class="pb-4 px-4">Precio</th>
-              <th class="pb-4 px-4">Stock</th>
-              <th class="pb-4 px-4 text-right">Acciones</th>
+              <th scope="col" class="pb-4 px-4">Producto</th>
+              <th scope="col" class="pb-4 px-4">Categoría</th>
+              <th scope="col" class="pb-4 px-4">Precio</th>
+              <th scope="col" class="pb-4 px-4">Stock</th>
+              <th scope="col" class="pb-4 px-4 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody class="text-sm">
@@ -469,7 +499,7 @@ function formatEur(n: number): string {
 
           <div class="space-y-2">
             <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Categoría</label>
-            <select v-model="productoEditar.categoria" class="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container">
+            <select v-model="productoEditar.categoria" class="select-field border-none">
               <option v-for="cat in categorias.filter(c => c !== 'TODOS')" :key="cat" :value="cat">{{ labelCat[cat] }}</option>
             </select>
           </div>

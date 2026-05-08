@@ -235,7 +235,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
       </div>
       <div class="flex items-center gap-3 w-full md:w-auto">
         <input type="date" v-model="fechaFiltro" class="input bg-white w-full md:w-44" />
-        <select v-model="agrupacion" class="input bg-white w-full md:w-44 cursor-pointer">
+        <select v-model="agrupacion" class="select-field bg-white w-full md:w-44 cursor-pointer">
           <option value="DIA">Ver datos del día</option>
           <option value="MES">Ver datos del mes</option>
         </select>
@@ -425,15 +425,16 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
             </div>
           </div>
           <div class="overflow-x-auto rounded-xl border border-outline-variant/20">
-            <table class="w-full text-left border-collapse bg-white">
+            <table class="w-full text-left border-collapse bg-white" aria-label="Ausencias y vacaciones del equipo">
+              <caption class="sr-only">Control de días de ausencia por empleado este mes</caption>
               <thead class="bg-surface-container-low">
                 <tr class="border-b border-outline-variant/20">
-                  <th class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider">Empleado</th>
-                  <th class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Citas mes</th>
-                  <th class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Vacaciones</th>
-                  <th class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Pendientes</th>
-                  <th class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">A. Propios</th>
-                  <th class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Baja</th>
+                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider">Empleado</th>
+                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Citas mes</th>
+                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Vacaciones</th>
+                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Pendientes</th>
+                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">A. Propios</th>
+                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Baja</th>
                 </tr>
               </thead>
               <tbody class="text-sm divide-y divide-outline-variant/10">

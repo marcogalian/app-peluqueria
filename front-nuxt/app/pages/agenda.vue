@@ -1,643 +1,937 @@
 <script setup lang="ts">
-/**
- * Página Agenda de Citas — diseño Atelier Sapphire.
- *
- * Layout: calendario mensual custom (izquierda) + panel "Detalle del Día" (derecha).
- * Al hacer click en un día con citas, el panel derecho muestra la lista del día.
- *
- * Los empleados ven nombre del cliente pero NO teléfono, email ni dirección,
- * para proteger la privacidad y evitar que se lleven clientela.
- */
 import {
-  User, MoreVertical, Plus, CheckCircle2, X, Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Loader2,
+  Plus,
+  Search,
+  Users,
+  X,
 } from 'lucide-vue-next'
 import {
-  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  addDays, isSameMonth, isToday, isSameDay,
-  setMonth as dfSetMonth, setDate as dfSetDate,
-  getDaysInMonth, getMonth, getDate,
+  addDays,
+  format,
+  isSameDay,
+  isToday,
+  startOfWeek,
+  subDays,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
-import type { CitaAgenda } from '~/modules/agenda/types/agenda.types'
-import type { ResumenDia } from '~/modules/calendario/types/calendario.types'
-import { agendaService } from '~/modules/agenda/services/agendaService'
-import { calendarioService } from '~/modules/calendario/services/calendarioService'
+import { isAxiosError } from 'axios'
+import { api } from '~/infrastructure/http/api'
+import { useToast } from '~/modules/shared/composables/useToast'
 
 definePageMeta({ middleware: 'auth' })
 
-// ── Estado ────────────────────────────────────────────────
-const mesActual       = ref(new Date())
-const diaSeleccionado = ref(new Date())       // hoy por defecto
-const resumenMes      = ref<ResumenDia[]>([])
-const citasDia        = ref<CitaAgenda[]>([])
-const cargandoCitas   = ref(false)
-const citaEnEdicion   = ref<string | null>(null)
-const comentarioTemp  = ref('')
+type EstadoCita = 'PENDIENTE' | 'EN_CURSO' | 'COMPLETADA' | 'CANCELADO'
+type GeneroCliente = 'FEMENINO' | 'MASCULINO' | 'OTRO'
 
-// ── Selects de mes y día ───────────────────────────────────
-const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+interface ClienteAgenda {
+  id: string
+  nombre: string
+  apellidos: string
+  telefono?: string
+  email?: string
+  genero?: GeneroCliente
+  esVip?: boolean
+  descuentoPorcentaje?: number | null
+}
 
-const mesSeleccionado = computed({
-  get: () => getMonth(mesActual.value) + 1,
-  set: (val: number) => {
-    const nueva = dfSetMonth(mesActual.value, val - 1)
-    mesActual.value = nueva
-    const maxDia = getDaysInMonth(nueva)
-    const diaActual = getDate(diaSeleccionado.value)
-    seleccionarDia(dfSetDate(nueva, Math.min(diaActual, maxDia)))
-  },
-})
+interface ServicioAgenda {
+  id: string
+  nombre: string
+  duracionMinutos?: number
+}
 
-const diasDelMes = computed(() => {
-  const n = getDaysInMonth(mesActual.value)
-  return Array.from({ length: n }, (_, i) => i + 1)
-})
-
-const numeroDia = computed({
-  get: () => getDate(diaSeleccionado.value),
-  set: (val: number) => seleccionarDia(dfSetDate(mesActual.value, val)),
-})
-
-// ── Modal nueva cita ───────────────────────────────────────
-const modalAbierto   = ref(false)
-const cargandoModal  = ref(false)
-const guardandoCita  = ref(false)
-const errorModal     = ref('')
-const clientes       = ref<any[]>([])
-const serviciosLista = ref<any[]>([])
-const peluqueros     = ref<any[]>([])
-
-const formNuevaCita = ref({
-  fecha:       '',
-  hora:        '10:00',
-  clienteId:   '',
-  servicioId:  '',
-  peluqueroId: '',
-})
-
-async function abrirModal() {
-  formNuevaCita.value = {
-    fecha:       format(diaSeleccionado.value, 'yyyy-MM-dd'),
-    hora:        '10:00',
-    clienteId:   '',
-    servicioId:  '',
-    peluqueroId: '',
+interface PeluqueroAgenda {
+  id: string
+  nombre: string
+  disponible?: boolean
+  user?: {
+    id?: string
+    username?: string
   }
-  errorModal.value = ''
-  modalAbierto.value = true
+}
 
-  if (!clientes.value.length) {
-    cargandoModal.value = true
-    try {
-      const { api } = await import('~/infrastructure/http/api')
-      const [resC, resS, resP] = await Promise.all([
-        api.get('/v1/clientes'),
-        api.get('/v1/servicios'),
-        api.get('/peluqueros'),
-      ])
-      clientes.value       = resC.data
-      serviciosLista.value = resS.data
-      peluqueros.value     = resP.data
-    } catch {
-      errorModal.value = 'Error cargando datos. Comprueba que el backend esté activo.'
-    } finally {
-      cargandoModal.value = false
+interface CitaApi {
+  id: string
+  fechaHora: string
+  duracionTotal?: number
+  estado: EstadoCita
+  comentarios?: string
+  motivoCancelacion?: string | null
+  cliente: ClienteAgenda
+  peluquero: PeluqueroAgenda
+  servicios: ServicioAgenda[]
+}
+
+interface CitaAgendaItem {
+  id: string
+  horaInicio: string
+  duracionMinutos: number
+  estado: EstadoCita
+  clienteNombre: string
+  clienteApellidos: string
+  clienteTelefono: string
+  clienteEmail: string
+  clienteEsVip: boolean
+  servicioNombre: string
+  comentarios: string
+  motivoCancelacion: string | null
+}
+
+const toast = useToast()
+const authStore = useAuthStore()
+
+const HORA_INICIO = 9
+const HORA_FIN = 21
+const SLOT_MINUTOS = 15
+
+const diaActual = ref(new Date())
+const cargando = ref(true)
+const guardando = ref(false)
+const errorCarga = ref('')
+
+const peluqueros = ref<PeluqueroAgenda[]>([])
+const clientes = ref<ClienteAgenda[]>([])
+const servicios = ref<ServicioAgenda[]>([])
+const citasDia = ref<CitaAgendaItem[]>([])
+
+const miPeluqueroId = ref<string | null>(null)
+const peluqueroSeleccionadoId = ref<string | null>(null)
+const mostrandoAgendas = ref(false)
+const horaSeleccionada = ref<string | null>(null)
+
+const clienteQuery = ref('')
+const clienteSeleccionadoId = ref<string | null>(null)
+const notasCita = ref('')
+const errorGeneralFormulario = ref('')
+
+const erroresFormulario = reactive({
+  cliente: '',
+  telefono: '',
+  servicio: '',
+})
+
+const formCita = reactive({
+  servicioId: '',
+})
+
+const formNuevoCliente = reactive({
+  telefono: '',
+  email: '',
+  genero: 'OTRO' as GeneroCliente,
+})
+
+const slots = computed(() => {
+  const resultado: string[] = []
+  for (let h = HORA_INICIO; h < HORA_FIN; h++) {
+    for (let m = 0; m < 60; m += SLOT_MINUTOS) {
+      resultado.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
     }
   }
-}
-
-async function crearCita() {
-  const { fecha, hora, clienteId, servicioId, peluqueroId } = formNuevaCita.value
-  if (!clienteId || !servicioId || !peluqueroId) {
-    errorModal.value = 'Completa todos los campos.'
-    return
-  }
-  guardandoCita.value = true
-  errorModal.value = ''
-  try {
-    const { api } = await import('~/infrastructure/http/api')
-    await api.post('/citas', {
-      fechaHora: `${fecha}T${hora}:00`,
-      estado: 'PENDIENTE',
-      cliente:   { id: clienteId },
-      peluquero: { id: peluqueroId },
-      servicios: [{ id: servicioId }],
-    })
-    modalAbierto.value = false
-    await cargarResumenMes()
-    if (format(diaSeleccionado.value, 'yyyy-MM-dd') === fecha) {
-      await seleccionarDia(diaSeleccionado.value)
-    }
-  } catch {
-    errorModal.value = 'Error al crear la cita. Inténtalo de nuevo.'
-  } finally {
-    guardandoCita.value = false
-  }
-}
-
-// ── Días del calendario (grid 7 cols) ─────────────────────
-const diasDelCalendario = computed(() => {
-  const inicio = startOfWeek(startOfMonth(mesActual.value), { weekStartsOn: 1 }) // empieza lunes
-  const fin    = endOfWeek(endOfMonth(mesActual.value), { weekStartsOn: 1 })
-  const dias: Date[] = []
-  let d = inicio
-  while (d <= fin) {
-    dias.push(d)
-    d = addDays(d, 1)
-  }
-  return dias
+  return resultado
 })
 
-// Encabezados de días de la semana
-const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const textoFecha = computed(() => {
+  const value = format(diaActual.value, "EEEE d 'de' MMMM", { locale: es })
+  return value.charAt(0).toUpperCase() + value.slice(1)
+})
 
-// ── Helpers ───────────────────────────────────────────────
+const diasSemana = computed(() => {
+  const inicio = startOfWeek(diaActual.value, { weekStartsOn: 1 })
+  return Array.from({ length: 7 }, (_, i) => addDays(inicio, i))
+})
 
-/** Resumen de un día concreto (número de citas y lista resumida) */
-function resumenDe(dia: Date): ResumenDia | undefined {
-  const key = format(dia, 'yyyy-MM-dd')
-  return resumenMes.value.find(r => r.fecha === key)
-}
-
-/** Texto del mes y año para el encabezado del calendario */
-const textoMes = computed(() =>
-  format(mesActual.value, 'MMMM yyyy', { locale: es })
-    .replace(/^\w/, c => c.toUpperCase()),
+const peluqueroActual = computed(() =>
+  peluqueros.value.find(p => p.id === peluqueroSeleccionadoId.value) ?? null,
 )
 
-/** Texto del día seleccionado para el panel lateral */
-const textoDiaSeleccionado = computed(() => ({
-  numero:     format(diaSeleccionado.value, 'd'),
-  mesCorto:   format(diaSeleccionado.value, 'MMM', { locale: es }).toUpperCase(),
-  diaSemana:  format(diaSeleccionado.value, 'EEEE', { locale: es }).replace(/^\w/, c => c.toUpperCase()),
-}))
+const viendoAgendaAjena = computed(() =>
+  Boolean(
+    miPeluqueroId.value &&
+    peluqueroSeleccionadoId.value &&
+    miPeluqueroId.value !== peluqueroSeleccionadoId.value,
+  ),
+)
 
-/** Capacidad del día en % (basada en número de citas vs máximo asumido de 8) */
-const capacidadDia = computed(() => {
-  const total = citasDia.value.length
-  return Math.min(Math.round((total / 8) * 100), 100)
+const puedeEditarAgendaActual = computed(() =>
+  authStore.isAdmin || !viendoAgendaAjena.value,
+)
+
+const clienteSeleccionado = computed(() =>
+  clientes.value.find(c => c.id === clienteSeleccionadoId.value) ?? null,
+)
+
+const servicioSeleccionado = computed(() =>
+  servicios.value.find(servicio => servicio.id === formCita.servicioId) ?? null,
+)
+
+const coincidenciasClientes = computed(() => {
+  const query = clienteQuery.value.trim().toLowerCase()
+  if (!query || clienteSeleccionadoId.value) return []
+
+  return clientes.value
+    .filter((cliente) => {
+      const nombreCompleto = `${cliente.nombre} ${cliente.apellidos}`.trim().toLowerCase()
+      return nombreCompleto.includes(query) || (cliente.telefono ?? '').includes(query)
+    })
+    .slice(0, 6)
 })
 
-// ── Acciones ──────────────────────────────────────────────
+const primerClienteCoincidente = computed(() => coincidenciasClientes.value[0] ?? null)
 
-async function seleccionarDia(dia: Date) {
-  diaSeleccionado.value = dia
-  cargandoCitas.value   = true
-  try {
-    citasDia.value = await agendaService.getCitasDelDia(dia)
-  } finally {
-    cargandoCitas.value = false
-  }
-}
+const clienteEsNuevo = computed(() =>
+  clienteQuery.value.trim().length > 0 && !clienteSeleccionado.value,
+)
 
-async function cargarResumenMes() {
-  try {
-    resumenMes.value = await calendarioService.getResumenMes(
-      mesActual.value.getFullYear(),
-      mesActual.value.getMonth() + 1,
-    )
-  } catch {
-    resumenMes.value = []
-  }
-}
+const telefonoCliente = computed(() => clienteSeleccionado.value?.telefono ?? '')
+const emailCliente = computed(() => clienteSeleccionado.value?.email ?? '')
+const generoCliente = computed(() => clienteSeleccionado.value?.genero ?? 'OTRO')
 
+watch(clienteQuery, (nuevoValor) => {
+  erroresFormulario.cliente = ''
+  errorGeneralFormulario.value = ''
 
-async function iniciarEdicionComentario(cita: CitaAgenda) {
-  citaEnEdicion.value = cita.id
-  comentarioTemp.value = cita.comentarios
-}
-
-async function guardarComentario(cita: CitaAgenda) {
-  if (comentarioTemp.value === cita.comentarios) {
-    citaEnEdicion.value = null
+  if (!nuevoValor.trim()) {
+    clienteSeleccionadoId.value = null
     return
   }
 
-  try {
-    await agendaService.actualizarComentario(cita.id, comentarioTemp.value)
-    cita.comentarios = comentarioTemp.value
-    citaEnEdicion.value = null
-  } catch (error) {
-    console.error('Error al guardar comentario:', error)
+  if (clienteSeleccionado.value) {
+    const nombreActual = nombreCompleto(clienteSeleccionado.value).toLowerCase()
+    if (nuevoValor.trim().toLowerCase() !== nombreActual) {
+      clienteSeleccionadoId.value = null
+    }
+  }
+
+  const matchExacto = clientes.value.find((cliente) =>
+    nombreCompleto(cliente).toLowerCase() === nuevoValor.trim().toLowerCase(),
+  )
+
+  if (matchExacto) {
+    seleccionarCliente(matchExacto)
+  }
+})
+
+watch([diaActual, peluqueroSeleccionadoId], async () => {
+  if (peluqueroSeleccionadoId.value) {
+    await cargarCitasDia()
+  }
+})
+
+watch(() => formNuevoCliente.telefono, () => {
+  erroresFormulario.telefono = ''
+  errorGeneralFormulario.value = ''
+})
+
+watch(() => formCita.servicioId, () => {
+  erroresFormulario.servicio = ''
+  errorGeneralFormulario.value = ''
+})
+
+function nombreCompleto(cliente: ClienteAgenda) {
+  return `${cliente.nombre} ${cliente.apellidos ?? ''}`.trim()
+}
+
+function getFechaHoraIso(hora: string) {
+  return `${format(diaActual.value, 'yyyy-MM-dd')}T${hora}:00`
+}
+
+function mapearCita(cita: CitaApi): CitaAgendaItem {
+  return {
+    id: cita.id,
+    horaInicio: format(new Date(cita.fechaHora), 'HH:mm'),
+    duracionMinutos: cita.duracionTotal || cita.servicios?.[0]?.duracionMinutos || 30,
+    estado: cita.estado,
+    clienteNombre: cita.cliente?.nombre ?? '',
+    clienteApellidos: cita.cliente?.apellidos ?? '',
+    clienteTelefono: cita.cliente?.telefono ?? '',
+    clienteEmail: cita.cliente?.email ?? '',
+    clienteEsVip: Boolean(cita.cliente?.esVip),
+    servicioNombre: cita.servicios?.[0]?.nombre ?? 'Sin servicio',
+    comentarios: cita.comentarios ?? '',
+    motivoCancelacion: cita.motivoCancelacion ?? null,
   }
 }
 
-function cancelarEdicion() {
-  citaEnEdicion.value = null
-  comentarioTemp.value = ''
+function slotsCita(cita: CitaAgendaItem) {
+  return Math.max(1, Math.ceil((cita.duracionMinutos || 30) / SLOT_MINUTOS))
 }
 
-// Clases CSS de cada celda del calendario
-function claseCelda(dia: Date): string {
-  const base  = 'min-h-[70px] sm:min-h-[110px] p-1 sm:p-2 border-r border-b border-surface-container cursor-pointer transition-colors group'
-  const esHoy = isToday(dia)
-  const selec = isSameDay(dia, diaSeleccionado.value)
-  const fuera = !isSameMonth(dia, mesActual.value)
-
-  if (fuera)  return `${base} opacity-30 bg-surface-container-low/10`
-  if (selec)  return `${base} bg-primary-container/5 ring-2 ring-inset ring-primary-container/20`
-  if (esHoy)  return `${base} bg-surface-container-low/50`
-  return       `${base} hover:bg-surface-container-low`
+function parseHora(hora: string) {
+  const [h, m] = hora.split(':').map(Number)
+  return h * 60 + m
 }
 
-// Recargar mes cuando cambia mesActual
-watch(mesActual, cargarResumenMes)
+function duracionNuevaCita() {
+  return Math.max(SLOT_MINUTOS, servicioSeleccionado.value?.duracionMinutos || 30)
+}
+
+function citaOcupaSlot(hora: string) {
+  const minutoSlot = parseHora(hora)
+  return citasDia.value.find((cita) => {
+    const minutoCita = parseHora(cita.horaInicio)
+    return minutoSlot >= minutoCita && minutoSlot < minutoCita + cita.duracionMinutos
+  })
+}
+
+function esInicioCita(hora: string) {
+  return citasDia.value.find(cita => cita.horaInicio === hora)
+}
+
+function puedeEmpezarCita(hora: string) {
+  if (citaOcupaSlot(hora)) return false
+
+  const inicio = parseHora(hora)
+  const fin = inicio + duracionNuevaCita()
+  const cierre = HORA_FIN * 60
+
+  if (fin > cierre) return false
+
+  return !citasDia.value.some((cita) => {
+    const citaInicio = parseHora(cita.horaInicio)
+    const citaFin = citaInicio + cita.duracionMinutos
+    return inicio < citaFin && fin > citaInicio
+  })
+}
+
+function seleccionarCliente(cliente: ClienteAgenda) {
+  clienteSeleccionadoId.value = cliente.id
+  clienteQuery.value = nombreCompleto(cliente)
+}
+
+function limpiarClienteSeleccionado() {
+  const habiaCliente = Boolean(clienteSeleccionado.value)
+  clienteSeleccionadoId.value = null
+  if (habiaCliente) {
+    clienteQuery.value = ''
+  }
+}
+
+function resolverClienteDesdeBusqueda() {
+  if (clienteSeleccionado.value) return
+
+  const query = clienteQuery.value.trim()
+  if (!query) return
+
+  const matchExacto = clientes.value.find((cliente) =>
+    nombreCompleto(cliente).toLowerCase() === query.toLowerCase(),
+  )
+
+  if (matchExacto) {
+    seleccionarCliente(matchExacto)
+    return
+  }
+
+  if (primerClienteCoincidente.value) {
+    seleccionarCliente(primerClienteCoincidente.value)
+  }
+}
+
+function resetFormularioCita() {
+  horaSeleccionada.value = null
+  clienteQuery.value = ''
+  clienteSeleccionadoId.value = null
+  formCita.servicioId = ''
+  notasCita.value = ''
+  formNuevoCliente.telefono = ''
+  formNuevoCliente.email = ''
+  formNuevoCliente.genero = 'OTRO'
+  errorGeneralFormulario.value = ''
+  erroresFormulario.cliente = ''
+  erroresFormulario.telefono = ''
+  erroresFormulario.servicio = ''
+}
+
+function seleccionarHora(hora: string) {
+  if (!puedeEmpezarCita(hora)) return
+  horaSeleccionada.value = hora
+}
+
+function irDia(dia: Date) {
+  diaActual.value = dia
+}
+
+async function cargarDatosBase() {
+  const [resPeluqueros, resClientes, resServicios] = await Promise.all([
+    api.get<PeluqueroAgenda[]>('/peluqueros'),
+    api.get<ClienteAgenda[]>('/v1/clientes'),
+    api.get<ServicioAgenda[]>('/v1/servicios'),
+  ])
+
+  peluqueros.value = resPeluqueros.data ?? []
+  clientes.value = resClientes.data ?? []
+  servicios.value = resServicios.data ?? []
+
+  const mio = peluqueros.value.find((peluquero) =>
+    peluquero.user?.username === authStore.usuario?.username ||
+    peluquero.user?.id === authStore.usuario?.id,
+  )
+
+  miPeluqueroId.value = mio?.id ?? null
+  peluqueroSeleccionadoId.value = miPeluqueroId.value ?? peluqueros.value[0]?.id ?? null
+}
+
+async function cargarCitasDia() {
+  if (!peluqueroSeleccionadoId.value) {
+    citasDia.value = []
+    return
+  }
+
+  cargando.value = true
+  errorCarga.value = ''
+
+  try {
+    const inicio = `${format(diaActual.value, 'yyyy-MM-dd')}T00:00:00`
+    const fin = `${format(diaActual.value, 'yyyy-MM-dd')}T23:59:59`
+    const { data } = await api.get<CitaApi[]>('/citas', {
+      params: {
+        start: inicio,
+        end: fin,
+        peluqueroId: peluqueroSeleccionadoId.value,
+      },
+    })
+
+    citasDia.value = (data ?? []).map(mapearCita)
+  } catch {
+    citasDia.value = []
+    errorCarga.value = 'No se pudieron cargar las citas del día.'
+  } finally {
+    cargando.value = false
+  }
+}
+
+function separarNombreCompleto(value: string) {
+  const partes = value.trim().split(/\s+/)
+  return {
+    nombre: partes[0] ?? '',
+    apellidos: partes.slice(1).join(' '),
+  }
+}
+
+async function crearClienteSiHaceFalta() {
+  if (clienteSeleccionado.value) {
+    return clienteSeleccionado.value.id
+  }
+
+  const nombrePlano = clienteQuery.value.trim()
+  if (!nombrePlano) {
+    throw new Error('Escribe el nombre del cliente.')
+  }
+  if (!formNuevoCliente.telefono.trim()) {
+    throw new Error('Añade un teléfono para guardar el cliente.')
+  }
+
+  const { nombre, apellidos } = separarNombreCompleto(nombrePlano)
+  if (!nombre) {
+    throw new Error('Escribe al menos el nombre del cliente.')
+  }
+
+  const { data } = await api.post<ClienteAgenda>('/v1/clientes', {
+    nombre,
+    apellidos,
+    telefono: formNuevoCliente.telefono.trim(),
+    email: formNuevoCliente.email.trim(),
+    genero: formNuevoCliente.genero,
+    esVip: false,
+  })
+
+  clientes.value.unshift(data)
+  seleccionarCliente(data)
+  return data.id
+}
+
+async function guardarCita() {
+  errorGeneralFormulario.value = ''
+  erroresFormulario.cliente = ''
+  erroresFormulario.telefono = ''
+  erroresFormulario.servicio = ''
+
+  if (!horaSeleccionada.value) {
+    errorGeneralFormulario.value = 'Selecciona una hora libre en la agenda antes de guardar.'
+    return
+  }
+  if (!puedeEditarAgendaActual.value) {
+    errorGeneralFormulario.value = 'Solo puedes crear citas en tu propia agenda.'
+    return
+  }
+  if (!peluqueroSeleccionadoId.value) {
+    errorGeneralFormulario.value = 'No hay una agenda disponible para guardar esta cita.'
+    return
+  }
+  if (!clienteQuery.value.trim()) {
+    erroresFormulario.cliente = 'Escribe el nombre del cliente.'
+  }
+  if (!clienteSeleccionado.value && !formNuevoCliente.telefono.trim()) {
+    erroresFormulario.telefono = 'Añade un teléfono para guardar al cliente.'
+  }
+  if (!formCita.servicioId) {
+    erroresFormulario.servicio = 'Selecciona un servicio.'
+  }
+
+  if (erroresFormulario.cliente || erroresFormulario.telefono || erroresFormulario.servicio) {
+    return
+  }
+
+  guardando.value = true
+  try {
+    const clienteId = await crearClienteSiHaceFalta()
+
+    await api.post('/citas', {
+      fechaHora: getFechaHoraIso(horaSeleccionada.value),
+      estado: 'PENDIENTE',
+      comentarios: notasCita.value.trim(),
+      cliente: { id: clienteId },
+      peluquero: { id: peluqueroSeleccionadoId.value },
+      servicios: [{ id: formCita.servicioId }],
+    })
+
+    toast.success('Cita guardada')
+    resetFormularioCita()
+    await cargarCitasDia()
+  } catch (error) {
+    let message = 'No se pudo guardar la cita.'
+
+    if (isAxiosError(error)) {
+      const status = error.response?.status
+      const apiMessage = error.response?.data?.message
+
+      if (status === 403) {
+        message = viendoAgendaAjena.value
+          ? 'Solo puedes crear citas en tu propia agenda.'
+          : 'No tienes permisos para guardar esta cita.'
+      } else if (typeof apiMessage === 'string' && apiMessage.trim()) {
+        message = apiMessage
+      } else if (status === 409) {
+        message = 'Ese hueco ya no está libre. Recarga la agenda y prueba otra hora.'
+      }
+    } else if (error instanceof Error && error.message.trim()) {
+      message = error.message
+    }
+
+    errorGeneralFormulario.value = message
+  } finally {
+    guardando.value = false
+  }
+}
+
+async function seleccionarAgenda(peluqueroId: string) {
+  peluqueroSeleccionadoId.value = peluqueroId
+  mostrandoAgendas.value = false
+  resetFormularioCita()
+  await cargarCitasDia()
+}
 
 onMounted(async () => {
-  await cargarResumenMes()
-  await seleccionarDia(new Date())
+  cargando.value = true
+  try {
+    await cargarDatosBase()
+    await cargarCitasDia()
+  } catch {
+    errorCarga.value = 'No se pudo preparar la agenda.'
+    cargando.value = false
+  }
 })
 </script>
 
 <template>
-  <!-- Layout de dos columnas: calendario izquierda + panel derecha -->
-  <div class="flex flex-col lg:flex-row gap-6 h-full overflow-hidden">
-
-    <!-- ══════════════════════════════════════════════════════
-         CALENDARIO MENSUAL — columna principal
-         ════════════════════════════════════════════════════ -->
-    <section class="flex-1 bg-surface-container-lowest rounded-2xl overflow-hidden flex flex-col shadow-card border border-outline-variant/10">
-
-      <!-- Cabecera del calendario -->
-      <div class="px-6 py-4 flex items-center justify-between border-b border-surface-container">
-        <div class="flex items-center gap-3">
-          <!-- Selector de mes -->
-          <select
-            v-model.number="mesSeleccionado"
-            class="px-3 py-1.5 rounded-xl border border-surface-container bg-surface-container-low text-sm font-semibold text-primary-container focus:outline-none focus:ring-2 focus:ring-primary-container/30 cursor-pointer"
-          >
-            <option v-for="(mes, i) in meses" :key="i" :value="i + 1">{{ mes }}</option>
-          </select>
-          <!-- Selector de día -->
-          <select
-            v-model.number="numeroDia"
-            class="px-3 py-1.5 rounded-xl border border-surface-container bg-surface-container-low text-sm font-semibold text-primary-container focus:outline-none focus:ring-2 focus:ring-primary-container/30 cursor-pointer"
-          >
-            <option v-for="d in diasDelMes" :key="d" :value="d">Día {{ d }}</option>
-          </select>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <!-- Botón "Hoy" -->
-          <button
-            class="px-4 py-1.5 bg-surface-container-low text-on-surface-variant rounded-full text-sm font-medium hover:bg-surface-container transition-colors"
-            @click="mesActual = new Date(); seleccionarDia(new Date())"
-          >
-            Hoy
-          </button>
-
-          <!-- Botón nueva cita (solo admin) -->
-          <button v-if="useAuthStore().isAdmin" class="btn-primary py-2" @click="abrirModal">
-            <Plus class="w-4 h-4" />
-            Nueva cita
-          </button>
-        </div>
-      </div>
-
-      <!-- Encabezados de días -->
-      <div class="grid grid-cols-7 border-b border-surface-container bg-surface-container-low/30">
-        <div
-          v-for="dia in diasSemana"
-          :key="dia"
-          class="py-3 text-center text-[10px] font-bold tracking-[0.15em] text-on-surface-variant uppercase"
+  <div class="flex flex-col gap-5 min-h-full" role="main" aria-label="Agenda diaria">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div class="flex items-center gap-2 min-w-0">
+        <button
+          class="min-h-11 min-w-11 rounded-xl hover:bg-surface-container-low transition-colors inline-flex items-center justify-center"
+          aria-label="Día anterior"
+          @click="irDia(subDays(diaActual, 1))"
         >
-          {{ dia }}
-        </div>
-      </div>
-
-      <!-- Grid del calendario -->
-      <div class="flex-1 grid grid-cols-7 overflow-auto" style="grid-template-rows: repeat(auto-fill, minmax(70px, 1fr))">
-        <div
-          v-for="dia in diasDelCalendario"
-          :key="dia.toISOString()"
-          :class="claseCelda(dia)"
-          @click="seleccionarDia(dia)"
+          <ChevronLeft class="w-5 h-5 text-on-surface-variant" />
+        </button>
+        <h1 class="text-lg sm:text-2xl font-extrabold text-primary truncate">{{ textoFecha }}</h1>
+        <button
+          class="min-h-11 min-w-11 rounded-xl hover:bg-surface-container-low transition-colors inline-flex items-center justify-center"
+          aria-label="Día siguiente"
+          @click="irDia(addDays(diaActual, 1))"
         >
-          <!-- Número del día + badge de citas -->
-          <div class="flex justify-between items-start">
-            <span
-              class="text-sm font-bold leading-none"
-              :class="[
-                isSameDay(dia, diaSeleccionado) ? 'w-6 h-6 rounded-full bg-primary-container text-white flex items-center justify-center text-xs' : 'text-primary',
-                !isSameMonth(dia, mesActual) ? 'text-on-surface-variant' : '',
-              ]"
-            >
-              {{ format(dia, 'd') }}
-            </span>
-
-            <!-- Badge número de citas -->
-            <span
-              v-if="resumenDe(dia)?.totalCitas"
-              class="text-[10px] px-2 py-0.5 rounded-full font-bold"
-              :class="isSameDay(dia, diaSeleccionado)
-                ? 'bg-primary-container text-white'
-                : 'bg-secondary-container text-on-surface-variant'"
-            >
-              {{ resumenDe(dia)!.totalCitas }} cita{{ resumenDe(dia)!.totalCitas !== 1 ? 's' : '' }}
-            </span>
-          </div>
-
-          <!-- Previsualización de los primeros 2 clientes del día -->
-          <div v-if="resumenDe(dia)" class="mt-1.5 space-y-1">
-            <div
-              v-for="(cita, i) in resumenDe(dia)!.citas.slice(0, 2)"
-              :key="cita.id"
-              class="text-[10px] px-2 py-0.5 rounded truncate border-l-2"
-              :class="isSameDay(dia, diaSeleccionado)
-                ? 'bg-primary-container text-white border-primary'
-                : 'bg-primary/5 text-primary-container border-primary-container'"
-            >
-              {{ cita.clienteNombre }}
-            </div>
-            <!-- "+N más" si hay más de 2 -->
-            <div
-              v-if="resumenDe(dia)!.citas.length > 2"
-              class="text-[10px] px-2 py-0.5 rounded truncate border-l-2 opacity-70"
-              :class="isSameDay(dia, diaSeleccionado)
-                ? 'bg-primary-container/80 text-white border-primary'
-                : 'bg-primary/5 text-primary-container border-primary-container'"
-            >
-              +{{ resumenDe(dia)!.citas.length - 2 }} más
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- ══════════════════════════════════════════════════════
-         PANEL DERECHO — Detalle del Día seleccionado
-         ════════════════════════════════════════════════════ -->
-    <aside class="w-full lg:w-80 bg-surface-container-low rounded-2xl p-4 sm:p-6 overflow-y-auto flex flex-col gap-6 border border-outline-variant/10">
-
-      <!-- Etiqueta "Detalle del Día" -->
-      <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
-        Detalle del Día
-      </p>
-
-      <!-- Bloque de fecha seleccionada -->
-      <div class="flex items-center gap-4">
-        <div class="bg-primary-container text-white w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold flex-shrink-0">
-          <span class="text-xl font-extrabold leading-none">{{ textoDiaSeleccionado.numero }}</span>
-          <span class="text-[9px] uppercase tracking-wider mt-0.5">{{ textoDiaSeleccionado.mesCorto }}</span>
-        </div>
-        <div>
-          <p class="font-extrabold text-lg text-primary leading-tight">
-            {{ textoDiaSeleccionado.diaSemana }}
-          </p>
-          <p class="text-sm text-on-surface-variant">
-            {{ citasDia.length }} cita{{ citasDia.length !== 1 ? 's' : '' }} programada{{ citasDia.length !== 1 ? 's' : '' }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Lista de citas del día -->
-      <div class="flex-1 space-y-3">
-
-        <!-- Loading -->
-        <div v-if="cargandoCitas" class="flex items-center justify-center py-8">
-          <div class="w-5 h-5 border-2 border-primary-container border-t-transparent rounded-full animate-spin" />
-        </div>
-
-        <!-- Sin citas -->
-        <div v-else-if="citasDia.length === 0" class="text-center py-8">
-          <p class="text-sm text-on-surface-variant font-medium">Sin citas este día</p>
-        </div>
-
-        <!-- Tarjetas de citas -->
-        <div
-          v-for="cita in citasDia"
-          v-else
-          :key="cita.id"
-          class="bg-surface-container-lowest p-4 rounded-xl shadow-card border border-transparent
-                 hover:border-primary-container/20 transition-all cursor-pointer"
+          <ChevronRight class="w-5 h-5 text-on-surface-variant" />
+        </button>
+        <button
+          v-if="!isToday(diaActual)"
+          class="min-h-11 px-4 rounded-full bg-surface-container-low text-sm font-semibold text-on-surface-variant hover:bg-surface-container transition-colors"
+          @click="irDia(new Date())"
         >
-          <!-- Hora + acciones -->
-          <div class="flex justify-between items-start mb-2">
-            <span
-              class="text-xs font-bold px-2 py-1 rounded"
-              :class="cita.estado === 'COMPLETADA'
-                ? 'bg-primary-container text-white'
-                : 'bg-primary/5 text-primary-container'"
-            >
-              {{ cita.horaInicio }}
-            </span>
-            <component
-              :is="cita.estado === 'COMPLETADA' ? CheckCircle2 : MoreVertical"
-              class="w-4 h-4"
-              :class="cita.estado === 'COMPLETADA' ? 'text-primary-container' : 'text-on-surface-variant/30'"
-            />
-          </div>
-
-          <!-- Nombre del cliente (sin datos de contacto — privacidad empleados) -->
-          <h5 class="font-bold text-on-surface text-sm">
-            {{ cita.clienteNombre }} {{ cita.clienteApellidos }}
-            <span v-if="cita.clienteEsVip" class="ml-1 text-[10px] bg-tertiary-fixed text-amber-900 px-1.5 py-0.5 rounded-full font-bold">VIP</span>
-          </h5>
-          <p class="text-sm text-on-surface-variant">{{ cita.servicioNombre }}</p>
-
-          <!-- Duración -->
-          <div class="mt-3 flex items-center gap-2 pt-3 border-t border-surface-container">
-            <User class="w-3 h-3 text-on-surface-variant" />
-            <span class="text-[11px] text-on-surface-variant">
-              {{ cita.duracionMinutos }} min
-              <span v-if="cita.clienteDescuentoPorcentaje" class="ml-2 text-green-600 font-semibold">
-                -{{ cita.clienteDescuentoPorcentaje }}%
-              </span>
-            </span>
-          </div>
-
-          <!-- Comentarios — edición inline -->
-          <div class="mt-3 pt-3 border-t border-surface-container">
-            <p v-if="citaEnEdicion !== cita.id"
-               class="text-[11px] text-on-surface-variant cursor-pointer hover:text-primary transition-colors"
-               @click="iniciarEdicionComentario(cita)">
-              <span v-if="!cita.comentarios" class="italic opacity-70">+ Añadir comentario</span>
-              <span v-else>{{ cita.comentarios }}</span>
-            </p>
-            <div v-else class="space-y-2">
-              <textarea
-                v-model="comentarioTemp"
-                class="w-full px-2 py-1 text-[11px] border border-primary rounded bg-surface-container-lowest text-on-surface resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-                rows="2"
-                placeholder="Añadir nota..."
-              />
-              <div class="flex gap-2">
-                <button
-                  @click="guardarComentario(cita)"
-                  class="flex-1 px-2 py-1 text-[10px] font-bold bg-primary text-white rounded hover:bg-primary/90 transition-colors"
-                >
-                  Guardar
-                </button>
-                <button
-                  @click="cancelarEdicion"
-                  class="flex-1 px-2 py-1 text-[10px] font-bold bg-surface-container text-on-surface rounded hover:bg-surface-container/80 transition-colors"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          Hoy
+        </button>
       </div>
 
-      <!-- ── Tarjeta de Capacidad del Día ────────────────── -->
-      <div class="bg-primary rounded-2xl p-5 relative overflow-hidden flex-shrink-0">
-        <div class="relative z-10">
-          <p class="text-primary-fixed text-[10px] font-bold uppercase tracking-widest mb-1">
-            Capacidad del Día
-          </p>
-          <p class="text-white text-3xl font-black mb-4">{{ capacidadDia }}%</p>
-          <div class="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
-            <div
-              class="bg-white h-full rounded-full transition-all duration-500"
-              :style="{ width: capacidadDia + '%' }"
-            />
-          </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="px-4 py-2 rounded-full bg-surface-container-low text-sm font-semibold text-primary-container">
+          {{ peluqueroActual?.nombre ?? 'Sin agenda' }}
         </div>
-        <!-- Decoración de fondo -->
-        <div class="absolute -right-3 -bottom-3 opacity-10">
-          <svg class="w-20 h-20 text-white" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z"/>
-          </svg>
+        <button
+          class="btn-secondary"
+          :disabled="peluqueros.length <= 1"
+          @click="mostrandoAgendas = true"
+        >
+          <Users class="w-4 h-4" aria-hidden="true" />
+          Ver agendas
+        </button>
+        <div class="text-sm font-semibold text-on-surface-variant">
+          {{ citasDia.length }} cita{{ citasDia.length !== 1 ? 's' : '' }}
         </div>
       </div>
+    </div>
 
-    </aside>
+    <div
+      v-if="viendoAgendaAjena && miPeluqueroId"
+      class="rounded-2xl border border-primary/10 bg-primary/5 px-4 py-3 text-sm text-primary-container flex items-center justify-between gap-3"
+    >
+      <span>Estás viendo la agenda de {{ peluqueroActual?.nombre }}.</span>
+      <button class="btn-ghost" @click="seleccionarAgenda(miPeluqueroId)">
+        Volver a mi agenda
+      </button>
+    </div>
 
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════
-       MODAL — Nueva Cita
-       ════════════════════════════════════════════════════ -->
-  <Teleport to="body">
-    <Transition name="fade">
-      <div
-        v-if="modalAbierto"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-        @click.self="modalAbierto = false"
+    <div class="grid grid-cols-7 gap-2">
+      <button
+        v-for="dia in diasSemana"
+        :key="dia.toISOString()"
+        class="min-h-16 rounded-2xl text-center transition-colors text-xs font-medium"
+        :class="[
+          isSameDay(dia, diaActual)
+            ? 'bg-primary-container text-white font-bold'
+            : isToday(dia)
+              ? 'bg-primary/5 text-primary-container hover:bg-primary/10'
+              : 'text-on-surface-variant hover:bg-surface-container-low'
+        ]"
+        @click="irDia(dia)"
       >
-        <div class="bg-surface-container-lowest rounded-2xl shadow-2xl w-full max-w-md border border-outline-variant/20">
+        <div class="text-[10px] uppercase">{{ format(dia, 'EEE', { locale: es }) }}</div>
+        <div class="text-lg font-black">{{ format(dia, 'd') }}</div>
+      </button>
+    </div>
 
-          <!-- Cabecera del modal -->
-          <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-surface-container">
-            <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Plus class="w-5 h-5 text-primary-container" />
-              </div>
-              <h2 class="text-base font-bold text-primary">Nueva Cita</h2>
-            </div>
-            <button
-              class="p-1.5 rounded-full hover:bg-surface-container transition-colors text-on-surface-variant"
-              @click="modalAbierto = false"
-            >
-              <X class="w-5 h-5" />
-            </button>
+    <div v-if="cargando" class="card min-h-[420px] flex items-center justify-center gap-3">
+      <Loader2 class="w-6 h-6 animate-spin text-primary" aria-hidden="true" />
+      <span class="text-sm text-on-surface-variant">Cargando agenda...</span>
+    </div>
+
+    <div v-else-if="errorCarga" class="card min-h-[420px] flex flex-col items-center justify-center gap-4 text-center px-6">
+      <p class="text-sm font-bold text-error">{{ errorCarga }}</p>
+      <button class="btn-secondary" @click="Promise.all([cargarDatosBase(), cargarCitasDia()])">
+        Reintentar
+      </button>
+    </div>
+
+    <div v-else class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] items-start">
+      <section class="card overflow-hidden">
+        <div class="sticky top-0 z-10 grid grid-cols-[76px_minmax(0,1fr)] border-b border-surface-container bg-surface-container-low/95 backdrop-blur">
+          <div class="px-3 py-4 flex items-center justify-center border-r border-surface-container text-on-surface-variant">
+            <Clock class="w-4 h-4" aria-hidden="true" />
           </div>
-
-          <!-- Cuerpo del modal -->
-          <div class="px-6 py-5 space-y-4">
-
-            <!-- Loader inicial -->
-            <div v-if="cargandoModal" class="flex items-center justify-center py-8">
-              <Loader2 class="w-6 h-6 animate-spin text-primary-container" />
-            </div>
-
-            <template v-else>
-              <!-- Fecha -->
-              <div>
-                <label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Fecha</label>
-                <input
-                  v-model="formNuevaCita.fecha"
-                  type="date"
-                  class="w-full px-3 py-2 rounded-xl border border-surface-container bg-surface-container-low text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/30"
-                />
-              </div>
-
-              <!-- Hora -->
-              <div>
-                <label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Hora</label>
-                <input
-                  v-model="formNuevaCita.hora"
-                  type="time"
-                  class="w-full px-3 py-2 rounded-xl border border-surface-container bg-surface-container-low text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/30"
-                />
-              </div>
-
-              <!-- Cliente -->
-              <div>
-                <label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Cliente</label>
-                <select
-                  v-model="formNuevaCita.clienteId"
-                  class="w-full px-3 py-2 rounded-xl border border-surface-container bg-surface-container-low text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/30 cursor-pointer"
-                >
-                  <option value="" disabled>Seleccionar cliente…</option>
-                  <option v-for="c in clientes" :key="c.id" :value="c.id">
-                    {{ c.nombre }} {{ c.apellidos }}
-                  </option>
-                </select>
-              </div>
-
-              <!-- Servicio -->
-              <div>
-                <label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Servicio</label>
-                <select
-                  v-model="formNuevaCita.servicioId"
-                  class="w-full px-3 py-2 rounded-xl border border-surface-container bg-surface-container-low text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/30 cursor-pointer"
-                >
-                  <option value="" disabled>Seleccionar servicio…</option>
-                  <option v-for="s in serviciosLista" :key="s.id" :value="s.id">
-                    {{ s.nombre }}
-                  </option>
-                </select>
-              </div>
-
-              <!-- Peluquero -->
-              <div>
-                <label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Peluquero/a</label>
-                <select
-                  v-model="formNuevaCita.peluqueroId"
-                  class="w-full px-3 py-2 rounded-xl border border-surface-container bg-surface-container-low text-sm font-medium text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/30 cursor-pointer"
-                >
-                  <option value="" disabled>Seleccionar peluquero…</option>
-                  <option v-for="p in peluqueros" :key="p.id" :value="p.id">
-                    {{ p.nombre }} {{ p.apellidos }}
-                  </option>
-                </select>
-              </div>
-
-              <!-- Error -->
-              <p v-if="errorModal" class="text-xs text-red-600 font-semibold bg-red-50 px-3 py-2 rounded-lg">
-                {{ errorModal }}
-              </p>
-            </template>
+          <div class="px-4 py-4 text-sm font-bold text-primary-container">
+            {{ peluqueroActual?.nombre ?? 'Agenda diaria' }}
           </div>
-
-          <!-- Pie del modal -->
-          <div class="flex gap-3 px-6 pb-6">
-            <button
-              class="flex-1 px-4 py-2.5 rounded-xl border border-surface-container bg-surface-container-low text-sm font-semibold text-on-surface-variant hover:bg-surface-container transition-colors"
-              @click="modalAbierto = false"
-            >
-              Cancelar
-            </button>
-            <button
-              class="flex-1 btn-primary py-2.5 flex items-center justify-center gap-2"
-              :disabled="guardandoCita || cargandoModal"
-              @click="crearCita"
-            >
-              <Loader2 v-if="guardandoCita" class="w-4 h-4 animate-spin" />
-              <span>{{ guardandoCita ? 'Guardando…' : 'Crear cita' }}</span>
-            </button>
-          </div>
-
         </div>
-      </div>
-    </Transition>
-  </Teleport>
-</template>
 
-<style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-</style>
+        <div class="overflow-auto">
+          <div
+            v-for="hora in slots"
+            :key="hora"
+            class="grid grid-cols-[76px_minmax(0,1fr)] border-b border-surface-container/40"
+          >
+            <div class="px-3 py-3 text-xs font-semibold text-on-surface-variant/70 text-right border-r border-surface-container">
+              {{ hora.endsWith(':00') ? hora : '' }}
+            </div>
+
+            <div
+              class="relative min-h-16"
+              :class="puedeEmpezarCita(hora)
+                ? 'cursor-pointer hover:bg-primary/[0.03] transition-colors'
+                : 'bg-surface-container-low/30'"
+              role="button"
+              :tabindex="puedeEmpezarCita(hora) ? 0 : -1"
+              :aria-label="`Seleccionar ${hora} para nueva cita`"
+              @click="seleccionarHora(hora)"
+              @keydown.enter.prevent="seleccionarHora(hora)"
+            >
+              <div
+                v-if="esInicioCita(hora)"
+                class="absolute inset-x-2 top-2 rounded-2xl border-l-4 px-4 py-3 z-[1] overflow-hidden"
+                :class="esInicioCita(hora)!.estado === 'COMPLETADA'
+                  ? 'bg-green-50 border-green-500 text-green-900'
+                  : 'bg-primary/5 border-primary-container text-primary-container'"
+                :style="{ height: `${slotsCita(esInicioCita(hora)!) * 64 - 8}px` }"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-sm font-bold truncate">
+                      {{ esInicioCita(hora)!.clienteNombre }} {{ esInicioCita(hora)!.clienteApellidos }}
+                    </p>
+                    <p class="text-xs opacity-80 truncate">{{ esInicioCita(hora)!.servicioNombre }}</p>
+                    <p class="text-[11px] opacity-70 mt-2">
+                      {{ esInicioCita(hora)!.duracionMinutos }} min
+                    </p>
+                  </div>
+                  <span
+                    v-if="esInicioCita(hora)!.clienteEsVip"
+                    class="px-2 py-1 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold"
+                  >
+                    VIP
+                  </span>
+                </div>
+              </div>
+
+              <div
+                v-else-if="puedeEmpezarCita(hora)"
+                class="absolute inset-0 px-4 flex items-center text-xs text-on-surface-variant/0 hover:text-on-surface-variant transition-colors"
+              >
+                <Plus class="w-4 h-4 mr-2" aria-hidden="true" />
+                Añadir cita
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card p-5 self-start">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-base font-bold text-primary">Nueva cita</h2>
+            <p class="text-xs text-on-surface-variant">
+              {{ horaSeleccionada ? `${horaSeleccionada} · ${peluqueroActual?.nombre}` : 'Selecciona una hora en la agenda' }}
+            </p>
+          </div>
+          <button
+            v-if="horaSeleccionada"
+            class="btn-ghost"
+            aria-label="Limpiar formulario de cita"
+            @click="resetFormularioCita"
+          >
+            <X class="w-4 h-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div v-if="!horaSeleccionada" class="rounded-2xl bg-surface-container-low px-4 py-8 text-center text-sm text-on-surface-variant">
+          Pulsa sobre un hueco libre de la agenda para crear una cita.
+        </div>
+
+        <div v-else class="space-y-4">
+          <div
+            v-if="errorGeneralFormulario"
+            class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {{ errorGeneralFormulario }}
+          </div>
+
+          <div
+            v-if="viendoAgendaAjena && !authStore.isAdmin"
+            class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          >
+            Puedes consultar la agenda de tus compañeros, pero las citas nuevas solo se crean en tu agenda.
+          </div>
+
+          <div>
+            <label for="agenda-cliente-nombre" class="label">Cliente</label>
+            <div class="relative">
+              <div class="absolute left-3 inset-y-0 flex items-center pointer-events-none">
+                <Search class="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
+              </div>
+              <input
+                id="agenda-cliente-nombre"
+                v-model="clienteQuery"
+                type="text"
+                class="input pl-10"
+                placeholder="Escribe nombre y apellidos"
+                autocomplete="off"
+                :disabled="!puedeEditarAgendaActual"
+                @keydown.enter.prevent="resolverClienteDesdeBusqueda"
+              />
+              <div
+                v-if="coincidenciasClientes.length"
+                class="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 rounded-2xl border border-outline-variant/20 bg-white shadow-card overflow-hidden"
+              >
+                <button
+                  v-for="cliente in coincidenciasClientes"
+                  :key="cliente.id"
+                  class="w-full px-4 py-3 text-left hover:bg-surface-container-low transition-colors border-b border-outline-variant/10 last:border-b-0"
+                  @click="seleccionarCliente(cliente)"
+                >
+                  <p class="text-sm font-semibold text-primary">{{ nombreCompleto(cliente) }}</p>
+                  <p class="text-xs text-on-surface-variant">{{ cliente.telefono || 'Sin teléfono' }}</p>
+                </button>
+              </div>
+            </div>
+            <p v-if="erroresFormulario.cliente" class="mt-2 text-xs font-semibold text-red-600">
+              {{ erroresFormulario.cliente }}
+            </p>
+            <p v-if="clienteSeleccionado" class="mt-2 text-xs font-semibold text-green-700">
+              Cliente encontrado. Datos listos para usar.
+            </p>
+            <p v-else-if="clienteEsNuevo" class="mt-2 text-xs font-semibold text-primary-container">
+              Cliente nuevo. Completa el contacto y lo guardamos al crear la cita.
+            </p>
+          </div>
+
+          <div
+            v-if="clienteSeleccionado"
+            class="rounded-2xl border border-green-200 bg-green-50/70 px-4 py-3 flex items-start justify-between gap-3"
+          >
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-green-800 truncate">
+                {{ nombreCompleto(clienteSeleccionado) }}
+              </p>
+              <p class="text-xs text-green-700/80">
+                Cliente existente
+              </p>
+            </div>
+            <button class="btn-ghost shrink-0" @click="limpiarClienteSeleccionado">
+              Cambiar
+            </button>
+          </div>
+
+          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+            <div>
+              <label for="agenda-cliente-telefono" class="label">Teléfono</label>
+              <input
+                v-if="clienteSeleccionado"
+                id="agenda-cliente-telefono"
+                type="text"
+                class="input"
+                :value="telefonoCliente"
+                readonly
+                placeholder="Sin teléfono"
+              />
+              <input
+                v-else
+                id="agenda-cliente-telefono"
+                v-model="formNuevoCliente.telefono"
+                type="text"
+                class="input"
+                placeholder="Ej. 612345678"
+                :disabled="!puedeEditarAgendaActual"
+              />
+              <p v-if="erroresFormulario.telefono" class="mt-2 text-xs font-semibold text-red-600">
+                {{ erroresFormulario.telefono }}
+              </p>
+            </div>
+
+            <div>
+              <label for="agenda-cliente-email" class="label">Email</label>
+              <input
+                v-if="clienteSeleccionado"
+                id="agenda-cliente-email"
+                type="email"
+                class="input"
+                :value="emailCliente"
+                readonly
+                placeholder="Sin email"
+              />
+              <input
+                v-else
+                id="agenda-cliente-email"
+                v-model="formNuevoCliente.email"
+                type="email"
+                class="input"
+                placeholder="Opcional"
+                :disabled="!puedeEditarAgendaActual"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label for="agenda-cliente-genero" class="label">Género</label>
+            <select
+              id="agenda-cliente-genero"
+              v-model="formNuevoCliente.genero"
+              class="select-field"
+              :disabled="Boolean(clienteSeleccionado) || !puedeEditarAgendaActual"
+            >
+              <option value="FEMENINO">Femenino</option>
+              <option value="MASCULINO">Masculino</option>
+              <option value="OTRO">Otro</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="agenda-servicio" class="label">Servicio</label>
+            <select
+              id="agenda-servicio"
+              v-model="formCita.servicioId"
+              class="select-field"
+              :disabled="!puedeEditarAgendaActual"
+            >
+              <option value="" disabled>Selecciona un servicio</option>
+              <option v-for="servicio in servicios" :key="servicio.id" :value="servicio.id">
+                {{ servicio.nombre }}
+              </option>
+            </select>
+            <p v-if="erroresFormulario.servicio" class="mt-2 text-xs font-semibold text-red-600">
+              {{ erroresFormulario.servicio }}
+            </p>
+          </div>
+
+          <div>
+            <label for="agenda-notas" class="label">Notas de la cita</label>
+            <textarea
+              id="agenda-notas"
+              v-model="notasCita"
+              rows="3"
+              class="input resize-none"
+              placeholder="Opcional"
+              :disabled="!puedeEditarAgendaActual"
+            />
+          </div>
+
+          <button
+            class="btn-primary w-full"
+            :disabled="guardando || !puedeEditarAgendaActual || !horaSeleccionada || !clienteQuery.trim() || !formCita.servicioId"
+            @click="guardarCita"
+          >
+            <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" aria-hidden="true" />
+            <span>{{ guardando ? 'Guardando...' : 'Guardar cita' }}</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <Teleport to="body">
+      <Transition name="modal-overlay">
+        <div
+          v-if="mostrandoAgendas"
+          class="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex justify-end"
+          @click.self="mostrandoAgendas = false"
+        >
+          <aside class="h-full w-full max-w-sm bg-white shadow-2xl p-5 flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-lg font-bold text-primary">Ver agendas</h3>
+                <p class="text-sm text-on-surface-variant">Cambia rápidamente entre compañeros</p>
+              </div>
+              <button class="btn-ghost" aria-label="Cerrar selector de agendas" @click="mostrandoAgendas = false">
+                <X class="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div class="space-y-2 overflow-y-auto">
+              <button
+                v-for="peluquero in peluqueros"
+                :key="peluquero.id"
+                class="w-full text-left rounded-2xl border px-4 py-3 transition-colors"
+                :class="peluquero.id === peluqueroSeleccionadoId
+                  ? 'border-primary-container bg-primary/5 text-primary-container'
+                  : 'border-outline-variant/20 hover:bg-surface-container-low text-on-surface'"
+                @click="seleccionarAgenda(peluquero.id)"
+              >
+                <p class="font-semibold">{{ peluquero.nombre }}</p>
+                <p class="text-xs text-on-surface-variant mt-1">
+                  {{ peluquero.id === miPeluqueroId ? 'Mi agenda' : 'Compañero/a' }}
+                </p>
+              </button>
+            </div>
+          </aside>
+        </div>
+      </Transition>
+    </Teleport>
+  </div>
+</template>

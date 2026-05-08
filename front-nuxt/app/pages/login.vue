@@ -7,6 +7,7 @@
  * No requiere autenticación previa.
  */
 import { Eye, EyeOff, AtSign, Lock, Scissors, ArrowRight, Loader2 } from 'lucide-vue-next'
+import { useToast } from '~/modules/shared/composables/useToast'
 
 definePageMeta({
   layout: 'auth',
@@ -80,18 +81,20 @@ async function handleLogin() {
 }
 
 /** Solicita el email de recuperación al backend */
+const toast = useToast()
+
 async function handleRecuperar() {
   if (!emailRecuperar.value) return
   enviandoReset.value = true
   try {
     const { authService } = await import('~/modules/auth/services/authService')
     await authService.solicitarResetPassword(emailRecuperar.value)
-    resetEnviado.value = true
   } catch {
-    // Mostramos siempre el mismo mensaje por seguridad (no revelar si el email existe)
-    resetEnviado.value = true
+    // Silenciar — no revelar si el email existe
   } finally {
     enviandoReset.value = false
+    modalRecuperar.value = false
+    toast.info('Si el email existe, recibirás un enlace en breve')
   }
 }
 </script>
@@ -161,14 +164,15 @@ async function handleRecuperar() {
         </div>
 
         <!-- ── Formulario ──────────────────────────────────── -->
-        <form class="space-y-5" @submit.prevent="handleLogin">
+        <form class="space-y-5" aria-label="Iniciar sesión" @submit.prevent="handleLogin">
 
           <!-- Campo usuario -->
           <div>
-            <label class="label">Usuario</label>
+            <label class="label" for="login-username">Usuario</label>
             <div class="relative">
-              <AtSign class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+              <AtSign class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden="true" />
               <input
+                id="login-username"
                 v-model="form.username"
                 type="text"
                 placeholder="nombre.usuario"
@@ -181,10 +185,11 @@ async function handleRecuperar() {
 
           <!-- Campo contraseña con toggle de visibilidad -->
           <div>
-            <label class="label">Contraseña</label>
+            <label class="label" for="login-password">Contraseña</label>
             <div class="relative">
-              <Lock class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+              <Lock class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden="true" />
               <input
+                id="login-password"
                 v-model="form.password"
                 :type="mostrarPassword ? 'text' : 'password'"
                 placeholder="••••••••••••"
@@ -196,19 +201,22 @@ async function handleRecuperar() {
               <!-- Botón ojo para mostrar/ocultar contraseña -->
               <button
                 type="button"
+                :aria-label="mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                :aria-pressed="mostrarPassword"
                 class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
                 @click="mostrarPassword = !mostrarPassword"
               >
-                <Eye v-if="!mostrarPassword" class="w-4 h-4" />
-                <EyeOff v-else class="w-4 h-4" />
+                <Eye v-if="!mostrarPassword" class="w-4 h-4" aria-hidden="true" />
+                <EyeOff v-else class="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           </div>
 
           <!-- Recuérdame + Olvidé contraseña -->
           <div class="flex items-center justify-between">
-            <label class="flex items-center gap-2 cursor-pointer group">
+            <label class="flex items-center gap-2 cursor-pointer group" for="login-remember">
               <input
+                id="login-remember"
                 v-model="form.rememberMe"
                 type="checkbox"
                 class="w-4 h-4 rounded border-surface-border text-primary focus:ring-primary/30 cursor-pointer"
@@ -228,7 +236,7 @@ async function handleRecuperar() {
 
           <!-- Mensaje de error -->
           <Transition name="modal-overlay">
-            <p v-if="error" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <p v-if="error" role="alert" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               {{ error }}
             </p>
           </Transition>
@@ -269,17 +277,23 @@ async function handleRecuperar() {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
         @click.self="modalRecuperar = false"
       >
-        <div class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-recuperar-titulo"
+          class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
+        >
 
-          <h3 class="text-lg font-semibold text-text-primary mb-1">Recuperar contraseña</h3>
+          <h3 id="modal-recuperar-titulo" class="text-lg font-semibold text-text-primary mb-1">Recuperar contraseña</h3>
           <p class="text-sm text-text-secondary mb-5">
             Introduce tu email y te enviaremos un enlace para restablecer tu contraseña.
           </p>
 
-          <template v-if="!resetEnviado">
+          <template>
             <div class="mb-4">
-              <label class="label">Email</label>
+              <label class="label" for="recuperar-email">Email</label>
               <input
+                id="recuperar-email"
                 v-model="emailRecuperar"
                 type="email"
                 placeholder="nombre@ejemplo.com"
@@ -295,19 +309,6 @@ async function handleRecuperar() {
             </div>
           </template>
 
-          <template v-else>
-            <div class="text-center py-4">
-              <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span class="text-green-600 text-xl">✓</span>
-              </div>
-              <p class="text-sm text-text-secondary mb-4">
-                Si el email existe en el sistema, recibirás un enlace en breve.
-              </p>
-              <button class="btn-primary" @click="modalRecuperar = false; resetEnviado = false">
-                Entendido
-              </button>
-            </div>
-          </template>
 
         </div>
       </div>

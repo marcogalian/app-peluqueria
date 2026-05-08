@@ -73,25 +73,27 @@ function cerrarSesion() {
     </div>
 
     <!-- ── Navegación ─────────────────────────────────────── -->
-    <nav class="flex-1 overflow-y-auto px-2 space-y-0.5">
+    <nav aria-label="Menú principal" class="flex-1 overflow-y-auto px-2 space-y-0.5">
       <NuxtLink
         v-for="item in items"
         :key="item.path"
         :to="item.path"
         :class="esActivo(item.path) ? 'nav-item-active' : 'nav-item'"
+        :aria-current="esActivo(item.path) ? 'page' : undefined"
       >
-        <component :is="item.icon" class="w-[18px] h-[18px] flex-shrink-0" />
+        <component :is="item.icon" class="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
         <span>{{ item.label }}</span>
       </NuxtLink>
 
       <!-- Separador + Configuración (solo admin) -->
       <template v-if="authStore.isAdmin">
-        <div class="my-4 mx-2 border-t border-outline-variant/20" />
+        <div class="my-4 mx-2 border-t border-outline-variant/20" aria-hidden="true" />
         <NuxtLink
           to="/admin/configuracion"
           :class="esActivo('/admin/configuracion') ? 'nav-item-active' : 'nav-item'"
+          :aria-current="esActivo('/admin/configuracion') ? 'page' : undefined"
         >
-          <Settings class="w-[18px] h-[18px] flex-shrink-0" />
+          <Settings class="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
           <span>Configuración</span>
         </NuxtLink>
       </template>
@@ -113,9 +115,10 @@ function cerrarSesion() {
       <!-- Botón cerrar sesión -->
       <button
         class="nav-item w-full text-error hover:bg-error-container/30 hover:text-error"
+        aria-label="Cerrar sesión"
         @click="cerrarSesion"
       >
-        <LogOut class="w-[18px] h-[18px]" />
+        <LogOut class="w-[18px] h-[18px]" aria-hidden="true" />
         <span>Cerrar sesión</span>
       </button>
     </div>

@@ -33,9 +33,7 @@ const runtimeConfig = useRuntimeConfig()
 const mensajes = ref<Mensaje[]>([])
 const contactos = ref<Contacto[]>([])
 const contactoActivo = ref<Contacto | null>(null)
-const mensajeNuevo = ref('')
 const cargando = ref(true)
-const enviando = ref(false)
 const conectado = ref(false)
 const enviandoEmail = ref(false)
 const emailEstado = ref<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
@@ -136,39 +134,6 @@ async function seleccionarContacto(c: Contacto) {
   }
 }
 
-async function enviarMensaje() {
-  if (!mensajeNuevo.value.trim() || !contactoActivo.value) return
-  enviando.value = true
-
-  const contenido = mensajeNuevo.value.trim()
-  mensajeNuevo.value = ''
-
-  try {
-    if (stompClient?.connected) {
-      stompClient.publish({
-        destination: '/app/mensajes/enviar',
-        body: JSON.stringify({
-          destinatarioId: contactoActivo.value.id,
-          contenido,
-        }),
-      })
-    } else {
-      const { api } = await import('~/infrastructure/http/api')
-      const { data } = await api.post('/mensajes/enviar', {
-        destinatarioId: contactoActivo.value.id,
-        contenido,
-      })
-      mensajes.value.push(data)
-    }
-    await nextTick()
-    scrollAbajo()
-  } catch {
-    // vacío
-  } finally {
-    enviando.value = false
-  }
-}
-
 async function enviarEmailManual() {
   if (!contactoActivo.value?.email) {
     emailEstado.value = { tipo: 'error', texto: 'Este contacto no tiene email configurado.' }
@@ -221,25 +186,26 @@ function formatHora(iso: string): string {
 
 <template>
   <div class="flex gap-6 min-h-full items-start pb-6">
-    <aside class="w-72 self-start card flex flex-col overflow-hidden flex-shrink-0">
+    <aside class="w-72 self-start card flex flex-col overflow-hidden flex-shrink-0" aria-label="Contactos">
       <div class="p-5 border-b border-surface-container">
         <h3 class="font-bold text-primary text-sm">Mensajes</h3>
         <div class="flex items-center gap-2 mt-1">
-          <div class="w-2 h-2 rounded-full" :class="conectado ? 'bg-green-500' : 'bg-surface-container-high'" />
-          <p class="text-[10px] text-on-surface-variant">{{ conectado ? 'Conectado' : 'Desconectado' }}</p>
+          <div class="w-2 h-2 rounded-full" :class="conectado ? 'bg-green-500' : 'bg-surface-container-high'" aria-hidden="true" />
+          <p class="text-[10px] text-on-surface-variant" role="status" aria-live="polite">{{ conectado ? 'Conectado' : 'Desconectado' }}</p>
         </div>
       </div>
 
-      <div v-if="cargando" class="flex items-center justify-center py-8">
-        <Loader2 class="w-5 h-5 animate-spin text-primary" />
+      <div v-if="cargando" class="flex items-center justify-center py-8" aria-busy="true" aria-label="Cargando contactos">
+        <Loader2 class="w-5 h-5 animate-spin text-primary" aria-hidden="true" />
       </div>
 
-      <div v-else class="flex-1 overflow-y-auto">
+      <ul v-else class="flex-1 overflow-y-auto" role="list" aria-label="Lista de contactos">
+        <li v-for="c in contactos" :key="c.id">
         <button
-          v-for="c in contactos"
-          :key="c.id"
           class="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left"
           :class="contactoActivo?.id === c.id ? 'bg-surface-container-low border-r-4 border-primary-container' : ''"
+          :aria-label="`${c.nombre}, ${c.rol === 'ROLE_ADMIN' ? 'Administrador' : 'Empleado'}${c.online ? ', en línea' : ''}`"
+          :aria-pressed="contactoActivo?.id === c.id"
           @click="seleccionarContacto(c)"
         >
           <div class="relative flex-shrink-0">
@@ -253,11 +219,12 @@ function formatHora(iso: string): string {
             <p class="text-[10px] text-on-surface-variant">{{ c.rol === 'ROLE_ADMIN' ? 'Administrador' : 'Empleado' }}</p>
           </div>
         </button>
+        </li>
 
-        <div v-if="contactos.length === 0" class="px-4 py-8 text-center text-sm text-on-surface-variant">
+        <li v-if="contactos.length === 0" class="px-4 py-8 text-center text-sm text-on-surface-variant">
           No hay contactos disponibles
-        </div>
-      </div>
+        </li>
+      </ul>
     </aside>
 
     <section class="flex-1 self-start card flex flex-col overflow-hidden">
@@ -328,10 +295,11 @@ function formatHora(iso: string): string {
 
               <div
                 v-if="emailEstado"
+                role="alert"
                 class="mt-2 rounded-2xl px-4 py-3.5 text-sm flex items-start gap-2"
                 :class="emailEstado.tipo === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'"
               >
-                <CheckCircle2 v-if="emailEstado.tipo === 'ok'" class="w-4 h-4 flex-shrink-0" />
+                <CheckCircle2 v-if="emailEstado.tipo === 'ok'" class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                 <span>{{ emailEstado.texto }}</span>
               </div>
             </div>
@@ -342,7 +310,7 @@ function formatHora(iso: string): string {
           </div>
         </div>
 
-        <div ref="chatContainer" class="flex-1 min-h-40 overflow-y-auto p-6 space-y-4">
+        <div ref="chatContainer" class="flex-1 min-h-40 overflow-y-auto p-6 space-y-4" aria-live="polite" aria-label="Mensajes del chat">
           <div
             v-for="m in mensajes"
             :key="m.id"
@@ -367,30 +335,9 @@ function formatHora(iso: string): string {
             </div>
           </div>
 
-          <div v-if="mensajes.length === 0" class="text-center py-8 text-sm text-on-surface-variant">
-            No hay mensajes internos todavía con {{ contactoActivo.nombre }}
-          </div>
+          <div v-if="mensajes.length === 0" class="h-full min-h-24" aria-hidden="true" />
         </div>
 
-        <div class="px-6 py-4 border-t border-surface-container flex-shrink-0">
-          <div class="flex items-center gap-3 bg-surface-container-low rounded-full px-4 py-2">
-            <input
-              v-model="mensajeNuevo"
-              type="text"
-              placeholder="Escribe un mensaje interno..."
-              class="flex-1 bg-transparent border-none text-sm text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none"
-              @keyup.enter="enviarMensaje"
-            />
-            <button
-              class="w-8 h-8 bg-primary-container text-white rounded-full flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50 flex-shrink-0"
-              :disabled="!mensajeNuevo.trim() || enviando"
-              @click="enviarMensaje"
-            >
-              <Loader2 v-if="enviando" class="w-4 h-4 animate-spin" />
-              <Send v-else class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
       </template>
     </section>
   </div>

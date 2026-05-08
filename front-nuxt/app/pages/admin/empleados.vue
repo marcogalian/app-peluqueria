@@ -8,6 +8,9 @@ import {
   Plus, X, Loader2, Save, Phone, Mail, ChevronLeft, ChevronRight,
 } from 'lucide-vue-next'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday } from 'date-fns'
+import { useToast } from '~/modules/shared/composables/useToast'
+
+const toast = useToast()
 import { es } from 'date-fns/locale'
 import { useAuthStore } from '~/modules/auth/store/auth.store'
 
@@ -120,7 +123,8 @@ async function registrarBaja() {
     empleadoSeleccionado.value.enBaja = true
     empleadoSeleccionado.value.disponible = false
     modalBaja.value = false
-  } catch { /* toast */ } finally {
+    toast.success('Baja registrada')
+  } catch { toast.error('Error al registrar baja') } finally {
     guardando.value = false
   }
 }
@@ -133,7 +137,8 @@ async function crearEmpleado() {
     empleados.value.unshift(data)
     modalNuevo.value = false
     Object.assign(formNuevo, { nombre: '', apellidos: '', email: '', telefono: '', especialidades: '' })
-  } catch { /* toast */ } finally {
+    toast.success('Empleado creado')
+  } catch { toast.error('Error al crear empleado') } finally {
     guardando.value = false
   }
 }
@@ -172,7 +177,8 @@ async function guardarEdicion() {
     const idx = empleados.value.findIndex(e => e.id === empleadoSeleccionado.value!.id)
     if (idx !== -1) empleados.value[idx] = { ...empleadoSeleccionado.value }
     modalEditar.value = false
-  } catch { /* toast */ } finally {
+    toast.success('Empleado actualizado')
+  } catch { toast.error('Error al guardar cambios') } finally {
     guardando.value = false
   }
 }
@@ -184,7 +190,8 @@ async function reactivarEmpleado(empleado: Empleado) {
     await api.patch(`/peluqueros/${empleado.id}`, { enBaja: false, disponible: true })
     empleado.enBaja     = false
     empleado.disponible = true
-  } catch { /* toast */ } finally {
+    toast.success('Empleado reactivado')
+  } catch { toast.error('Error al reactivar') } finally {
     guardando.value = false
   }
 }
@@ -204,7 +211,8 @@ async function subirFoto(event: Event) {
     empleadoSeleccionado.value.fotoUrl = data.fotoUrl
     const idx = empleados.value.findIndex(e => e.id === empleadoSeleccionado.value!.id)
     if (idx !== -1) empleados.value[idx].fotoUrl = data.fotoUrl
-  } catch { /* toast */ }
+    toast.success('Foto actualizada')
+  } catch { toast.error('Error al subir foto') }
 }
 
 function abrirEmail(empleado: Empleado) {
@@ -434,11 +442,16 @@ function abrirEmail(empleado: Empleado) {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
         @click.self="modalBaja = false"
       >
-        <div class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-baja-titulo"
+          class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
+        >
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-bold text-primary">Registrar Baja Médica</h3>
-            <button class="p-1 rounded hover:bg-surface-container-low" @click="modalBaja = false">
-              <X class="w-4 h-4" />
+            <h3 id="modal-baja-titulo" class="text-lg font-bold text-primary">Registrar Baja Médica</h3>
+            <button class="p-1 rounded hover:bg-surface-container-low" aria-label="Cerrar" @click="modalBaja = false">
+              <X class="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 
@@ -479,11 +492,16 @@ function abrirEmail(empleado: Empleado) {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
         @click.self="modalNuevo = false"
       >
-        <div class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-nuevo-empleado-titulo"
+          class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
+        >
           <div class="flex items-center justify-between mb-5">
-            <h3 class="text-lg font-bold text-primary">Nuevo Empleado</h3>
-            <button class="p-1 rounded hover:bg-surface-container-low" @click="modalNuevo = false">
-              <X class="w-4 h-4" />
+            <h3 id="modal-nuevo-empleado-titulo" class="text-lg font-bold text-primary">Nuevo Empleado</h3>
+            <button class="p-1 rounded hover:bg-surface-container-low" aria-label="Cerrar" @click="modalNuevo = false">
+              <X class="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 
@@ -529,11 +547,16 @@ function abrirEmail(empleado: Empleado) {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
         @click.self="modalEditar = false"
       >
-        <div class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-editar-empleado-titulo"
+          class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
+        >
           <div class="flex items-center justify-between mb-5">
-            <h3 class="text-lg font-bold text-primary">Editar Empleado</h3>
-            <button class="p-1 rounded hover:bg-surface-container-low" @click="modalEditar = false">
-              <X class="w-4 h-4" />
+            <h3 id="modal-editar-empleado-titulo" class="text-lg font-bold text-primary">Editar Empleado</h3>
+            <button class="p-1 rounded hover:bg-surface-container-low" aria-label="Cerrar" @click="modalEditar = false">
+              <X class="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 

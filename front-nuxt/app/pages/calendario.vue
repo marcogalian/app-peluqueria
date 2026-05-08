@@ -212,7 +212,7 @@ onMounted(() => {
     </div>
 
     <!-- ── Calendario FullCalendar ───────────────────────── -->
-    <div class="card p-4">
+    <div class="card p-4" aria-label="Calendario de citas">
       <FullCalendar :options="opcionesCalendario" />
     </div>
 
@@ -227,21 +227,24 @@ onMounted(() => {
       <div
         v-if="popoverVisible && diaSeleccionado"
         id="popover-citas"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="popover-citas-titulo"
         class="fixed z-50 bg-white rounded-card shadow-card-lg border border-surface-border w-80 animate-fade-scale-in"
         :style="{ top: popoverY + 'px', left: popoverX + 'px' }"
       >
         <!-- Cabecera del popover -->
         <div class="flex items-center justify-between px-4 py-3 border-b border-surface-border">
           <div>
-            <p class="font-semibold text-text-primary capitalize">
+            <p id="popover-citas-titulo" class="font-semibold text-text-primary capitalize">
               {{ formatearFechaDia(diaSeleccionado.fecha) }}
             </p>
             <p class="text-xs text-text-secondary mt-0.5">
               {{ diaSeleccionado.totalCitas }} cita{{ diaSeleccionado.totalCitas !== 1 ? 's' : '' }}
             </p>
           </div>
-          <button class="btn-ghost py-1 px-1.5" @click="cerrarPopover">
-            <X class="w-4 h-4" />
+          <button class="btn-ghost py-1 px-1.5" aria-label="Cerrar" @click="cerrarPopover">
+            <X class="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 

@@ -119,18 +119,18 @@ function formatEur(n: number): string {
         <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Rendimiento Comercial</h2>
         <p class="text-on-surface-variant text-sm">Análisis detallado de Atelier Sapphire</p>
       </div>
-      <div class="flex items-center gap-2 bg-surface-container-low p-1.5 rounded-2xl">
-        <button
-          v-for="p in periodos"
-          :key="p.key"
-          class="px-4 py-1.5 text-xs font-bold rounded-xl transition-all"
-          :class="periodo === p.key
-            ? 'bg-primary-container text-white shadow-lg shadow-primary-container/20'
-            : 'text-on-surface-variant hover:bg-surface-container'"
-          @click="periodo = p.key"
+      <div class="w-full sm:w-52">
+        <label for="resultados-periodo" class="sr-only">Seleccionar período de análisis</label>
+        <select
+          id="resultados-periodo"
+          v-model="periodo"
+          class="select-field rounded-full bg-surface-container-lowest"
+          aria-label="Seleccionar período de análisis"
         >
-          {{ p.label }}
-        </button>
+          <option v-for="p in periodos" :key="p.key" :value="p.key">
+            {{ p.label }}
+          </option>
+        </select>
       </div>
     </div>
 
@@ -204,9 +204,9 @@ function formatEur(n: number): string {
 
       </div>
 
-      <!-- ── Ranking empleados ──────────────────────────── -->
+      <!-- ── Trabajos por empleado ──────────────────────── -->
       <div class="card p-8">
-        <h5 class="text-lg font-bold text-primary mb-6">Ranking de Empleados</h5>
+        <h5 class="text-lg font-bold text-primary mb-6">Trabajos por Empleado</h5>
         <div class="space-y-4">
           <div
             v-for="(emp, i) in datos.topEmpleados"

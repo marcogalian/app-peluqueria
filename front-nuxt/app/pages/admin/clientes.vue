@@ -68,6 +68,15 @@ const formCliente = ref({
 
 const mostrandoArchivados = computed(() => vistaClientes.value === 'archivados')
 const ahora = computed(() => new Date())
+const opcionesTipoCliente = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'vip', label: 'VIP' },
+  { value: 'normales', label: 'Normales' },
+] as const
+const opcionesEstadoCliente = [
+  { value: 'activos', label: 'Activos' },
+  { value: 'archivados', label: 'Archivados' },
+] as const
 
 // ── Filtrado local ────────────────────────────────────────
 const clientesFiltrados = computed(() => {
@@ -296,6 +305,10 @@ async function cambiarVista(vista: 'activos' | 'archivados') {
   await cargarClientes()
 }
 
+async function seleccionarVistaClientes(vista: 'activos' | 'archivados') {
+  await cambiarVista(vista)
+}
+
 async function archivarOReactivarCliente(cliente: Cliente) {
   const { api } = await import('~/infrastructure/http/api')
   const endpoint = cliente.archivado ? 'reactivar' : 'archivar'
@@ -344,57 +357,56 @@ async function guardarCliente() {
     <div class="flex flex-col flex-1 min-w-0 space-y-4">
 
       <!-- Barra de búsqueda + botón añadir -->
-      <div class="flex gap-3 items-start">
-        <div class="relative flex-1">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+      <div class="flex flex-col xl:flex-row gap-3 xl:items-center">
+        <div class="relative flex-1 min-w-0">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden="true" />
+          <label for="clientes-busqueda" class="sr-only">Buscar clientes</label>
           <input
+            id="clientes-busqueda"
             v-model="busqueda"
             type="search"
-            placeholder="Buscar clientes..."
-            class="input pl-10"
+            placeholder="Buscar por nombre, teléfono o email..."
+            class="input min-h-11 rounded-full pl-10"
+            aria-label="Buscar clientes por nombre, teléfono o email"
           />
         </div>
-        <div class="flex rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-1">
-          <button
-            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-            :class="filtroTipoCliente === 'todos' ? 'bg-primary-container text-white' : 'text-text-secondary hover:text-text-primary'"
-            @click="filtroTipoCliente = 'todos'"
+        <div class="xl:w-48">
+          <label for="clientes-tipo" class="sr-only">Filtrar por tipo de cliente</label>
+          <select
+            id="clientes-tipo"
+            v-model="filtroTipoCliente"
+            class="select-field rounded-full bg-surface-container-lowest"
+            aria-label="Filtrar por tipo de cliente"
           >
-            Todos
-          </button>
-          <button
-            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-            :class="filtroTipoCliente === 'vip' ? 'bg-primary-container text-white' : 'text-text-secondary hover:text-text-primary'"
-            @click="filtroTipoCliente = 'vip'"
-          >
-            VIP
-          </button>
-          <button
-            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-            :class="filtroTipoCliente === 'normales' ? 'bg-primary-container text-white' : 'text-text-secondary hover:text-text-primary'"
-            @click="filtroTipoCliente = 'normales'"
-          >
-            Normales
-          </button>
+            <option
+              v-for="opcion in opcionesTipoCliente"
+              :key="opcion.value"
+              :value="opcion.value"
+            >
+              {{ opcion.label }}
+            </option>
+          </select>
         </div>
-        <div class="flex rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-1">
-          <button
-            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-            :class="!mostrandoArchivados ? 'bg-primary-container text-white' : 'text-text-secondary hover:text-text-primary'"
-            @click="cambiarVista('activos')"
+        <div class="xl:w-52">
+          <label for="clientes-estado" class="sr-only">Filtrar por estado de cliente</label>
+          <select
+            id="clientes-estado"
+            v-model="vistaClientes"
+            class="select-field rounded-full bg-surface-container-lowest"
+            aria-label="Filtrar por estado de cliente"
+            @change="seleccionarVistaClientes(vistaClientes)"
           >
-            Activos
-          </button>
-          <button
-            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-            :class="mostrandoArchivados ? 'bg-primary-container text-white' : 'text-text-secondary hover:text-text-primary'"
-            @click="cambiarVista('archivados')"
-          >
-            Archivados
-          </button>
+            <option
+              v-for="opcion in opcionesEstadoCliente"
+              :key="opcion.value"
+              :value="opcion.value"
+            >
+              {{ opcion.label }}
+            </option>
+          </select>
         </div>
-        <button class="btn-primary" @click="abrirModalNuevoCliente">
-          <Plus class="w-4 h-4" />
+        <button class="btn-primary min-h-11 whitespace-nowrap" @click="abrirModalNuevoCliente">
+          <Plus class="w-4 h-4" aria-hidden="true" />
           Nuevo cliente
         </button>
       </div>
@@ -405,13 +417,22 @@ async function guardarCliente() {
       </div>
 
       <!-- Lista -->
+      <div v-else-if="clientesFiltrados.length === 0" class="card p-8 text-center">
+        <p class="text-sm font-bold text-primary">No hay clientes con esos filtros.</p>
+        <p class="text-xs text-text-secondary mt-1">Prueba con otro nombre, teléfono o cambia el filtro.</p>
+      </div>
+
       <div v-else class="space-y-2">
         <div
           v-for="cliente in clientesFiltrados"
           :key="cliente.id"
           class="card p-4 cursor-pointer flex items-center gap-4 group"
           :class="clienteSeleccionado?.id === cliente.id ? 'border-primary shadow-card-md' : ''"
+          role="button"
+          tabindex="0"
+          :aria-label="`Abrir ficha de ${cliente.nombre} ${cliente.apellidos}`"
           @click="abrirCliente(cliente)"
+          @keydown.enter.prevent="abrirCliente(cliente)"
         >
           <!-- Avatar con inicial -->
           <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -450,6 +471,9 @@ async function guardarCliente() {
       <aside
         v-if="drawerAbierto && clienteSeleccionado"
         ref="panelClienteRef"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="`Ficha de ${clienteSeleccionado.nombre} ${clienteSeleccionado.apellidos}`"
         class="w-96 max-w-full max-h-[calc(100vh-2rem)] flex-shrink-0 self-start sticky top-4 card p-0 flex flex-col min-h-0 overflow-hidden animate-slide-in-right"
       >
         <!-- Cabecera del drawer -->
@@ -462,14 +486,17 @@ async function guardarCliente() {
               Añadido por {{ clienteSeleccionado.agregadoPorNombre }}
             </p>
           </div>
-          <button class="btn-ghost py-1 px-1.5" @click="drawerAbierto = false">
-            <X class="w-4 h-4" />
+          <button class="btn-ghost py-1 px-1.5" aria-label="Cerrar panel" @click="drawerAbierto = false">
+            <X class="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
         <!-- Tabs: Información | Fotos -->
-        <div class="flex border-b border-surface-border px-5">
+        <div class="flex border-b border-surface-border px-5" role="tablist" aria-label="Secciones del cliente">
           <button
+            role="tab"
+            :aria-selected="tabActiva === 'info'"
+            aria-controls="tab-panel-info"
             class="py-3 px-2 text-sm font-medium border-b-2 transition-colors"
             :class="tabActiva === 'info'
               ? 'border-primary text-primary'
@@ -479,22 +506,25 @@ async function guardarCliente() {
             Información
           </button>
           <button
+            role="tab"
+            :aria-selected="tabActiva === 'fotos'"
+            aria-controls="tab-panel-fotos"
             class="py-3 px-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5"
             :class="tabActiva === 'fotos'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-secondary hover:text-text-primary'"
             @click="handleTabFotos"
           >
-            <Camera class="w-3.5 h-3.5" />
+            <Camera class="w-3.5 h-3.5" aria-hidden="true" />
             Fotos
-            <span v-if="fotos.length > 0" class="text-xs bg-primary/10 text-primary px-1.5 rounded-full">
+            <span v-if="fotos.length > 0" class="text-xs bg-primary/10 text-primary px-1.5 rounded-full" aria-hidden="true">
               {{ fotos.length }}
             </span>
           </button>
         </div>
 
         <!-- ── TAB: Información ─────────────────────────── -->
-        <div v-if="tabActiva === 'info'" class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+        <div v-if="tabActiva === 'info'" id="tab-panel-info" role="tabpanel" aria-label="Información del cliente" class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
 
           <!-- Badges VIP y descuento -->
           <div class="flex items-center gap-2 flex-wrap">
@@ -632,7 +662,7 @@ async function guardarCliente() {
         </div>
 
         <!-- ── TAB: Fotos del historial ─────────────────── -->
-        <div v-if="tabActiva === 'fotos'" class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+        <div v-if="tabActiva === 'fotos'" id="tab-panel-fotos" role="tabpanel" aria-label="Fotos del historial de peinados" class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
 
           <!-- Subir nueva foto -->
           <div class="border-2 border-dashed border-surface-border rounded-lg p-4 text-center">
@@ -687,15 +717,17 @@ async function guardarCliente() {
               <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button
                   class="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-text-primary hover:bg-white transition-colors"
+                  :aria-label="`Ampliar foto: ${foto.descripcion || 'peinado'}`"
                   @click="fotoAmpliada = foto"
                 >
-                  <ZoomIn class="w-4 h-4" />
+                  <ZoomIn class="w-4 h-4" aria-hidden="true" />
                 </button>
                 <button
                   class="w-8 h-8 rounded-full bg-red-500/90 flex items-center justify-center text-white hover:bg-red-600 transition-colors"
+                  :aria-label="`Eliminar foto: ${foto.descripcion || 'peinado'}`"
                   @click="eliminarFoto(foto)"
                 >
-                  <Trash2 class="w-4 h-4" />
+                  <Trash2 class="w-4 h-4" aria-hidden="true" />
                 </button>
               </div>
               <!-- Descripción -->
@@ -757,7 +789,7 @@ async function guardarCliente() {
               </div>
               <div>
                 <label class="label">Género</label>
-                <select v-model="formCliente.genero" class="input">
+                <select v-model="formCliente.genero" class="select-field">
                   <option value="FEMENINO">Femenino</option>
                   <option value="MASCULINO">Masculino</option>
                   <option value="OTRO">Otro</option>

@@ -7,8 +7,11 @@
 import { Plus, Check, X, Loader2, Calendar } from 'lucide-vue-next'
 import { addDays, differenceInDays, parseISO, format, isBefore } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useToast } from '~/modules/shared/composables/useToast'
 
 definePageMeta({ middleware: 'auth' })
+
+const toast = useToast()
 
 // ── Tipos ─────────────────────────────────────────────────
 type TipoAusencia = 'VACACIONES' | 'ASUNTO_PROPIO' | 'BAJA'
@@ -111,6 +114,7 @@ async function enviarSolicitud() {
     solicitudes.value.unshift(data)
     modalAbierto.value = false
     Object.assign(form, { tipo: 'VACACIONES', fechaInicio: '', fechaFin: '', motivo: '' })
+    toast.success('Solicitud enviada')
   } catch { errorForm.value = 'No se pudo enviar la solicitud.' }
   finally { enviando.value = false }
 }
@@ -123,7 +127,8 @@ async function aprobar(id: number) {
     await api.patch(`/v1/ausencias/${id}/aprobar`)
     const sol = solicitudes.value.find(s => s.id === id)
     if (sol) sol.estado = 'APROBADA'
-  } catch { /* toast */ } finally { procesando.value = false }
+    toast.success('Ausencia aprobada')
+  } catch { toast.error('Error al aprobar') } finally { procesando.value = false }
 }
 
 async function rechazar() {
@@ -136,7 +141,8 @@ async function rechazar() {
     if (sol) { sol.estado = 'RECHAZADA'; sol.motivoRechazo = motivoRechazo.value }
     modalRechazo.value = false
     motivoRechazo.value = ''
-  } catch { /* toast */ } finally { procesando.value = false }
+    toast.success('Ausencia rechazada')
+  } catch { toast.error('Error al rechazar') } finally { procesando.value = false }
 }
 
 // ── Cancelar solicitud propia (empleado, solo si está PENDIENTE) ─────────────
@@ -146,7 +152,8 @@ async function cancelarSolicitud(id: number) {
     const { api } = await import('~/infrastructure/http/api')
     await api.patch(`/v1/ausencias/${id}/cancelar`)
     solicitudes.value = solicitudes.value.filter(s => s.id !== id)
-  } catch { /* toast */ } finally { procesando.value = false }
+    toast.success('Solicitud cancelada')
+  } catch { toast.error('Error al cancelar') } finally { procesando.value = false }
 }
 
 // ── Helpers ───────────────────────────────────────────────
@@ -257,18 +264,18 @@ function formatFecha(f: string): string {
           <template v-if="authStore.isAdmin && s.estado === 'PENDIENTE'">
             <button
               class="w-8 h-8 rounded-full bg-green-100 hover:bg-green-200 text-green-700 flex items-center justify-center transition-colors"
-              title="Aprobar"
+              :aria-label="`Aprobar solicitud de ${s.empleadoNombre || 'empleado'}`"
               :disabled="procesando"
               @click="aprobar(s.id)"
             >
-              <Check class="w-4 h-4" />
+              <Check class="w-4 h-4" aria-hidden="true" />
             </button>
             <button
               class="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 text-red-700 flex items-center justify-center transition-colors"
-              title="Rechazar"
+              :aria-label="`Rechazar solicitud de ${s.empleadoNombre || 'empleado'}`"
               @click="solicitudId = s.id; modalRechazo = true"
             >
-              <X class="w-4 h-4" />
+              <X class="w-4 h-4" aria-hidden="true" />
             </button>
           </template>
         </div>
@@ -291,11 +298,16 @@ function formatFecha(f: string): string {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
         @click.self="modalAbierto = false"
       >
-        <div class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-ausencia-titulo"
+          class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
+        >
           <div class="flex items-center justify-between mb-5">
-            <h3 class="text-lg font-bold text-primary">Nueva Solicitud de Ausencia</h3>
-            <button class="p-1 rounded hover:bg-surface-container-low" @click="modalAbierto = false">
-              <X class="w-4 h-4" />
+            <h3 id="modal-ausencia-titulo" class="text-lg font-bold text-primary">Nueva Solicitud de Ausencia</h3>
+            <button class="p-1 rounded hover:bg-surface-container-low" aria-label="Cerrar" @click="modalAbierto = false">
+              <X class="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 
@@ -304,7 +316,7 @@ function formatFecha(f: string): string {
             <!-- Tipo -->
             <div>
               <label class="label">Tipo de ausencia</label>
-              <select v-model="form.tipo" class="input">
+              <select v-model="form.tipo" class="select-field">
                 <option value="VACACIONES">Vacaciones</option>
                 <option value="ASUNTO_PROPIO">Asunto propio</option>
                 <option v-if="authStore.isAdmin" value="BAJA">Baja médica</option>
@@ -363,11 +375,16 @@ function formatFecha(f: string): string {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
         @click.self="modalRechazo = false"
       >
-        <div class="bg-white rounded-card shadow-card-lg w-full max-w-xs p-6 animate-fade-scale-in">
-          <h3 class="text-lg font-bold text-primary mb-4">Rechazar solicitud</h3>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-rechazo-titulo"
+          class="bg-white rounded-card shadow-card-lg w-full max-w-xs p-6 animate-fade-scale-in"
+        >
+          <h3 id="modal-rechazo-titulo" class="text-lg font-bold text-primary mb-4">Rechazar solicitud</h3>
           <div>
-            <label class="label">Motivo del rechazo</label>
-            <textarea v-model="motivoRechazo" rows="3" class="input resize-none" placeholder="Explica el motivo..." />
+            <label class="label" for="motivo-rechazo">Motivo del rechazo</label>
+            <textarea id="motivo-rechazo" v-model="motivoRechazo" rows="3" class="input resize-none" placeholder="Explica el motivo..." />
           </div>
           <div class="flex gap-3 mt-4">
             <button class="btn-secondary flex-1" @click="modalRechazo = false">Cancelar</button>
