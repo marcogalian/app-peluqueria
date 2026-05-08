@@ -336,7 +336,7 @@ async function guardarCliente() {
 </script>
 
 <template>
-  <div class="flex gap-6 h-full min-h-0 items-start">
+  <div class="flex flex-col lg:flex-row gap-6 h-full min-h-0 items-start">
 
     <!-- ══════════════════════════════════════════════════════
          PANEL IZQUIERDO — Lista de clientes

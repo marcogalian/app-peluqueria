@@ -114,7 +114,7 @@ function formatEur(n: number): string {
   <div class="space-y-8">
 
     <!-- ── Cabecera + selector de período ────────────────── -->
-    <div class="flex items-end justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-0 sm:justify-between">
       <div>
         <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Rendimiento Comercial</h2>
         <p class="text-on-surface-variant text-sm">Análisis detallado de Atelier Sapphire</p>
