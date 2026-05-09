@@ -18,6 +18,8 @@ import com.marcog.peluqueria.security.infrastructure.out.persistence.UserEntity;
 import com.marcog.peluqueria.security.infrastructure.out.persistence.JpaUserRepository;
 import com.marcog.peluqueria.shared.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -49,12 +51,14 @@ public class ProductoService implements GestionarProductoUseCase {
     private final NotificationService notificationService;
 
     @Override
+    @CacheEvict(value = "productos", allEntries = true)
     public Producto crear(Producto producto) {
         producto.setActivo(true);
         return repository.guardar(producto);
     }
 
     @Override
+    @CacheEvict(value = "productos", allEntries = true)
     public Producto actualizar(UUID id, Producto detalles) {
         Producto existente = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Producto no encontrado: " + id));
@@ -70,6 +74,7 @@ public class ProductoService implements GestionarProductoUseCase {
     }
 
     @Override
+    @CacheEvict(value = "productos", allEntries = true)
     public void eliminar(UUID id) {
         Producto p = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Producto no encontrado: " + id));
@@ -78,6 +83,7 @@ public class ProductoService implements GestionarProductoUseCase {
     }
 
     @Override
+    @CacheEvict(value = "productos", allEntries = true)
     public Producto ajustarStock(UUID id, int cantidad) {
         Producto p = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producto no encontrado: " + id));
@@ -91,6 +97,7 @@ public class ProductoService implements GestionarProductoUseCase {
 
     @Override
     @Transactional
+    @CacheEvict(value = "productos", allEntries = true)
     public VentaProductoResponseDTO vender(UUID id, int cantidad) {
         if (cantidad <= 0) {
             throw new ResponseStatusException(BAD_REQUEST, "La cantidad debe ser mayor que cero");
@@ -141,6 +148,7 @@ public class ProductoService implements GestionarProductoUseCase {
 
     @Override
     @Transactional
+    @CacheEvict(value = "productos", allEntries = true)
     public VentaAgrupadaResponseDTO venderAgrupado(VentaAgrupadaRequestDTO request, String username) {
         if (request.getLineas() == null || request.getLineas().isEmpty()) {
             throw new ResponseStatusException(BAD_REQUEST, "La venta debe tener al menos una línea");
@@ -295,6 +303,7 @@ public class ProductoService implements GestionarProductoUseCase {
     }
 
     @Override
+    @Cacheable("productos")
     public List<Producto> listar(CategoriaProducto categoria) {
         if (categoria != null) return repository.findByCategoria(categoria);
         return repository.findAll();
