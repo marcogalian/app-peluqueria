@@ -3,6 +3,8 @@ package com.marcog.peluqueria.peluqueros.application.service;
 import com.marcog.peluqueria.peluqueros.domain.model.Peluquero;
 import com.marcog.peluqueria.peluqueros.domain.port.out.PeluqueroRepositoryPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,6 +16,7 @@ public class PeluqueroService {
 
     private final PeluqueroRepositoryPort repositoryPort;
 
+    @Cacheable("peluqueros")
     public List<Peluquero> getAllPeluqueros() {
         return repositoryPort.findAll();
     }
@@ -23,10 +26,12 @@ public class PeluqueroService {
                 .orElseThrow(() -> new RuntimeException("Peluquero not found"));
     }
 
+    @CacheEvict(value = "peluqueros", allEntries = true)
     public Peluquero createPeluquero(Peluquero peluquero) {
         return repositoryPort.save(peluquero);
     }
 
+    @CacheEvict(value = "peluqueros", allEntries = true)
     public Peluquero updatePeluquero(UUID id, Peluquero peluqueroDetails) {
         Peluquero existing = getPeluqueroById(id);
         existing.setNombre(peluqueroDetails.getNombre());
@@ -38,12 +43,14 @@ public class PeluqueroService {
         return repositoryPort.save(existing);
     }
 
+    @CacheEvict(value = "peluqueros", allEntries = true)
     public void actualizarFoto(UUID id, String rutaRelativa) {
         Peluquero p = getPeluqueroById(id);
         p.setFotoUrl(rutaRelativa);
         repositoryPort.save(p);
     }
 
+    @CacheEvict(value = "peluqueros", allEntries = true)
     public Peluquero registrarBaja(UUID id) {
         Peluquero peluquero = getPeluqueroById(id);
         peluquero.setEnBaja(true);
@@ -51,6 +58,7 @@ public class PeluqueroService {
         return repositoryPort.save(peluquero);
     }
 
+    @CacheEvict(value = "peluqueros", allEntries = true)
     public Peluquero reactivar(UUID id) {
         Peluquero peluquero = getPeluqueroById(id);
         peluquero.setEnBaja(false);
@@ -58,6 +66,7 @@ public class PeluqueroService {
         return repositoryPort.save(peluquero);
     }
 
+    @CacheEvict(value = "peluqueros", allEntries = true)
     public void deletePeluquero(UUID id) {
         repositoryPort.deleteById(id);
     }
