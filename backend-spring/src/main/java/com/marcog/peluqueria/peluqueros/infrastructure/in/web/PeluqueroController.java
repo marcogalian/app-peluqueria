@@ -16,7 +16,11 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "Empleados", description = "Gestion de peluqueros/empleados")
 @RestController
 @RequestMapping("/api/peluqueros")
 @RequiredArgsConstructor
@@ -25,24 +29,33 @@ public class PeluqueroController {
     private final PeluqueroService   peluqueroService;
     private final FileStorageConfig  storageConfig;
 
+    @Operation(summary = "Listar empleados", description = "Retorna todos los peluqueros del centro")
+    @ApiResponse(responseCode = "200", description = "Lista de peluqueros")
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<List<Peluquero>> getAllPeluqueros() {
         return ResponseEntity.ok(peluqueroService.getAllPeluqueros());
     }
 
+    @Operation(summary = "Obtener empleado", description = "Retorna un peluquero por su ID")
+    @ApiResponse(responseCode = "200", description = "Peluquero encontrado")
+    @ApiResponse(responseCode = "404", description = "No encontrado")
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<Peluquero> getPeluqueroById(@PathVariable UUID id) {
         return ResponseEntity.ok(peluqueroService.getPeluqueroById(id));
     }
 
+    @Operation(summary = "Crear empleado", description = "Registra un nuevo peluquero (solo admin)")
+    @ApiResponse(responseCode = "200", description = "Peluquero creado")
     @PostMapping
     @PreAuthorize("hasAuthority('ROLE_ADMIN')") // Solo Admin puede crear peluqueros
     public ResponseEntity<Peluquero> createPeluquero(@RequestBody Peluquero peluquero) {
         return ResponseEntity.ok(peluqueroService.createPeluquero(peluquero));
     }
 
+    @Operation(summary = "Actualizar empleado", description = "Modifica los datos de un peluquero")
+    @ApiResponse(responseCode = "200", description = "Peluquero actualizado")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Peluquero> updatePeluquero(
@@ -51,6 +64,8 @@ public class PeluqueroController {
         return ResponseEntity.ok(peluqueroService.updatePeluquero(id, peluquero));
     }
 
+    @Operation(summary = "Eliminar empleado", description = "Elimina un peluquero permanentemente")
+    @ApiResponse(responseCode = "204", description = "Peluquero eliminado")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> deletePeluquero(@PathVariable UUID id) {
@@ -58,18 +73,24 @@ public class PeluqueroController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Registrar baja", description = "Marca un peluquero como dado de baja")
+    @ApiResponse(responseCode = "200", description = "Baja registrada")
     @PostMapping("/{id}/baja")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Peluquero> registrarBaja(@PathVariable UUID id) {
         return ResponseEntity.ok(peluqueroService.registrarBaja(id));
     }
 
+    @Operation(summary = "Reactivar empleado", description = "Reactiva un peluquero dado de baja")
+    @ApiResponse(responseCode = "200", description = "Peluquero reactivado")
     @PostMapping("/{id}/reactivar")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Peluquero> reactivar(@PathVariable UUID id) {
         return ResponseEntity.ok(peluqueroService.reactivar(id));
     }
 
+    @Operation(summary = "Subir foto", description = "Sube la foto de perfil de un peluquero")
+    @ApiResponse(responseCode = "200", description = "Foto subida")
     @PostMapping("/{id}/foto")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Map<String, String>> subirFoto(

@@ -15,7 +15,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "Autenticacion", description = "Registro, login y renovacion de tokens JWT")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -25,16 +29,25 @@ public class AuthenticationController {
     private final RefreshTokenService refreshTokenService;
     private final JwtService jwtService;
 
+    @Operation(summary = "Registrar usuario", description = "Crea un nuevo usuario en el sistema")
+    @ApiResponse(responseCode = "200", description = "Usuario registrado")
+    @ApiResponse(responseCode = "400", description = "Datos invalidos")
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authenticationService.register(request));
     }
 
+    @Operation(summary = "Iniciar sesion", description = "Autentica con credenciales y devuelve token JWT")
+    @ApiResponse(responseCode = "200", description = "Token generado")
+    @ApiResponse(responseCode = "401", description = "Credenciales incorrectas")
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> authenticate(@RequestBody AuthRequest request) {
         return ResponseEntity.ok(authenticationService.authenticate(request));
     }
 
+    @Operation(summary = "Renovar token", description = "Genera nuevo access token a partir del refresh token")
+    @ApiResponse(responseCode = "200", description = "Token renovado")
+    @ApiResponse(responseCode = "401", description = "Refresh token invalido")
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refreshToken(@RequestBody RefreshTokenRequest request) {
         return refreshTokenService.findByToken(request.getRefreshToken())

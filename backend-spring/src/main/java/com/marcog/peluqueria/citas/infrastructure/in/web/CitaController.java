@@ -20,7 +20,11 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import com.marcog.peluqueria.citas.application.service.GenerarTicketPdfUseCase;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "Citas", description = "Gestion de citas y agenda diaria")
 @RestController
 @RequestMapping("/api/citas")
 @RequiredArgsConstructor
@@ -29,6 +33,8 @@ public class CitaController {
     private final CitaService citaService;
     private final GenerarTicketPdfUseCase generarTicketPdfUseCase;
 
+    @Operation(summary = "Listar citas", description = "Retorna citas filtradas por rango de fechas y/o peluquero")
+    @ApiResponse(responseCode = "200", description = "Lista de citas")
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<List<Cita>> getCitas(
@@ -38,24 +44,35 @@ public class CitaController {
         return ResponseEntity.ok(citaService.getCitas(start, end, peluqueroId));
     }
 
+    @Operation(summary = "Obtener cita por ID", description = "Retorna el detalle de una cita")
+    @ApiResponse(responseCode = "200", description = "Cita encontrada")
+    @ApiResponse(responseCode = "404", description = "Cita no encontrada")
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<Cita> getCitaById(@PathVariable UUID id) {
         return ResponseEntity.ok(citaService.getCitaById(id));
     }
 
+    @Operation(summary = "Crear cita", description = "Crea una nueva cita validando disponibilidad del peluquero")
+    @ApiResponse(responseCode = "200", description = "Cita creada")
+    @ApiResponse(responseCode = "400", description = "Datos invalidos o cita superpuesta")
     @PostMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<Cita> createCita(@RequestBody Cita cita) {
         return ResponseEntity.ok(citaService.createCita(cita));
     }
 
+    @Operation(summary = "Actualizar cita", description = "Modifica una cita existente")
+    @ApiResponse(responseCode = "200", description = "Cita actualizada")
+    @ApiResponse(responseCode = "404", description = "Cita no encontrada")
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<Cita> updateCita(@PathVariable UUID id, @RequestBody Cita cita) {
         return ResponseEntity.ok(citaService.updateCita(id, cita));
     }
 
+    @Operation(summary = "Cancelar cita", description = "Cancela una cita con motivo opcional")
+    @ApiResponse(responseCode = "200", description = "Cita cancelada")
     @PatchMapping("/{id}/cancelar")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<Cita> cancelarCita(
@@ -65,6 +82,8 @@ public class CitaController {
         return ResponseEntity.ok(citaService.cancelar(id, motivo));
     }
 
+    @Operation(summary = "Eliminar cita", description = "Elimina permanentemente una cita (solo admin)")
+    @ApiResponse(responseCode = "204", description = "Cita eliminada")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> deleteCita(@PathVariable UUID id) {
@@ -75,6 +94,8 @@ public class CitaController {
     /**
      * Obtiene las citas del día para la agenda del empleado autenticado.
      */
+    @Operation(summary = "Agenda del dia", description = "Obtiene las citas del dia para la vista de agenda")
+    @ApiResponse(responseCode = "200", description = "Lista de citas del dia")
     @GetMapping("/agenda")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<List<CitaAgendaDto>> getCitasAgenda(
@@ -93,6 +114,8 @@ public class CitaController {
     /**
      * Obtiene el resumen de citas para un mes (para los badges del calendario).
      */
+    @Operation(summary = "Resumen mensual", description = "Resumen de citas agrupadas por dia para el calendario")
+    @ApiResponse(responseCode = "200", description = "Resumen por dia")
     @GetMapping("/resumen-mes")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<List<ResumenDiaDto>> getResumenMes(
@@ -126,6 +149,9 @@ public class CitaController {
     /**
      * HU13: Endpoint para descargar la factura o ticket de la cita en formato PDF.
      */
+    @Operation(summary = "Descargar ticket PDF", description = "Genera y descarga el ticket/factura de una cita en PDF")
+    @ApiResponse(responseCode = "200", description = "PDF generado")
+    @ApiResponse(responseCode = "500", description = "Error generando PDF")
     @GetMapping("/{id}/ticket")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<byte[]> descargarTicketPdf(@PathVariable UUID id) {
