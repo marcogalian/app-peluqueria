@@ -118,6 +118,25 @@ class ChatbotServiceTest {
     }
 
     @Test
+    @DisplayName("Consulta clientes VIP: responde con nombres desde funcion directa sin depender del modelo")
+    void chat_clientesVip_respuestaDirectaConNombres() {
+        when(functionExecutor.execute(eq("getClientesVip"), any(), any(), eq(true)))
+                .thenReturn("""
+                        {"totalVip":2,"clientes":[
+                          {"nombre":"Sofia Martinez","telefono":"600111222","descuento":10},
+                          {"nombre":"Lucia Gomez","telefono":"600333444","descuento":15}
+                        ]}
+                        """);
+
+        ChatResponse respuesta = chatbotService.chat(
+                peticionConMensaje("Dame los nombres de los clientes VIP"), adminUser);
+
+        assertEquals("Tenemos 2 clientes VIP: Sofia Martinez, Lucia Gomez.", respuesta.getReply());
+        verify(functionExecutor).execute(eq("getClientesVip"), any(), any(), eq(true));
+        verify(llmClient, never()).generateContent(any(), any(), any(), anyList());
+    }
+
+    @Test
     @DisplayName("Empleado solo recibe 2 tools (citas + vacaciones)")
     void chat_empleado_pasaSolo2Tools() {
         when(llmClient.generateContent(any(), any(), any(),

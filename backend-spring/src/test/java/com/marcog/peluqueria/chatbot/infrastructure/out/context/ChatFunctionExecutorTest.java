@@ -6,6 +6,7 @@ import com.marcog.peluqueria.ausencias.domain.model.EstadoAusencia;
 import com.marcog.peluqueria.ausencias.domain.model.SolicitudAusencia;
 import com.marcog.peluqueria.ausencias.domain.port.out.AusenciaRepositoryPort;
 import com.marcog.peluqueria.citas.domain.port.out.CitaRepositoryPort;
+import com.marcog.peluqueria.clientes.domain.model.Cliente;
 import com.marcog.peluqueria.clientes.domain.port.out.ClienteRepository;
 import com.marcog.peluqueria.finanzas.application.service.FinanzasDashboardService;
 import com.marcog.peluqueria.productos.domain.port.out.ProductoRepositoryPort;
@@ -97,6 +98,32 @@ class ChatFunctionExecutorTest {
         assertEquals(2, resultado.get("aprobadas").asInt(),
                 "Antes comparaba String con enum y siempre daba 0");
         assertEquals(1, resultado.get("pendientes").asInt());
+    }
+
+    @Test
+    @DisplayName("getClientesVip filtra desde activos sin usar query con nombre nulo")
+    void getClientesVip_filtraActivosEnMemoria() throws Exception {
+        Cliente vip = Cliente.builder()
+                .nombre("Sofia")
+                .apellidos("Martinez")
+                .telefono("600111222")
+                .esVip(true)
+                .descuentoPorcentaje(10)
+                .build();
+        Cliente normal = Cliente.builder()
+                .nombre("Laura")
+                .apellidos("Garcia")
+                .telefono("600333444")
+                .esVip(false)
+                .build();
+
+        when(clienteRepository.findAllByArchivado(false)).thenReturn(List.of(vip, normal));
+
+        String resultadoJson = executor.execute("getClientesVip", null, UUID.randomUUID(), true);
+
+        JsonNode resultado = new ObjectMapper().readTree(resultadoJson);
+        assertEquals(1, resultado.get("totalVip").asInt());
+        assertEquals("Sofia Martinez", resultado.get("clientes").get(0).get("nombre").asText());
     }
 
     @Test

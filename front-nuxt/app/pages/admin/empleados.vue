@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * Gestión de Personal — lista de empleados con panel lateral de detalle.
+ * Gestión de Personal — lista de empleados con ficha desplegable de detalle.
  * Email por empleado y registro de bajas/vacaciones.
- * Solo admin puede ver todos; panel lateral con mini-calendario del mes.
+ * Solo admin puede ver todos; detalle inline con mini-calendario del mes.
  */
 import {
-  Plus, X, Loader2, Save, Phone, Mail, ChevronLeft, ChevronRight,
+  Plus, X, Loader2, Mail, ChevronLeft, ChevronRight,
 } from 'lucide-vue-next'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday } from 'date-fns'
 import { useToast } from '~/modules/shared/composables/useToast'
@@ -94,8 +94,6 @@ onMounted(async () => {
     // vacío
   } finally {
     cargando.value = false
-    // Seleccionar el primero por defecto
-    if (empleados.value.length > 0) empleadoSeleccionado.value = empleados.value[0]
   }
 })
 
@@ -112,6 +110,20 @@ function badgeEstado(e: Empleado): string {
   if (e.enVacaciones) return 'bg-blue-100 text-blue-700'
   if (e.disponible)   return 'bg-green-100 text-green-700'
   return 'bg-surface-container text-on-surface-variant'
+}
+
+function abrirEmpleado(empleado: Empleado) {
+  if (empleadoSeleccionado.value?.id === empleado.id) {
+    empleadoSeleccionado.value = null
+    return
+  }
+
+  empleadoSeleccionado.value = empleado
+  formEditar.nombre             = empleado.nombre + (empleado.apellidos ? ' ' + empleado.apellidos : '')
+  formEditar.telefono           = empleado.telefono
+  formEditar.especialidades     = empleado.especialidades
+  formEditar.horarioBase        = ''
+  formEditar.porcentajeComision = empleado.porcentajeComision
 }
 
 async function registrarBaja() {
@@ -261,11 +273,9 @@ function abrirEmail(empleado: Empleado) {
       </div>
     </div>
 
-    <!-- ── Layout lista + panel ──────────────────────────── -->
-    <div class="flex gap-6 items-start">
-
-      <!-- Lista de empleados -->
-      <div class="flex-1 card overflow-hidden">
+    <!-- ── Lista con detalle desplegable ─────────────────── -->
+    <div>
+      <div class="card empleados-panel-card overflow-hidden">
         <div class="p-6 border-b border-surface-container">
           <h3 class="font-bold text-primary-container">Lista de Empleados</h3>
         </div>
@@ -277,158 +287,187 @@ function abrirEmail(empleado: Empleado) {
 
         <!-- Filas -->
         <div v-else class="divide-y divide-surface-container">
-          <div
-            v-for="e in empleados"
-            :key="e.id"
-            class="flex items-center gap-4 px-6 py-4 hover:bg-surface-container-low cursor-pointer transition-colors"
-            :class="empleadoSeleccionado?.id === e.id ? 'bg-surface-container-low' : ''"
-            @click="empleadoSeleccionado = e"
-          >
-            <!-- Avatar -->
-            <div
-              class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-              :class="e.enBaja ? 'bg-red-400' : e.enVacaciones ? 'bg-blue-400' : 'bg-primary-container'"
+          <div v-for="e in empleados" :key="e.id">
+            <button
+              type="button"
+              class="flex w-full items-center gap-4 px-6 py-4 text-left hover:bg-surface-container-low transition-colors"
+              :class="empleadoSeleccionado?.id === e.id ? 'bg-white' : ''"
+              @click="abrirEmpleado(e)"
             >
-              {{ e.iniciales || (e.nombre[0] + e.apellidos[0]).toUpperCase() }}
-            </div>
+              <!-- Avatar -->
+              <div
+                class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                :class="e.enBaja ? 'bg-red-400' : e.enVacaciones ? 'bg-blue-400' : 'bg-primary-container'"
+              >
+                {{ e.iniciales || (e.nombre[0] + e.apellidos[0]).toUpperCase() }}
+              </div>
 
-            <!-- Nombre + especialidad -->
-            <div class="flex-1 min-w-0">
-              <p class="font-bold text-on-surface text-sm truncate">{{ e.nombre }} {{ e.apellidos }}</p>
-              <p class="text-xs text-on-surface-variant truncate">{{ e.especialidades || 'Sin especialidad definida' }}</p>
-            </div>
+              <!-- Nombre + especialidad -->
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-on-surface text-sm truncate">{{ e.nombre }} {{ e.apellidos }}</p>
+                <p class="text-xs text-on-surface-variant truncate">{{ e.especialidades || 'Sin especialidad definida' }}</p>
+              </div>
 
-            <!-- Citas del mes -->
-            <p class="text-xs text-on-surface-variant w-16 text-center">
-              <span class="font-bold text-on-surface">{{ e.citasMes }}</span> citas
-            </p>
+              <!-- Citas del mes -->
+              <p class="hidden sm:block text-xs text-on-surface-variant w-16 text-center">
+                <span class="font-bold text-on-surface">{{ e.citasMes }}</span> citas
+              </p>
 
-            <!-- Badge estado -->
-            <span class="text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0" :class="badgeEstado(e)">
-              {{ estadoEmpleado(e) }}
-            </span>
+              <!-- Badge estado -->
+              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0" :class="badgeEstado(e)">
+                {{ estadoEmpleado(e) }}
+              </span>
+            </button>
+
+            <Transition name="fade-slide">
+              <div
+                v-if="empleadoSeleccionado?.id === e.id"
+                class="border-t border-surface-container bg-white px-6 py-6"
+              >
+                <div class="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
+                  <div class="space-y-5">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="flex items-center gap-4">
+                        <div
+                          class="relative w-16 h-16 rounded-full flex-shrink-0"
+                          :class="authStore.isAdmin ? 'cursor-pointer group' : ''"
+                          @click.stop="authStore.isAdmin && inputFoto?.click()"
+                        >
+                          <img
+                            v-if="empleadoSeleccionado.fotoUrl"
+                            :src="`${$config.public.uploadsBase}/${empleadoSeleccionado.fotoUrl}`"
+                            class="w-16 h-16 rounded-full object-cover"
+                            alt="Foto empleado"
+                          />
+                          <div
+                            v-else
+                            class="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-bold"
+                            :class="empleadoSeleccionado.enBaja ? 'bg-red-400' : 'bg-primary-container'"
+                          >
+                            {{ (empleadoSeleccionado.nombre[0] + (empleadoSeleccionado.apellidos[0] || '')).toUpperCase() }}
+                          </div>
+                          <div class="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span class="text-white text-[10px] font-bold">Cambiar</span>
+                          </div>
+                        </div>
+                        <input ref="inputFoto" type="file" accept="image/*" class="hidden" @change="subirFoto" />
+                        <div>
+                          <h3 class="text-lg font-bold text-on-surface">{{ empleadoSeleccionado.nombre }} {{ empleadoSeleccionado.apellidos }}</h3>
+                          <p class="text-sm text-on-surface-variant">{{ empleadoSeleccionado.especialidades || 'Sin especialidad' }}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        class="inline-flex items-center justify-center gap-2 rounded-md border border-outline-variant/50 bg-white px-4 py-2 text-sm font-bold text-on-surface shadow-sm transition-colors hover:bg-surface-container-low"
+                        @click.stop="abrirEmail(empleadoSeleccionado)"
+                      >
+                        <Mail class="w-4 h-4 text-primary-container" />
+                        Ir a email
+                      </button>
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label class="label">Nombre completo</label>
+                        <input v-model="formEditar.nombre" type="text" class="input" />
+                      </div>
+                      <div>
+                        <label class="label">Teléfono</label>
+                        <input v-model="formEditar.telefono" type="tel" class="input" placeholder="Ej. 600123456" />
+                      </div>
+                      <div>
+                        <label class="label">Email</label>
+                        <div class="flex min-h-11 items-center gap-2 rounded-md border border-outline-variant/50 bg-white px-3 text-sm text-on-surface-variant">
+                          <Mail class="w-4 h-4 flex-shrink-0" />
+                          <span class="truncate">{{ empleadoSeleccionado.email || 'Sin email' }}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label class="label">Comisión (%)</label>
+                        <input v-model.number="formEditar.porcentajeComision" type="number" min="0" max="100" step="0.5" class="input" placeholder="Ej. 30" />
+                      </div>
+                      <div>
+                        <label class="label">Especialidades</label>
+                        <input v-model="formEditar.especialidades" type="text" class="input" placeholder="Ej. Colorimetría, Corte, Alisados" />
+                      </div>
+                      <div>
+                        <label class="label">Horario base</label>
+                        <input v-model="formEditar.horarioBase" type="text" class="input" placeholder="Ej. L-V 09:00-17:00" />
+                      </div>
+                    </div>
+
+                    <div v-if="authStore.isAdmin" class="flex flex-wrap gap-3">
+                      <button
+                        class="btn-primary min-w-40"
+                        :disabled="guardando"
+                        @click.stop="guardarEdicion"
+                      >
+                        <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" />
+                        <span>{{ guardando ? 'Guardando...' : 'Guardar cambios' }}</span>
+                      </button>
+                      <button
+                        v-if="!empleadoSeleccionado.enBaja"
+                        class="btn-danger min-w-40"
+                        @click.stop="modalBaja = true"
+                      >
+                        Registrar baja médica
+                      </button>
+                      <button
+                        v-else
+                        class="btn-secondary min-w-40"
+                        :disabled="guardando"
+                        @click.stop="reactivarEmpleado(empleadoSeleccionado)"
+                      >
+                        Reactivar empleado
+                      </button>
+                      <NuxtLink
+                        :to="`/admin/calendario-laboral?empleado=${empleadoSeleccionado.id}`"
+                        class="btn-secondary min-w-40 text-center"
+                        @click.stop
+                      >
+                        Ver calendario laboral
+                      </NuxtLink>
+                    </div>
+                  </div>
+
+                  <div class="rounded-md border border-outline-variant/40 bg-surface-container-low/40 p-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">{{ textoMesCalendario }}</p>
+                      <div class="flex gap-1">
+                        <button class="p-1 rounded hover:bg-surface-container transition-colors" @click.stop="mesCalendario = new Date(mesCalendario.getFullYear(), mesCalendario.getMonth() - 1)">
+                          <ChevronLeft class="w-3 h-3" />
+                        </button>
+                        <button class="p-1 rounded hover:bg-surface-container transition-colors" @click.stop="mesCalendario = new Date(mesCalendario.getFullYear(), mesCalendario.getMonth() + 1)">
+                          <ChevronRight class="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-[9px] text-center font-black text-on-surface-variant/50 mb-2">
+                      <span v-for="d in ['L','M','X','J','V','S','D']" :key="d">{{ d }}</span>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-[11px]">
+                      <span
+                        v-for="(dia, i) in diasCalendario"
+                        :key="i"
+                        class="py-1.5 rounded"
+                        :class="[
+                          !isSameMonth(dia, mesCalendario) ? 'text-on-surface-variant/20' : 'font-bold',
+                          isToday(dia) ? 'bg-primary-container text-white' : '',
+                        ]"
+                      >
+                        {{ format(dia, 'd') }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Transition>
           </div>
           <div v-if="empleados.length === 0" class="px-6 py-12 text-center text-sm text-on-surface-variant">
             No hay empleados registrados
           </div>
         </div>
       </div>
-
-      <!-- Panel lateral de detalle -->
-      <aside
-        v-if="empleadoSeleccionado"
-        class="w-80 card-kpi p-6 sticky top-24 shadow-lg flex-shrink-0"
-      >
-        <!-- Avatar grande + nombre -->
-        <div class="text-center mb-6">
-          <div
-            class="relative w-20 h-20 rounded-full mx-auto mb-3"
-            :class="authStore.isAdmin ? 'cursor-pointer group' : ''"
-            @click="authStore.isAdmin && inputFoto?.click()"
-          >
-            <img
-              v-if="empleadoSeleccionado.fotoUrl"
-              :src="`${$config.public.uploadsBase}/${empleadoSeleccionado.fotoUrl}`"
-              class="w-20 h-20 rounded-full object-cover"
-              alt="Foto empleado"
-            />
-            <div
-              v-else
-              class="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold"
-              :class="empleadoSeleccionado.enBaja ? 'bg-red-400' : 'bg-primary-container'"
-            >
-              {{ (empleadoSeleccionado.nombre[0] + (empleadoSeleccionado.apellidos[0] || '')).toUpperCase() }}
-            </div>
-            <div class="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <span class="text-white text-[10px] font-bold">Cambiar</span>
-            </div>
-          </div>
-          <input ref="inputFoto" type="file" accept="image/*" class="hidden" @change="subirFoto" />
-          <h3 class="text-lg font-bold text-on-surface">{{ empleadoSeleccionado.nombre }} {{ empleadoSeleccionado.apellidos }}</h3>
-          <p class="text-sm text-on-surface-variant">{{ empleadoSeleccionado.especialidades || 'Sin especialidad' }}</p>
-
-          <div class="flex gap-3 mt-4">
-            <button
-              class="flex-1 bg-white hover:bg-surface-container text-on-surface font-bold py-2.5 px-4 rounded-xl text-[11px] flex items-center justify-center gap-2 transition-colors border border-outline-variant/20 shadow-sm"
-              @click="abrirEmail(empleadoSeleccionado)"
-            >
-              <Mail class="w-4 h-4 text-primary-container" />
-              Ir a email
-            </button>
-          </div>
-        </div>
-
-        <!-- Info básica -->
-        <div class="space-y-3 mb-6">
-          <div class="flex items-center gap-3 text-sm">
-            <Phone class="w-4 h-4 text-on-surface-variant flex-shrink-0" />
-            <span class="text-on-surface-variant">{{ empleadoSeleccionado.telefono || 'Sin teléfono' }}</span>
-          </div>
-          <div class="flex items-center gap-3 text-sm">
-            <Mail class="w-4 h-4 text-on-surface-variant flex-shrink-0" />
-            <span class="text-on-surface-variant truncate">{{ empleadoSeleccionado.email }}</span>
-          </div>
-          <div class="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2 text-sm">
-            <span class="text-on-surface-variant font-medium">Comisión</span>
-            <span class="font-bold text-primary-container">{{ empleadoSeleccionado.porcentajeComision }}%</span>
-          </div>
-        </div>
-
-        <!-- Mini-calendario del mes -->
-        <div class="mb-6">
-          <div class="flex items-center justify-between mb-3">
-            <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">{{ textoMesCalendario }}</p>
-            <div class="flex gap-1">
-              <button class="p-1 rounded hover:bg-surface-container transition-colors" @click="mesCalendario = new Date(mesCalendario.getFullYear(), mesCalendario.getMonth() - 1)">
-                <ChevronLeft class="w-3 h-3" />
-              </button>
-              <button class="p-1 rounded hover:bg-surface-container transition-colors" @click="mesCalendario = new Date(mesCalendario.getFullYear(), mesCalendario.getMonth() + 1)">
-                <ChevronRight class="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-          <div class="grid grid-cols-7 gap-1 text-[9px] text-center font-black text-on-surface-variant/50 mb-2">
-            <span v-for="d in ['L','M','X','J','V','S','D']" :key="d">{{ d }}</span>
-          </div>
-          <div class="grid grid-cols-7 gap-1 text-center text-[11px]">
-            <span
-              v-for="(dia, i) in diasCalendario"
-              :key="i"
-              class="py-1.5 rounded-lg"
-              :class="[
-                !isSameMonth(dia, mesCalendario) ? 'text-on-surface-variant/20' : 'font-bold',
-                isToday(dia) ? 'bg-primary-container text-white' : '',
-              ]"
-            >
-              {{ format(dia, 'd') }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Acciones — solo admin -->
-        <div v-if="authStore.isAdmin" class="space-y-2">
-          <button
-            class="w-full bg-primary-container/10 hover:bg-primary-container/20 text-primary-container font-bold py-2.5 rounded-xl text-sm transition-colors"
-            @click="abrirEditar"
-          >
-            Editar empleado
-          </button>
-          <button
-            v-if="!empleadoSeleccionado.enBaja"
-            class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors shadow-sm"
-            @click="modalBaja = true"
-          >
-            Registrar baja médica
-          </button>
-          <NuxtLink
-            :to="`/admin/calendario-laboral?empleado=${empleadoSeleccionado.id}`"
-            class="block w-full text-center bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-bold py-2.5 rounded-xl text-sm transition-colors"
-          >
-            Ver calendario laboral
-          </NuxtLink>
-        </div>
-      </aside>
-
     </div>
   </div>
 
@@ -595,3 +634,15 @@ function abrirEmail(empleado: Empleado) {
     </Transition>
   </Teleport>
 </template>
+
+<style scoped>
+.empleados-panel-card {
+  transform: none;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.empleados-panel-card:hover {
+  transform: none;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+</style>

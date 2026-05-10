@@ -66,7 +66,7 @@ export default defineNuxtConfig({
   // el bug de "pantalla en blanco" al navegar entre layouts en Nuxt
   app: {
     head: {
-      title: 'Atelier Sapphire — Gestión',
+      title: 'Peluquería Isabella',
       meta: [
         { name: 'description', content: 'Sistema de gestión de peluquería' },
         { name: 'viewport',    content: 'width=device-width, initial-scale=1' },

@@ -11,7 +11,7 @@
  */
 import {
   Search, Plus, Star, Percent, Camera,
-  Phone, Mail, User, Loader2, ChevronRight,
+  Phone, Mail, Loader2, ChevronRight,
   Upload, X, ZoomIn, Trash2, CalendarDays, Scissors,
 } from 'lucide-vue-next'
 import type {
@@ -19,7 +19,6 @@ import type {
   FotoCliente,
   Genero,
   HistorialCliente,
-  CitaHistorialCliente,
 } from '~/modules/clientes/types/cliente.types'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
@@ -32,9 +31,8 @@ const busqueda    = ref('')
 const cargando    = ref(true)
 const vistaClientes = ref<'activos' | 'archivados'>('activos')
 const filtroTipoCliente = ref<'todos' | 'vip' | 'normales'>('todos')
-const panelClienteRef = ref<HTMLElement | null>(null)
 
-// Drawer de detalle del cliente (panel derecho como en el diseño)
+// Ficha desplegable del cliente seleccionado
 const clienteSeleccionado = ref<Cliente | null>(null)
 const drawerAbierto       = ref(false)
 const tabActiva           = ref<'info' | 'fotos'>('info')
@@ -61,7 +59,7 @@ const formCliente = ref({
   apellidos: '',
   telefono:  '',
   email:     '',
-  genero:    'OTRO' as Genero,
+  genero:    'FEMENINO' as Genero,
   notas:     '',
   esVip:     false,
 })
@@ -153,12 +151,27 @@ async function cargarClientes() {
 }
 
 async function abrirCliente(cliente: Cliente) {
+  // Toggle: si el mismo cliente ya esta abierto, cerrar
+  if (clienteSeleccionado.value?.id === cliente.id && drawerAbierto.value) {
+    drawerAbierto.value = false
+    clienteSeleccionado.value = null
+    return
+  }
   clienteSeleccionado.value = cliente
   tabActiva.value           = 'info'
   drawerAbierto.value       = true
+  // Inicializar el form editable con los datos del cliente
+  formCliente.value = {
+    nombre: cliente.nombre ?? '',
+    apellidos: cliente.apellidos ?? '',
+    telefono: cliente.telefono ?? '',
+    email: cliente.email ?? '',
+    genero: cliente.genero ?? 'FEMENINO',
+    notas: cliente.notas ?? '',
+    esVip: cliente.esVip ?? false,
+  }
+  clienteEditandoId.value = cliente.id
   await cargarHistorialCliente(cliente.id)
-  await nextTick()
-  panelClienteRef.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
 }
 
 async function cargarHistorialCliente(clienteId: string) {
@@ -266,23 +279,9 @@ function abrirModalNuevoCliente() {
     apellidos: '',
     telefono: '',
     email: '',
-    genero: 'OTRO',
+    genero: 'FEMENINO',
     notas: '',
     esVip: false,
-  }
-  modalClienteAbierto.value = true
-}
-
-function abrirModalEditarCliente(cliente: Cliente) {
-  clienteEditandoId.value = cliente.id
-  formCliente.value = {
-    nombre: cliente.nombre ?? '',
-    apellidos: cliente.apellidos ?? '',
-    telefono: cliente.telefono ?? '',
-    email: cliente.email ?? '',
-    genero: cliente.genero ?? 'OTRO',
-    notas: cliente.notas ?? '',
-    esVip: cliente.esVip ?? false,
   }
   modalClienteAbierto.value = true
 }
@@ -349,7 +348,7 @@ async function guardarCliente() {
 </script>
 
 <template>
-  <div class="flex flex-col lg:flex-row gap-6 h-full min-h-0 items-start">
+  <div class="flex flex-col gap-6">
 
     <!-- ══════════════════════════════════════════════════════
          PANEL IZQUIERDO — Lista de clientes
@@ -366,7 +365,7 @@ async function guardarCliente() {
             v-model="busqueda"
             type="search"
             placeholder="Buscar por nombre, teléfono o email..."
-            class="input min-h-11 rounded-full pl-10"
+            class="input pl-10"
             aria-label="Buscar clientes por nombre, teléfono o email"
           />
         </div>
@@ -375,7 +374,7 @@ async function guardarCliente() {
           <select
             id="clientes-tipo"
             v-model="filtroTipoCliente"
-            class="select-field rounded-full bg-surface-container-lowest"
+            class="select-field"
             aria-label="Filtrar por tipo de cliente"
           >
             <option
@@ -392,7 +391,7 @@ async function guardarCliente() {
           <select
             id="clientes-estado"
             v-model="vistaClientes"
-            class="select-field rounded-full bg-surface-container-lowest"
+            class="select-field"
             aria-label="Filtrar por estado de cliente"
             @change="seleccionarVistaClientes(vistaClientes)"
           >
@@ -422,326 +421,357 @@ async function guardarCliente() {
         <p class="text-xs text-text-secondary mt-1">Prueba con otro nombre, teléfono o cambia el filtro.</p>
       </div>
 
-      <div v-else class="space-y-2">
+      <div v-else class="space-y-3">
         <div
           v-for="cliente in clientesFiltrados"
           :key="cliente.id"
-          class="card p-4 cursor-pointer flex items-center gap-4 group"
-          :class="clienteSeleccionado?.id === cliente.id ? 'border-primary shadow-card-md' : ''"
-          role="button"
-          tabindex="0"
-          :aria-label="`Abrir ficha de ${cliente.nombre} ${cliente.apellidos}`"
-          @click="abrirCliente(cliente)"
-          @keydown.enter.prevent="abrirCliente(cliente)"
+          class="card overflow-hidden"
+          :class="clienteSeleccionado?.id === cliente.id && drawerAbierto ? 'bg-primary/5 shadow-card-md' : ''"
         >
-          <!-- Avatar con inicial -->
-          <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <span class="text-primary font-semibold text-sm">
-              {{ (cliente.nombre || '?').charAt(0).toUpperCase() }}
-            </span>
-          </div>
-
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <p class="font-medium text-text-primary">{{ cliente.nombre }} {{ cliente.apellidos }}</p>
-              <span v-if="cliente.esVip" class="badge-vip inline-flex items-center gap-1.5">
-                <Star class="w-3.5 h-3.5 fill-current text-amber-500" />
-                VIP
-              </span>
-              <span
-                v-if="cliente.descuentoPorcentaje"
-                class="px-2 py-0.5 rounded-pill text-xs font-medium bg-green-100 text-green-700"
-              >
-                -{{ cliente.descuentoPorcentaje }}%
+          <div
+            class="flex cursor-pointer items-center gap-4 p-4 group"
+            role="button"
+            tabindex="0"
+            :aria-expanded="clienteSeleccionado?.id === cliente.id && drawerAbierto"
+            :aria-label="`Abrir ficha de ${cliente.nombre} ${cliente.apellidos}`"
+            @click="abrirCliente(cliente)"
+            @keydown.enter.prevent="abrirCliente(cliente)"
+          >
+            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <span class="text-primary font-semibold text-sm">
+                {{ (cliente.nombre || '?').charAt(0).toUpperCase() }}
               </span>
             </div>
-            <p class="text-sm text-text-secondary mt-0.5 truncate">{{ cliente.telefono }}</p>
-          </div>
 
-          <ChevronRight class="w-4 h-4 text-text-muted group-hover:text-primary transition-colors" />
-        </div>
-      </div>
-    </div>
-
-    <!-- ══════════════════════════════════════════════════════
-          PANEL DERECHO — Detalle del cliente (drawer lateral)
-          Igual que en la imagen de referencia del diseño
-          ════════════════════════════════════════════════════ -->
-    <Transition name="modal-overlay">
-      <aside
-        v-if="drawerAbierto && clienteSeleccionado"
-        ref="panelClienteRef"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="`Ficha de ${clienteSeleccionado.nombre} ${clienteSeleccionado.apellidos}`"
-        class="w-96 max-w-full max-h-[calc(100vh-2rem)] flex-shrink-0 self-start sticky top-4 card p-0 flex flex-col min-h-0 overflow-hidden animate-slide-in-right"
-      >
-        <!-- Cabecera del drawer -->
-        <div class="flex items-center justify-between px-5 py-4 border-b border-surface-border">
-          <div>
-            <p class="font-semibold text-text-primary">
-              {{ clienteSeleccionado.nombre }} {{ clienteSeleccionado.apellidos }}
-            </p>
-            <p class="text-xs text-text-secondary mt-0.5">
-              Añadido por {{ clienteSeleccionado.agregadoPorNombre }}
-            </p>
-          </div>
-          <button class="btn-ghost py-1 px-1.5" aria-label="Cerrar panel" @click="drawerAbierto = false">
-            <X class="w-4 h-4" aria-hidden="true" />
-          </button>
-        </div>
-
-        <!-- Tabs: Información | Fotos -->
-        <div class="flex border-b border-surface-border px-5" role="tablist" aria-label="Secciones del cliente">
-          <button
-            role="tab"
-            :aria-selected="tabActiva === 'info'"
-            aria-controls="tab-panel-info"
-            class="py-3 px-2 text-sm font-medium border-b-2 transition-colors"
-            :class="tabActiva === 'info'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-text-secondary hover:text-text-primary'"
-            @click="tabActiva = 'info'"
-          >
-            Información
-          </button>
-          <button
-            role="tab"
-            :aria-selected="tabActiva === 'fotos'"
-            aria-controls="tab-panel-fotos"
-            class="py-3 px-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5"
-            :class="tabActiva === 'fotos'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-text-secondary hover:text-text-primary'"
-            @click="handleTabFotos"
-          >
-            <Camera class="w-3.5 h-3.5" aria-hidden="true" />
-            Fotos
-            <span v-if="fotos.length > 0" class="text-xs bg-primary/10 text-primary px-1.5 rounded-full" aria-hidden="true">
-              {{ fotos.length }}
-            </span>
-          </button>
-        </div>
-
-        <!-- ── TAB: Información ─────────────────────────── -->
-        <div v-if="tabActiva === 'info'" id="tab-panel-info" role="tabpanel" aria-label="Información del cliente" class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
-
-          <!-- Badges VIP y descuento -->
-          <div class="flex items-center gap-2 flex-wrap">
-            <button
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
-              :class="clienteSeleccionado.esVip
-                ? 'bg-vip-light text-vip border border-vip/30'
-                : 'bg-surface-muted text-text-secondary border border-surface-border'"
-              @click="toggleVip(clienteSeleccionado)"
-            >
-              <Star
-                class="w-3.5 h-3.5"
-                :class="clienteSeleccionado.esVip ? 'fill-current text-amber-500' : 'text-text-secondary'"
-              />
-              {{ clienteSeleccionado.esVip ? 'VIP' : 'Normal' }}
-            </button>
-            <span
-              v-if="clienteSeleccionado.descuentoPorcentaje"
-              class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-sm border border-green-200"
-            >
-              <Percent class="w-3.5 h-3.5" />
-              {{ clienteSeleccionado.descuentoPorcentaje }}% descuento
-            </span>
-          </div>
-
-          <!-- Datos de contacto -->
-          <div class="space-y-3">
-            <div class="flex items-center gap-3 p-3 bg-surface-muted rounded-lg">
-              <Phone class="w-4 h-4 text-text-muted flex-shrink-0" />
-              <span class="text-sm text-text-primary">{{ clienteSeleccionado.telefono }}</span>
-            </div>
-            <div class="flex items-center gap-3 p-3 bg-surface-muted rounded-lg">
-              <Mail class="w-4 h-4 text-text-muted flex-shrink-0" />
-              <span class="text-sm text-text-primary">{{ clienteSeleccionado.email }}</span>
-            </div>
-          </div>
-
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <label class="label mb-0">Actividad</label>
-              <div class="flex rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-1">
-                <button
-                  class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                  :class="periodoActividad === 'mes' ? 'bg-primary-container text-white' : 'text-text-secondary hover:text-text-primary'"
-                  @click="periodoActividad = 'mes'"
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <p class="font-medium text-text-primary">{{ cliente.nombre }} {{ cliente.apellidos }}</p>
+                <span v-if="cliente.esVip" class="badge-vip inline-flex items-center gap-1.5">
+                  <Star class="w-3.5 h-3.5 fill-current text-amber-500" />
+                  VIP
+                </span>
+                <span
+                  v-if="cliente.descuentoPorcentaje"
+                  class="px-2 py-0.5 rounded-pill text-xs font-medium bg-green-100 text-green-700"
                 >
-                  Mes
-                </button>
-                <button
-                  class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                  :class="periodoActividad === 'anio' ? 'bg-primary-container text-white' : 'text-text-secondary hover:text-text-primary'"
-                  @click="periodoActividad = 'anio'"
-                >
-                  Año
-                </button>
+                  -{{ cliente.descuentoPorcentaje }}%
+                </span>
+              </div>
+              <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-secondary">
+                <span class="inline-flex items-center gap-1.5">
+                  <Phone class="w-3.5 h-3.5" aria-hidden="true" />
+                  {{ cliente.telefono }}
+                </span>
+                <span v-if="cliente.email" class="inline-flex min-w-0 items-center gap-1.5">
+                  <Mail class="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+                  <span class="truncate">{{ cliente.email }}</span>
+                </span>
               </div>
             </div>
 
-            <div v-if="cargandoHistorial" class="flex items-center justify-center py-6">
-              <Loader2 class="w-5 h-5 animate-spin text-primary" />
-            </div>
+            <ChevronRight
+              class="w-4 h-4 text-text-muted transition-transform group-hover:text-primary"
+              :class="clienteSeleccionado?.id === cliente.id && drawerAbierto ? 'rotate-90 text-primary' : ''"
+              aria-hidden="true"
+            />
+          </div>
 
-            <template v-else>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="rounded-2xl border border-outline-variant/30 bg-surface-muted p-4">
-                  <div class="flex items-center gap-2 text-text-secondary text-sm">
-                    <CalendarDays class="w-4 h-4" />
-                    Visitas este mes
-                  </div>
-                  <p class="mt-2 text-2xl font-semibold text-text-primary">{{ visitasMesActual }}</p>
-                </div>
-                <div class="rounded-2xl border border-outline-variant/30 bg-surface-muted p-4">
-                  <div class="flex items-center gap-2 text-text-secondary text-sm">
-                    <CalendarDays class="w-4 h-4" />
-                    Visitas este año
-                  </div>
-                  <p class="mt-2 text-2xl font-semibold text-text-primary">{{ visitasAnioActual }}</p>
-                </div>
-              </div>
-
-              <div class="rounded-2xl border border-outline-variant/30 bg-surface-muted p-4 space-y-3">
-                <div class="flex items-center gap-2">
-                  <Scissors class="w-4 h-4 text-primary" />
+          <Transition name="modal-overlay">
+            <div
+              v-if="clienteSeleccionado?.id === cliente.id && drawerAbierto"
+              class="border-t border-surface-border bg-surface-container-lowest"
+              @click.stop
+            >
+              <div class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
                   <p class="text-sm font-semibold text-text-primary">
-                    Servicios del {{ periodoActividad === 'mes' ? 'mes' : 'año' }}
+                    Ficha de {{ clienteSeleccionado.nombre }} {{ clienteSeleccionado.apellidos }}
+                  </p>
+                  <p class="text-xs text-text-secondary mt-0.5">
+                    Añadido por {{ clienteSeleccionado.agregadoPorNombre }}
                   </p>
                 </div>
+                <button type="button" class="btn-ghost py-1 px-1.5 self-start sm:self-center" aria-label="Cerrar ficha" @click="drawerAbierto = false">
+                  <X class="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
 
-                <div v-if="historialServiciosPeriodo.length === 0" class="text-sm text-text-secondary">
-                  No hay servicios registrados en este periodo.
+              <div class="flex border-y border-surface-border px-4" role="tablist" aria-label="Secciones del cliente">
+                <button
+                  type="button"
+                  role="tab"
+                  :aria-selected="tabActiva === 'info'"
+                  aria-controls="tab-panel-info"
+                  class="py-3 px-2 text-sm font-medium border-b-2 transition-colors"
+                  :class="tabActiva === 'info'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'"
+                  @click="tabActiva = 'info'"
+                >
+                  Información
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  :aria-selected="tabActiva === 'fotos'"
+                  aria-controls="tab-panel-fotos"
+                  class="py-3 px-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5"
+                  :class="tabActiva === 'fotos'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'"
+                  @click="handleTabFotos"
+                >
+                  <Camera class="w-3.5 h-3.5" aria-hidden="true" />
+                  Fotos
+                  <span v-if="fotos.length > 0" class="text-xs bg-primary/10 text-primary px-1.5 rounded-full" aria-hidden="true">
+                    {{ fotos.length }}
+                  </span>
+                </button>
+              </div>
+
+              <form
+                v-if="tabActiva === 'info'"
+                id="tab-panel-info"
+                role="tabpanel"
+                aria-label="Información editable del cliente"
+                class="p-4 space-y-5"
+                @submit.prevent="guardarCliente"
+              >
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div>
+                    <label class="label">Nombre</label>
+                    <input v-model="formCliente.nombre" type="text" class="input bg-white" required />
+                  </div>
+                  <div>
+                    <label class="label">Apellidos</label>
+                    <input v-model="formCliente.apellidos" type="text" class="input bg-white" />
+                  </div>
+                  <div>
+                    <label class="label">Teléfono</label>
+                    <input v-model="formCliente.telefono" type="text" class="input bg-white" required />
+                  </div>
+                  <div>
+                    <label class="label">Email</label>
+                    <input v-model="formCliente.email" type="email" class="input bg-white" />
+                  </div>
+                  <div>
+                    <label class="label">Género</label>
+                    <select v-model="formCliente.genero" class="select-field bg-white">
+                      <option value="FEMENINO">Femenino</option>
+                      <option value="MASCULINO">Masculino</option>
+                    </select>
+                  </div>
+                  <label class="flex min-h-11 items-center gap-3 rounded-lg border border-surface-border bg-white px-4 py-3 md:mt-6">
+                    <input v-model="formCliente.esVip" type="checkbox" class="h-4 w-4" />
+                    <span class="text-sm text-text-primary">Cliente VIP</span>
+                  </label>
                 </div>
 
-                <div v-else class="space-y-2">
-                  <div
-                    v-for="servicio in historialServiciosPeriodo.slice(0, 8)"
-                    :key="`${servicio.citaId}-${servicio.nombre}`"
-                    class="rounded-xl bg-white/80 px-3 py-2 border border-outline-variant/20"
-                  >
-                    <div class="flex items-center justify-between gap-3">
-                      <div class="min-w-0">
-                        <p class="text-sm font-medium text-text-primary truncate">{{ servicio.nombre }}</p>
-                        <p class="text-xs text-text-secondary">
-                          {{ servicio.categoria }} · {{ formatearFecha(servicio.fechaHora) }}
-                        </p>
-                      </div>
-                      <span v-if="servicio.precio !== null" class="text-xs font-semibold text-primary whitespace-nowrap">
-                        {{ servicio.precio }} EUR
+                <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_22rem]">
+                  <div>
+                    <label class="label">Notas</label>
+                    <textarea v-model="formCliente.notas" rows="5" class="input resize-none bg-white" />
+                  </div>
+                  <div class="space-y-3">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border"
+                        :class="formCliente.esVip
+                          ? 'bg-vip-light text-vip border-vip/30'
+                          : 'bg-white text-text-secondary border-surface-border'"
+                      >
+                        <Star
+                          class="w-3.5 h-3.5"
+                          :class="formCliente.esVip ? 'fill-current text-amber-500' : 'text-text-secondary'"
+                        />
+                        {{ formCliente.esVip ? 'VIP' : 'Normal' }}
                       </span>
+                      <span
+                        v-if="clienteSeleccionado.descuentoPorcentaje"
+                        class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-sm border border-green-200"
+                      >
+                        <Percent class="w-3.5 h-3.5" />
+                        {{ clienteSeleccionado.descuentoPorcentaje }}% descuento
+                      </span>
+                    </div>
+
+                    <div class="rounded-2xl border border-outline-variant/30 bg-white p-4 space-y-3">
+                      <div class="flex items-center justify-between gap-3">
+                        <label class="label mb-0">Actividad</label>
+                        <div class="flex rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-1">
+                          <button
+                            type="button"
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                            :class="periodoActividad === 'mes' ? 'bg-primary-container text-white' : 'text-text-secondary hover:text-text-primary'"
+                            @click="periodoActividad = 'mes'"
+                          >
+                            Mes
+                          </button>
+                          <button
+                            type="button"
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                            :class="periodoActividad === 'anio' ? 'bg-primary-container text-white' : 'text-text-secondary hover:text-text-primary'"
+                            @click="periodoActividad = 'anio'"
+                          >
+                            Año
+                          </button>
+                        </div>
+                      </div>
+
+                      <div v-if="cargandoHistorial" class="flex items-center justify-center py-6">
+                        <Loader2 class="w-5 h-5 animate-spin text-primary" />
+                      </div>
+
+                      <template v-else>
+                        <div class="grid grid-cols-2 gap-3">
+                          <div class="rounded-xl bg-surface-muted p-3">
+                            <div class="flex items-center gap-2 text-text-secondary text-xs">
+                              <CalendarDays class="w-4 h-4" />
+                              Este mes
+                            </div>
+                            <p class="mt-2 text-2xl font-semibold text-text-primary">{{ visitasMesActual }}</p>
+                          </div>
+                          <div class="rounded-xl bg-surface-muted p-3">
+                            <div class="flex items-center gap-2 text-text-secondary text-xs">
+                              <CalendarDays class="w-4 h-4" />
+                              Este año
+                            </div>
+                            <p class="mt-2 text-2xl font-semibold text-text-primary">{{ visitasAnioActual }}</p>
+                          </div>
+                        </div>
+
+                        <div class="space-y-2">
+                          <div class="flex items-center gap-2">
+                            <Scissors class="w-4 h-4 text-primary" />
+                            <p class="text-sm font-semibold text-text-primary">
+                              Servicios del {{ periodoActividad === 'mes' ? 'mes' : 'año' }}
+                            </p>
+                          </div>
+                          <p v-if="historialServiciosPeriodo.length === 0" class="text-sm text-text-secondary">
+                            No hay servicios registrados en este periodo.
+                          </p>
+                          <div v-else class="space-y-2">
+                            <div
+                              v-for="servicio in historialServiciosPeriodo.slice(0, 5)"
+                              :key="`${servicio.citaId}-${servicio.nombre}`"
+                              class="rounded-xl bg-surface-muted px-3 py-2"
+                            >
+                              <div class="flex items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                  <p class="text-sm font-medium text-text-primary truncate">{{ servicio.nombre }}</p>
+                                  <p class="text-xs text-text-secondary">
+                                    {{ servicio.categoria }} · {{ formatearFecha(servicio.fechaHora) }}
+                                  </p>
+                                </div>
+                                <span v-if="servicio.precio !== null" class="text-xs font-semibold text-primary whitespace-nowrap">
+                                  {{ servicio.precio }} EUR
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-3 border-t border-surface-border pt-4 sm:flex-row sm:justify-end">
+                  <button type="button" class="btn-secondary" @click="archivarOReactivarCliente(clienteSeleccionado)">
+                    {{ clienteSeleccionado.archivado ? 'Reactivar' : 'Archivar' }}
+                  </button>
+                  <button type="button" class="btn-secondary" @click="drawerAbierto = false">
+                    Cerrar
+                  </button>
+                  <button type="submit" class="btn-primary" :disabled="guardandoCliente">
+                    <Loader2 v-if="guardandoCliente" class="w-4 h-4 animate-spin" />
+                    <span v-else>Guardar cambios</span>
+                  </button>
+                </div>
+              </form>
+
+              <div
+                v-if="tabActiva === 'fotos'"
+                id="tab-panel-fotos"
+                role="tabpanel"
+                aria-label="Fotos del historial de peinados"
+                class="p-4 space-y-4"
+              >
+                <div class="border-2 border-dashed border-surface-border rounded-lg p-4 text-center bg-white">
+                  <label class="cursor-pointer block">
+                    <Upload class="w-6 h-6 text-text-muted mx-auto mb-2" />
+                    <p class="text-sm text-text-secondary mb-2">
+                      {{ subiendo ? 'Subiendo...' : 'Subir foto del peinado' }}
+                    </p>
+                    <input
+                      type="text"
+                      v-model="descripcionFoto"
+                      placeholder="Descripción (opcional)"
+                      class="input mb-2 text-sm"
+                      @click.stop
+                    />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      class="hidden"
+                      :disabled="subiendo"
+                      @change="subirFoto"
+                    />
+                    <span class="btn-secondary text-sm py-1.5 px-3">
+                      <Loader2 v-if="subiendo" class="w-4 h-4 animate-spin" />
+                      <span v-else>Seleccionar foto</span>
+                    </span>
+                  </label>
+                </div>
+
+                <div v-if="cargandoFotos" class="flex items-center justify-center py-8">
+                  <Loader2 class="w-5 h-5 animate-spin text-primary" />
+                </div>
+
+                <div v-else-if="fotos.length === 0" class="text-center py-8">
+                  <Camera class="w-8 h-8 text-surface-border mx-auto mb-2" />
+                  <p class="text-sm text-text-muted">Sin fotos todavía</p>
+                </div>
+
+                <div v-else class="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6">
+                  <div
+                    v-for="foto in fotos"
+                    :key="foto.id"
+                    class="relative group rounded-lg overflow-hidden aspect-square bg-surface-muted"
+                  >
+                    <img
+                      :src="urlFoto(foto.rutaArchivo)"
+                      :alt="foto.descripcion || 'Foto peinado'"
+                      class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    />
+                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        class="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-text-primary hover:bg-white transition-colors"
+                        :aria-label="`Ampliar foto: ${foto.descripcion || 'peinado'}`"
+                        @click="fotoAmpliada = foto"
+                      >
+                        <ZoomIn class="w-4 h-4" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        class="w-8 h-8 rounded-full bg-red-500/90 flex items-center justify-center text-white hover:bg-red-600 transition-colors"
+                        :aria-label="`Eliminar foto: ${foto.descripcion || 'peinado'}`"
+                        @click="eliminarFoto(foto)"
+                      >
+                        <Trash2 class="w-4 h-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                    <div v-if="foto.descripcion" class="absolute bottom-0 left-0 right-0 bg-black/50 px-2 py-1">
+                      <p class="text-white text-2xs truncate">{{ foto.descripcion }}</p>
                     </div>
                   </div>
                 </div>
               </div>
-            </template>
-          </div>
-
-          <!-- Notas generales -->
-          <div v-if="clienteSeleccionado.notas">
-            <label class="label">Notas</label>
-            <p class="text-sm text-text-secondary bg-surface-muted rounded-lg p-3">
-              {{ clienteSeleccionado.notas }}
-            </p>
-          </div>
-
-          <div class="flex gap-3">
-            <button class="btn-secondary flex-1" @click="abrirModalEditarCliente(clienteSeleccionado)">
-              Editar ficha
-            </button>
-            <button class="btn-secondary flex-1" @click="archivarOReactivarCliente(clienteSeleccionado)">
-              {{ clienteSeleccionado.archivado ? 'Reactivar' : 'Archivar' }}
-            </button>
-            <button class="btn-primary flex-1" @click="drawerAbierto = false">
-              Cerrar
-            </button>
-          </div>
-        </div>
-
-        <!-- ── TAB: Fotos del historial ─────────────────── -->
-        <div v-if="tabActiva === 'fotos'" id="tab-panel-fotos" role="tabpanel" aria-label="Fotos del historial de peinados" class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
-
-          <!-- Subir nueva foto -->
-          <div class="border-2 border-dashed border-surface-border rounded-lg p-4 text-center">
-            <label class="cursor-pointer block">
-              <Upload class="w-6 h-6 text-text-muted mx-auto mb-2" />
-              <p class="text-sm text-text-secondary mb-2">
-                {{ subiendo ? 'Subiendo...' : 'Subir foto del peinado' }}
-              </p>
-              <input
-                type="text"
-                v-model="descripcionFoto"
-                placeholder="Descripción (opcional)"
-                class="input mb-2 text-sm"
-                @click.stop
-              />
-              <input
-                type="file"
-                accept="image/*"
-                class="hidden"
-                :disabled="subiendo"
-                @change="subirFoto"
-              />
-              <span class="btn-secondary text-sm py-1.5 px-3">
-                <Loader2 v-if="subiendo" class="w-4 h-4 animate-spin" />
-                <span v-else>Seleccionar foto</span>
-              </span>
-            </label>
-          </div>
-
-          <!-- Galería de fotos -->
-          <div v-if="cargandoFotos" class="flex items-center justify-center py-8">
-            <Loader2 class="w-5 h-5 animate-spin text-primary" />
-          </div>
-
-          <div v-else-if="fotos.length === 0" class="text-center py-8">
-            <Camera class="w-8 h-8 text-surface-border mx-auto mb-2" />
-            <p class="text-sm text-text-muted">Sin fotos todavía</p>
-          </div>
-
-          <div v-else class="grid grid-cols-2 gap-2">
-            <div
-              v-for="foto in fotos"
-              :key="foto.id"
-              class="relative group rounded-lg overflow-hidden aspect-square bg-surface-muted"
-            >
-              <img
-                :src="urlFoto(foto.rutaArchivo)"
-                :alt="foto.descripcion || 'Foto peinado'"
-                class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-              />
-              <!-- Overlay con acciones al hacer hover -->
-              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <button
-                  class="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-text-primary hover:bg-white transition-colors"
-                  :aria-label="`Ampliar foto: ${foto.descripcion || 'peinado'}`"
-                  @click="fotoAmpliada = foto"
-                >
-                  <ZoomIn class="w-4 h-4" aria-hidden="true" />
-                </button>
-                <button
-                  class="w-8 h-8 rounded-full bg-red-500/90 flex items-center justify-center text-white hover:bg-red-600 transition-colors"
-                  :aria-label="`Eliminar foto: ${foto.descripcion || 'peinado'}`"
-                  @click="eliminarFoto(foto)"
-                >
-                  <Trash2 class="w-4 h-4" aria-hidden="true" />
-                </button>
-              </div>
-              <!-- Descripción -->
-              <div v-if="foto.descripcion" class="absolute bottom-0 left-0 right-0 bg-black/50 px-2 py-1">
-                <p class="text-white text-2xs truncate">{{ foto.descripcion }}</p>
-              </div>
             </div>
-          </div>
-
+          </Transition>
         </div>
-
-      </aside>
-    </Transition>
-
+      </div>
+    </div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════
@@ -792,7 +822,6 @@ async function guardarCliente() {
                 <select v-model="formCliente.genero" class="select-field">
                   <option value="FEMENINO">Femenino</option>
                   <option value="MASCULINO">Masculino</option>
-                  <option value="OTRO">Otro</option>
                 </select>
               </div>
             </div>

@@ -17,7 +17,7 @@
 import {
   LayoutDashboard, Calendar, Users, Scissors,
   Package, UserCog, BarChart3, LogOut,
-  MessageCircle, Palmtree, ShoppingBag, Bot,
+  MessageCircle, Palmtree, ShoppingBag, Sparkles,
 } from 'lucide-vue-next'
 import { useSidebarCollapsed } from '~/modules/shared/composables/useSidebarCollapsed'
 
@@ -67,7 +67,7 @@ const grupos: GrupoMenu[] = [
     titulo: 'Análisis',
     items: [
       { path: '/admin/resultados', label: 'Resultados',  icon: BarChart3, visiblePara: ['admin'] },
-      { path: '/chat-ia',          label: 'Asistente IA', icon: Bot,      visiblePara: ['admin', 'empleado'] },
+      { path: '/chat-ia',          label: 'Asistente gestión', icon: Sparkles, visiblePara: ['admin', 'empleado'] },
     ],
   },
 ]
@@ -103,7 +103,7 @@ function bloquearScroll(evento: WheelEvent) {
 <template>
   <aside
     :class="[
-      'flex-shrink-0 h-screen flex flex-col bg-surface-container-low select-none overflow-hidden',
+      'flex-shrink-0 h-dvh flex flex-col bg-surface-container-low select-none overflow-hidden',
       'transition-[width] duration-200 ease-out',
       collapsed ? 'w-16' : 'w-sidebar',
     ]"

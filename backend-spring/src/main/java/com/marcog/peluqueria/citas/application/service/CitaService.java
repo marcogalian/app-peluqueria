@@ -58,6 +58,8 @@ public class CitaService {
         existing.setEstado(citaDetails.getEstado());
         existing.setCliente(citaDetails.getCliente());
         existing.setServicios(citaDetails.getServicios());
+        existing.setComentarios(citaDetails.getComentarios());
+        existing.setMotivoCancelacion(citaDetails.getMotivoCancelacion());
 
         return repositoryPort.save(existing);
     }

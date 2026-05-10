@@ -8,13 +8,14 @@ import {
   Users, UserCheck, Scissors, AlertTriangle, Package,
   Trophy, ArrowDown, User, Star, Activity, BadgeCheck,
 } from 'lucide-vue-next'
-import { Line } from 'vue-chartjs'
+import { Bar, Doughnut, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
-  LineElement, PointElement, Title, Tooltip, Legend, Filler
+  LineElement, PointElement, Title, Tooltip, Legend, Filler,
+  ArcElement, BarElement
 } from 'chart.js'
 
-ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, Filler)
+ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, Filler, ArcElement, BarElement)
 
 definePageMeta({ middleware: ['auth', 'admin'] })
 
@@ -31,6 +32,7 @@ const stats = ref<any>({
   balance: 0,
   citasCompletadasMes: 0,
   ticketMedio: 0,
+  desgloseGastos: {},
   ingresosPorDia: {},
   gastosPorDia: {},
   empleadosStats: [],
@@ -139,7 +141,7 @@ async function fetchDashboardData() {
   } catch (error) {
     stats.value = {
       ingresosTotales: 0, gastosTotales: 0, balance: 0,
-      citasCompletadasMes: 0, ticketMedio: 0,
+      citasCompletadasMes: 0, ticketMedio: 0, desgloseGastos: {},
       ingresosPorDia: {}, gastosPorDia: {},
       empleadosStats: [], peluquerosActivosAhora: [],
       productosStats: { rankingProductos: [], pocoStock: [], productoMasVendido: '', ventasMasVendido: 0, productoMenosVendido: '', ventasMenosVendido: 0 }
@@ -155,6 +157,67 @@ onMounted(() => {
 
 function formatEur(n: number): string {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n || 0)
+}
+
+const doughnutOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  cutout: '68%',
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+      labels: {
+        usePointStyle: true,
+        boxWidth: 8,
+        padding: 14,
+        font: { size: 11, weight: '600' as const },
+      },
+    },
+    tooltip: {
+      callbacks: {
+        label: (ctx: any) => `${ctx.label}: ${ctx.parsed}`,
+      },
+    },
+  },
+}
+
+const doughnutMoneyOptions = {
+  ...doughnutOptions,
+  plugins: {
+    ...doughnutOptions.plugins,
+    tooltip: {
+      callbacks: {
+        label: (ctx: any) => `${ctx.label}: ${formatEur(ctx.parsed)}`,
+      },
+    },
+  },
+}
+
+const horizontalBarOptions = {
+  indexAxis: 'y' as const,
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (ctx: any) => `${ctx.parsed.x} unidades`,
+      },
+    },
+  },
+  scales: {
+    x: {
+      beginAtZero: true,
+      border: { display: false },
+      grid: { color: 'rgba(104, 111, 122, 0.12)' },
+      ticks: { precision: 0 },
+    },
+    y: {
+      border: { display: false },
+      grid: { display: false },
+      ticks: { font: { size: 11, weight: '600' as const } },
+    },
+  },
 }
 
 // Insights financieros extra (calculados del mapa ingresosPorDia)
@@ -210,6 +273,71 @@ const resumenEquipo = computed(() => {
   }
 })
 
+const equipoChartData = computed(() => {
+  const total = resumenEquipo.value.total
+  const activos = resumenEquipo.value.activos
+  const vacaciones = resumenEquipo.value.enVacaciones
+  const baja = resumenEquipo.value.enBaja
+  const disponibles = Math.max(total - activos - vacaciones - baja, 0)
+
+  return {
+    labels: ['Disponibles', 'En turno', 'Vacaciones', 'Baja'],
+    datasets: [{
+      data: [disponibles, activos, vacaciones, baja],
+      backgroundColor: ['#dbeafe', '#bbf7d0', '#ede9fe', '#fecaca'],
+      borderColor: '#fcfcfd',
+      borderWidth: 3,
+    }],
+  }
+})
+
+const totalEquipoChart = computed(() =>
+  (equipoChartData.value.datasets[0].data as number[]).reduce((sum, value) => sum + value, 0)
+)
+
+const gastosChartData = computed(() => {
+  const entries = Object.entries(stats.value.desgloseGastos || {})
+    .map(([categoria, value]) => ({
+      categoria: categoria.replaceAll('_', ' '),
+      value: Number(value || 0),
+    }))
+    .filter((item) => item.value > 0)
+
+  return {
+    labels: entries.map((item) => item.categoria),
+    datasets: [{
+      data: entries.map((item) => item.value),
+      backgroundColor: ['#93c5fd', '#fca5a5', '#fcd34d', '#c4b5fd', '#86efac', '#fdba74'],
+      borderColor: '#fcfcfd',
+      borderWidth: 3,
+    }],
+  }
+})
+
+const totalGastosChart = computed(() =>
+  (gastosChartData.value.datasets[0].data as number[]).reduce((sum, value) => sum + value, 0)
+)
+
+const topProductosChartData = computed(() => {
+  const productos = (stats.value.productosStats?.rankingProductos || [])
+    .filter((producto: any) => Number(producto.consumidos || 0) > 0)
+    .slice(0, 5)
+
+  return {
+    labels: productos.map((producto: any) => producto.nombre),
+    datasets: [{
+      data: productos.map((producto: any) => Number(producto.consumidos || 0)),
+      backgroundColor: '#002045',
+      borderRadius: 8,
+      barThickness: 14,
+    }],
+  }
+})
+
+const hayTopProductos = computed(() =>
+  (topProductosChartData.value.datasets[0].data as number[]).some((value) => value > 0)
+)
+
 // % de stock restante para la barra de alerta (max 100%)
 function pctStock(prod: { stock: number; stockMinimo: number }): number {
   if (!prod.stockMinimo) return 100
@@ -223,7 +351,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
     <!-- ══════════════════════════════════════════════════════
          FILTROS SUPERIORES
          ════════════════════════════════════════════════════ -->
-    <div class="card p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="dashboard-panel-card p-5 flex flex-col md:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
           <Activity class="w-5 h-5 text-primary" />
@@ -234,8 +362,8 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
         </div>
       </div>
       <div class="flex items-center gap-3 w-full md:w-auto">
-        <input type="date" v-model="fechaFiltro" class="input bg-white w-full md:w-44" />
-        <select v-model="agrupacion" class="select-field bg-white w-full md:w-44 cursor-pointer">
+        <input type="date" v-model="fechaFiltro" class="input dashboard-filter-field w-full md:w-44" />
+        <select v-model="agrupacion" class="select-field dashboard-filter-field w-full md:w-44 cursor-pointer">
           <option value="DIA">Ver datos del día</option>
           <option value="MES">Ver datos del mes</option>
         </select>
@@ -255,7 +383,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
       <div class="flex flex-col gap-6">
 
         <!-- Gráfica principal -->
-        <div class="card p-6 w-full flex flex-col min-h-[360px]">
+        <div class="dashboard-panel-card p-6 w-full flex flex-col min-h-[360px]">
           <div class="flex items-center justify-between mb-4">
             <div>
               <h3 class="text-base font-bold text-text-primary">Evolución mensual</h3>
@@ -301,7 +429,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
 
           <!-- Ingresos -->
-          <div class="card-kpi flex items-center gap-4">
+          <div class="dashboard-panel-kpi flex items-center gap-4">
             <div class="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
               <TrendingUp class="w-5 h-5 text-emerald-600" />
             </div>
@@ -314,7 +442,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
           </div>
 
           <!-- Gastos -->
-          <div class="card-kpi flex items-center gap-4">
+          <div class="dashboard-panel-kpi flex items-center gap-4">
             <div class="w-11 h-11 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
               <TrendingDown class="w-5 h-5 text-red-500" />
             </div>
@@ -327,30 +455,102 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
           </div>
 
           <!-- Balance neto — card destacada -->
-          <div class="flex-1 card p-5 bg-gradient-to-br from-primary to-[#1a3a6b] border-none text-white flex flex-col justify-between">
+          <div class="flex-1 dashboard-panel-card p-5 flex flex-col justify-between">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                <Wallet class="w-5 h-5 text-white" />
+              <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Wallet class="w-5 h-5 text-primary" />
               </div>
-              <p class="text-sm text-white/80 font-medium">
+              <p class="text-sm text-text-secondary font-medium">
                 Balance {{ agrupacion === 'DIA' ? 'del día' : 'mensual' }}
               </p>
             </div>
             <div>
-              <p class="text-4xl font-black text-white mt-3 mb-2">{{ formatEur(kpis.balance) }}</p>
+              <p class="text-4xl font-black text-text-primary mt-3 mb-2">{{ formatEur(kpis.balance) }}</p>
               <span
                 class="text-xs px-2.5 py-1 rounded-full font-semibold"
                 :class="kpis.balance > 0
-                  ? 'bg-emerald-400/25 text-emerald-100 border border-emerald-400/40'
+                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                   : kpis.balance < 0
-                    ? 'bg-red-400/25 text-red-100 border border-red-400/40'
-                    : 'bg-white/20 text-white/70 border border-white/30'"
+                    ? 'bg-red-100 text-red-700 border border-red-200'
+                    : 'bg-surface-container-low text-text-secondary border border-outline-variant/20'"
               >
                 {{ kpis.balance > 0 ? 'Rentable' : kpis.balance < 0 ? 'En pérdidas' : 'Neutro' }}
               </span>
             </div>
           </div>
 
+        </div>
+      </div>
+
+      <!-- Lectura rápida de proporciones -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="dashboard-panel-card p-6 min-h-[280px]">
+          <div class="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h3 class="text-base font-bold text-text-primary">Estado del equipo</h3>
+              <p class="text-xs text-text-secondary mt-0.5">Disponibilidad real del personal</p>
+            </div>
+            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
+              {{ resumenEquipo.total }} personas
+            </span>
+          </div>
+
+          <div v-if="totalEquipoChart > 0" class="relative h-44">
+            <Doughnut :data="equipoChartData" :options="doughnutOptions" />
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none pb-10">
+              <div class="text-center">
+                <p class="text-2xl font-black text-text-primary">{{ resumenEquipo.activos }}</p>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">En turno</p>
+              </div>
+            </div>
+          </div>
+          <div v-else class="h-44 flex items-center justify-center text-center">
+            <p class="text-sm text-text-muted">Sin datos de equipo</p>
+          </div>
+        </div>
+
+        <div class="dashboard-panel-card p-6 min-h-[280px]">
+          <div class="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h3 class="text-base font-bold text-text-primary">Gastos por categoría</h3>
+              <p class="text-xs text-text-secondary mt-0.5">Dónde se va el dinero del mes</p>
+            </div>
+            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+              {{ formatEur(stats.gastosTotales || 0) }}
+            </span>
+          </div>
+
+          <div v-if="totalGastosChart > 0" class="relative h-44">
+            <Doughnut :data="gastosChartData" :options="doughnutMoneyOptions" />
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none pb-10">
+              <div class="text-center">
+                <p class="text-xl font-black text-text-primary">{{ formatEur(totalGastosChart) }}</p>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">Total</p>
+              </div>
+            </div>
+          </div>
+          <div v-else class="h-44 flex items-center justify-center text-center">
+            <p class="text-sm text-text-muted">Sin gastos registrados</p>
+          </div>
+        </div>
+
+        <div class="dashboard-panel-card p-6 min-h-[280px]">
+          <div class="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h3 class="text-base font-bold text-text-primary">Top productos</h3>
+              <p class="text-xs text-text-secondary mt-0.5">Unidades vendidas este mes</p>
+            </div>
+            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+              Top 5
+            </span>
+          </div>
+
+          <div v-if="hayTopProductos" class="h-44">
+            <Bar :data="topProductosChartData" :options="horizontalBarOptions" />
+          </div>
+          <div v-else class="h-44 flex items-center justify-center text-center">
+            <p class="text-sm text-text-muted">Sin ventas de productos</p>
+          </div>
         </div>
       </div>
 
@@ -372,7 +572,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
 
       <!-- Pills de resumen rápido -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="card-kpi flex items-center gap-3">
+        <div class="dashboard-panel-kpi flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
             <Users class="w-4.5 h-4.5 text-primary" />
           </div>
@@ -381,7 +581,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
             <p class="text-2xl font-black text-text-primary">{{ resumenEquipo.total }}</p>
           </div>
         </div>
-        <div class="card-kpi flex items-center gap-3">
+        <div class="dashboard-panel-kpi flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
             <UserCheck class="w-4.5 h-4.5 text-green-600" />
           </div>
@@ -390,7 +590,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
             <p class="text-2xl font-black text-green-600">{{ resumenEquipo.activos }}</p>
           </div>
         </div>
-        <div class="card-kpi flex items-center gap-3">
+        <div class="dashboard-panel-kpi flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
             <Calendar class="w-4.5 h-4.5 text-purple-600" />
           </div>
@@ -399,7 +599,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
             <p class="text-2xl font-black text-purple-600">{{ resumenEquipo.enVacaciones }}</p>
           </div>
         </div>
-        <div class="card-kpi flex items-center gap-3">
+        <div class="dashboard-panel-kpi flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
             <AlertTriangle class="w-4.5 h-4.5 text-red-500" />
           </div>
@@ -414,7 +614,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 pb-2">
 
         <!-- Tabla de ausencias -->
-        <div class="card p-6 xl:col-span-2">
+        <div class="dashboard-panel-card p-6 xl:col-span-2">
           <div class="flex items-center gap-3 mb-5">
             <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
               <Users class="w-5 h-5 text-blue-600" />
@@ -440,7 +640,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
               <tbody class="text-sm divide-y divide-outline-variant/10">
                 <tr
                   v-for="(emp, i) in stats.empleadosStats" :key="emp.nombre"
-                  :class="[i % 2 === 0 ? 'bg-white' : 'bg-surface-container-lowest', 'hover:bg-primary/5 transition-colors']"
+                  :class="[i % 2 === 0 ? 'bg-white' : 'bg-surface-container-lowest']"
                 >
                   <td class="py-3 px-4">
                     <div class="flex items-center gap-2.5">
@@ -490,7 +690,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
         </div>
 
         <!-- Activos en este momento -->
-        <div class="card p-6 flex flex-col">
+        <div class="dashboard-panel-card p-6 flex flex-col">
           <div class="flex items-center gap-3 mb-5">
             <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
               <UserCheck class="w-5 h-5 text-green-600" />
@@ -550,7 +750,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
       <div v-if="stats.productosStats" class="grid grid-cols-1 xl:grid-cols-3 gap-6 pb-8">
 
         <!-- ── Ranking de productos con pestañas (2 cols) ─── -->
-        <div class="card p-6 xl:col-span-2 flex flex-col">
+        <div class="dashboard-panel-card p-6 xl:col-span-2 flex flex-col">
 
           <!-- Cabecera + totales de ganancia por género -->
           <div class="flex items-start justify-between mb-4 gap-4">
@@ -617,10 +817,10 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
             <div class="space-y-1.5">
               <div
                 v-for="(prod, i) in rankingActivo" :key="prod.nombre"
-                class="grid grid-cols-[28px_1fr_80px_90px] gap-3 items-center p-3 rounded-xl border transition-colors"
+                class="grid grid-cols-[28px_1fr_80px_90px] gap-3 items-center p-3 rounded-xl border"
                 :class="prod.bajoMinimo
-                  ? 'border-red-200/60 bg-red-50/30 hover:bg-red-50/60'
-                  : 'border-outline-variant/15 bg-white hover:bg-surface-container-lowest'"
+                  ? 'border-red-200/60 bg-red-50/30'
+                  : 'border-outline-variant/15 bg-white'"
               >
                 <!-- Posición -->
                 <div
@@ -668,7 +868,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
         </div>
 
         <!-- ── Alertas de stock ────────────────────────────── -->
-        <div class="card p-6 flex flex-col">
+        <div class="dashboard-panel-card p-6 flex flex-col">
           <div class="flex items-center gap-3 mb-5">
             <div class="w-10 h-10 rounded-xl flex items-center justify-center"
                  :class="stats.productosStats.pocoStock?.length ? 'bg-red-100' : 'bg-green-100'">
@@ -690,7 +890,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
           <div v-if="stats.productosStats.pocoStock?.length" class="space-y-3 overflow-y-auto flex-1 max-h-[320px] pr-1">
             <div
               v-for="prod in stats.productosStats.pocoStock" :key="prod.nombre"
-              class="p-3 rounded-xl border border-red-200/70 bg-white hover:bg-red-50/30 transition-colors"
+              class="p-3 rounded-xl border border-red-200/70 bg-white"
             >
               <div class="flex items-center justify-between mb-2">
                 <p class="text-sm font-semibold text-text-primary truncate pr-2">{{ prod.nombre }}</p>
@@ -723,3 +923,25 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
     </template>
   </div>
 </template>
+
+<style scoped>
+.dashboard-panel-card {
+  background: #fcfcfd;
+  border: 1px solid rgb(104 111 122 / 0.1);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.06);
+}
+
+.dashboard-panel-kpi {
+  background: #fcfcfd;
+  border: 1px solid rgb(104 111 122 / 0.1);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.06);
+}
+
+.dashboard-filter-field {
+  border-color: rgb(104 111 122 / 0.5);
+  box-shadow: inset 0 0 0 1px rgb(104 111 122 / 0.12);
+}
+</style>

@@ -3,7 +3,7 @@
  * Inventario — gestión de productos con alertas de stock bajo.
  * KPIs + alertas de stock + tabla con filtros por categoría.
  */
-import { Plus, AlertTriangle, Package, Loader2, X, Save, ShoppingCart } from 'lucide-vue-next'
+import { Plus, AlertTriangle, Package, Loader2, X, Save, ShoppingCart, Search } from 'lucide-vue-next'
 import { useToast } from '~/modules/shared/composables/useToast'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
@@ -47,6 +47,8 @@ interface VentaProductoResponse {
 const productos      = ref<Producto[]>([])
 const cargando       = ref(true)
 const filtroCategoria = ref('TODOS')
+const filtroStock = ref<'TODOS' | 'BAJO' | 'SIN_STOCK'>('TODOS')
+const busqueda = ref('')
 const drawerAbierto  = ref(false)
 const guardando      = ref(false)
 const productoEditar = ref<Partial<Producto>>({})
@@ -69,13 +71,31 @@ const labelCat: Record<string, string> = {
   TODOS: 'Todos', CERA: 'Cera', CHAMPU: 'Champú', ACONDICIONADOR: 'Acondicionador',
   COLORACION: 'Coloración', HERRAMIENTA: 'Herramienta', OTRO: 'Otro',
 }
+const opcionesCategoria = categorias.map(cat => ({ value: cat, label: labelCat[cat] }))
+const filtrosStock: { id: 'TODOS' | 'BAJO' | 'SIN_STOCK', label: string }[] = [
+  { id: 'TODOS', label: 'Todos' },
+  { id: 'BAJO', label: 'Bajo stock' },
+  { id: 'SIN_STOCK', label: 'Sin stock' },
+]
 
 // ── Computed ──────────────────────────────────────────────
-const productosFiltrados = computed(() =>
-  filtroCategoria.value === 'TODOS'
-    ? productos.value
-    : productos.value.filter(p => p.categoria === filtroCategoria.value),
-)
+const productosFiltrados = computed(() => {
+  const term = busqueda.value.trim().toLowerCase()
+
+  return productos.value.filter((p) => {
+    const coincideCategoria = filtroCategoria.value === 'TODOS' || p.categoria === filtroCategoria.value
+    const coincideStock =
+      filtroStock.value === 'TODOS'
+      || (filtroStock.value === 'BAJO' && p.stock <= p.stockMinimo)
+      || (filtroStock.value === 'SIN_STOCK' && p.stock === 0)
+    const coincideBusqueda =
+      !term
+      || p.nombre.toLowerCase().includes(term)
+      || (labelCat[p.categoria] ?? p.categoria).toLowerCase().includes(term)
+
+    return coincideCategoria && coincideStock && coincideBusqueda
+  })
+})
 
 const stockBajo      = computed(() => productos.value.filter(p => p.stock <= p.stockMinimo))
 const productosPorReponer = computed(() =>
@@ -137,7 +157,7 @@ async function guardar() {
   }
 }
 
-async function eliminar(id: number) {
+async function eliminar(id: string) {
   try {
     const { api } = await import('~/infrastructure/http/api')
     await api.delete(`/v1/productos/${id}`)
@@ -146,6 +166,18 @@ async function eliminar(id: number) {
   } catch {
     toast.error('Error al eliminar el producto')
   }
+}
+
+function verBajoStock() {
+  filtroCategoria.value = 'TODOS'
+  filtroStock.value = 'BAJO'
+  busqueda.value = ''
+}
+
+function limpiarFiltros() {
+  filtroCategoria.value = 'TODOS'
+  filtroStock.value = 'TODOS'
+  busqueda.value = ''
 }
 
 function abrirVenta(producto: Producto) {
@@ -221,15 +253,25 @@ function formatEur(n: number): string {
     <!-- ── KPI Cards ─────────────────────────────────────── -->
     <div class="grid grid-cols-2 xl:grid-cols-3 gap-6">
 
-      <div class="bg-primary-container text-white p-6 rounded-2xl shadow-lg shadow-primary-container/20">
+      <div class="inventario-panel-highlight text-white p-6 rounded-2xl">
         <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-1">Valor del Inventario</p>
         <h3 class="text-3xl font-extrabold">{{ formatEur(valorInventario) }}</h3>
         <p class="text-xs text-white/60 mt-2">{{ productos.length }} productos en total</p>
       </div>
 
-      <div class="card-kpi">
+      <div class="inventario-panel-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Productos por reponer</p>
-        <h3 class="text-4xl font-extrabold text-primary">{{ stockBajo.length }}</h3>
+        <div class="flex items-end justify-between gap-3">
+          <h3 class="text-4xl font-extrabold text-primary">{{ stockBajo.length }}</h3>
+          <button
+            v-if="stockBajo.length"
+            class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-800 transition-colors hover:bg-amber-200"
+            type="button"
+            @click="verBajoStock"
+          >
+            Ver bajos
+          </button>
+        </div>
         <div v-if="productosPorReponer.length" class="mt-3 space-y-1.5">
           <p
             v-for="producto in productosPorReponer"
@@ -242,25 +284,25 @@ function formatEur(n: number): string {
         <p v-else class="text-xs text-green-700 mt-2 font-medium">Todo el stock está controlado</p>
       </div>
 
-      <div class="card-kpi">
+      <div class="inventario-panel-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Sin stock</p>
         <h3 class="text-4xl font-extrabold text-primary">{{ sinStock.length }}</h3>
         <p class="text-xs text-on-surface-variant mt-2">Agotados actualmente</p>
       </div>
 
-      <div class="card-kpi">
+      <div class="inventario-panel-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ventas Semana</p>
         <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(resumenVentas.ingresosSemana) }}</h3>
         <p class="text-xs text-on-surface-variant mt-2">{{ resumenVentas.unidadesSemana }} uds vendidas</p>
       </div>
 
-      <div class="card-kpi">
+      <div class="inventario-panel-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ventas Mes</p>
         <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(resumenVentas.ingresosMes) }}</h3>
         <p class="text-xs text-on-surface-variant mt-2">{{ resumenVentas.unidadesMes }} uds vendidas</p>
       </div>
 
-      <div class="card-kpi">
+      <div class="inventario-panel-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ventas Año</p>
         <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(resumenVentas.ingresosAnio) }}</h3>
         <p class="text-xs text-on-surface-variant mt-2">{{ resumenVentas.unidadesAnio }} uds vendidas</p>
@@ -269,7 +311,7 @@ function formatEur(n: number): string {
     </div>
 
     <!-- ── Alertas de stock bajo ──────────────────────────── -->
-    <div v-if="stockBajo.length > 0" class="card p-5 !bg-amber-50 border-amber-200">
+    <div v-if="stockBajo.length > 0" class="inventario-alert-card p-5">
       <div class="flex items-center gap-2 mb-3">
         <AlertTriangle class="w-4 h-4 text-amber-600" />
         <p class="text-sm font-bold text-amber-800">
@@ -277,14 +319,15 @@ function formatEur(n: number): string {
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
-        <span
+        <button
           v-for="p in stockBajo"
           :key="p.id"
-          class="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium cursor-pointer hover:bg-amber-200 transition-colors"
+          class="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium hover:bg-amber-200 transition-colors"
+          type="button"
           @click="abrirEditar(p)"
         >
           {{ p.nombre }} ({{ p.stock }} uds)
-        </span>
+        </button>
       </div>
       <p class="mt-3 text-xs text-amber-800/80">
         Pulsa en cualquier producto para editar stock o ajustar el mínimo.
@@ -292,25 +335,53 @@ function formatEur(n: number): string {
     </div>
 
     <!-- ── Tabla principal ────────────────────────────────── -->
-    <div class="card p-6">
+    <div class="inventario-panel-card p-6">
 
       <!-- Filtros + acción -->
-      <div class="flex items-center justify-between gap-4 mb-8 flex-wrap">
-        <div class="w-full sm:w-60">
+      <div class="flex flex-col xl:flex-row xl:items-center gap-4 mb-8">
+        <div class="relative min-w-[18rem] flex-1">
+          <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+          <label for="inventario-busqueda" class="sr-only">Buscar producto</label>
+          <input
+            id="inventario-busqueda"
+            v-model="busqueda"
+            type="search"
+            class="input pl-9"
+            placeholder="Buscar producto..."
+          />
+        </div>
+        <div class="w-full xl:w-64">
           <label for="inventario-categoria" class="sr-only">Filtrar productos por categoría</label>
-          <select
+          <AppSelect
             id="inventario-categoria"
             v-model="filtroCategoria"
-            class="select-field rounded-full bg-surface-container-lowest border-outline-variant/30"
+            :options="opcionesCategoria"
             aria-label="Filtrar productos por categoría"
+          />
+        </div>
+        <div class="flex min-h-10 rounded-md border border-outline-variant/40 bg-white p-1">
+          <button
+            v-for="opcion in filtrosStock"
+            :key="opcion.id"
+            class="rounded px-4 py-1.5 text-xs font-bold transition-colors"
+            :class="filtroStock === opcion.id ? 'bg-surface-container-low text-primary' : 'text-on-surface-variant hover:bg-surface-container-lowest'"
+            type="button"
+            @click="filtroStock = opcion.id"
           >
-            <option v-for="cat in categorias" :key="cat" :value="cat">
-              {{ labelCat[cat] }}
-            </option>
-          </select>
+            {{ opcion.label }}
+          </button>
         </div>
         <button
-          class="flex items-center gap-2 bg-primary-container text-white px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all"
+          v-if="busqueda || filtroCategoria !== 'TODOS' || filtroStock !== 'TODOS'"
+          class="min-h-10 rounded-md border border-outline-variant/40 bg-white px-4 text-xs font-bold text-on-surface-variant transition-colors hover:bg-surface-container-lowest"
+          type="button"
+          @click="limpiarFiltros"
+        >
+          Limpiar
+        </button>
+        <button
+          type="button"
+          class="min-h-10 flex items-center justify-center gap-2 rounded-md bg-primary-container px-6 text-white font-bold text-sm hover:opacity-90 transition-all"
           @click="abrirCrear"
         >
           <Plus class="w-4 h-4" />
@@ -397,7 +468,7 @@ function formatEur(n: number): string {
             </tr>
             <tr v-if="productosFiltrados.length === 0">
               <td colspan="5" class="py-12 text-center text-on-surface-variant text-sm">
-                No hay productos en esta categoría
+                No hay productos con los filtros actuales
               </td>
             </tr>
           </tbody>
@@ -436,7 +507,7 @@ function formatEur(n: number): string {
               type="number"
               min="1"
               :max="productoVenta?.stock ?? 1"
-              class="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container"
+              class="input"
             />
           </div>
 
@@ -494,12 +565,12 @@ function formatEur(n: number): string {
 
           <div class="space-y-2">
             <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Nombre</label>
-            <input v-model="productoEditar.nombre" type="text" class="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container font-bold text-primary" placeholder="Nombre del producto" />
+            <input v-model="productoEditar.nombre" type="text" class="input font-bold text-primary" placeholder="Nombre del producto" />
           </div>
 
           <div class="space-y-2">
             <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Categoría</label>
-            <select v-model="productoEditar.categoria" class="select-field border-none">
+            <select v-model="productoEditar.categoria" class="select-field">
               <option v-for="cat in categorias.filter(c => c !== 'TODOS')" :key="cat" :value="cat">{{ labelCat[cat] }}</option>
             </select>
           </div>
@@ -507,22 +578,22 @@ function formatEur(n: number): string {
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Precio (€)</label>
-              <input v-model.number="productoEditar.precio" type="number" min="0" step="0.01" class="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container" />
+              <input v-model.number="productoEditar.precio" type="number" min="0" step="0.01" class="input" />
             </div>
             <div class="space-y-2">
               <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">P. Descuento</label>
-              <input v-model.number="productoEditar.precioDescuento" type="number" min="0" step="0.01" class="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container" placeholder="Opcional" />
+              <input v-model.number="productoEditar.precioDescuento" type="number" min="0" step="0.01" class="input" placeholder="Opcional" />
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Stock actual</label>
-              <input v-model.number="productoEditar.stock" type="number" min="0" class="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container" />
+              <input v-model.number="productoEditar.stock" type="number" min="0" class="input" />
             </div>
             <div class="space-y-2">
               <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Stock mínimo</label>
-              <input v-model.number="productoEditar.stockMinimo" type="number" min="0" class="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container" />
+              <input v-model.number="productoEditar.stockMinimo" type="number" min="0" class="input" />
             </div>
           </div>
 
@@ -545,6 +616,29 @@ function formatEur(n: number): string {
 </template>
 
 <style scoped>
+.inventario-panel-card,
+.inventario-panel-kpi,
+.inventario-alert-card {
+  background: #fcfcfd;
+  border: 1px solid rgb(104 111 122 / 0.1);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.06);
+}
+
+.inventario-panel-kpi {
+  padding: 1.5rem;
+}
+
+.inventario-panel-highlight {
+  background: rgb(29 55 95);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.12);
+}
+
+.inventario-alert-card {
+  background: rgb(255 251 235);
+  border-color: rgb(253 230 138);
+}
+
 .slide-right-enter-active, .slide-right-leave-active { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .slide-right-enter-from, .slide-right-leave-to { transform: translateX(100%); }
 </style>

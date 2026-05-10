@@ -82,7 +82,7 @@ async function guardar() {
   } finally { guardando.value = false }
 }
 
-async function eliminar(id: number) {
+async function eliminar(id: string) {
   try {
     const { api } = await import('~/infrastructure/http/api')
     await api.delete(`/v1/servicios/${id}`)
@@ -126,21 +126,21 @@ function formatEur(n: number): string {
 
     <!-- ── KPI Cards ─────────────────────────────────────── -->
     <div class="grid grid-cols-3 gap-6">
-      <div class="card-kpi flex items-center justify-between">
+      <div class="servicio-panel-kpi flex items-center justify-between">
         <div>
           <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">Total Servicios</p>
           <h3 class="text-4xl font-extrabold text-primary">{{ servicios.length }}</h3>
         </div>
         <div class="p-3 bg-primary-fixed rounded-xl text-primary-container text-2xl font-bold">#</div>
       </div>
-      <div class="card-kpi flex items-center justify-between">
+      <div class="servicio-panel-kpi flex items-center justify-between">
         <div>
           <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">Servicios Hombre</p>
           <h3 class="text-4xl font-extrabold text-primary">{{ totalHombre }}</h3>
         </div>
         <div class="p-3 bg-secondary-fixed rounded-xl text-on-secondary-fixed-variant text-2xl" aria-hidden="true">♂</div>
       </div>
-      <div class="card-kpi flex items-center justify-between">
+      <div class="servicio-panel-kpi flex items-center justify-between">
         <div>
           <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">Servicios Mujer</p>
           <h3 class="text-4xl font-extrabold text-primary">{{ totalMujer }}</h3>
@@ -150,7 +150,7 @@ function formatEur(n: number): string {
     </div>
 
     <!-- ── Tabla ─────────────────────────────────────────── -->
-    <div class="card p-6">
+    <div class="servicio-panel-card p-6">
 
       <div class="flex items-center justify-between gap-4 mb-8 flex-wrap">
         <div class="w-full sm:w-56">
@@ -158,7 +158,7 @@ function formatEur(n: number): string {
           <select
             id="servicios-filtro-genero"
             v-model="filtroActivo"
-            class="select-field rounded-full bg-surface-container-lowest"
+            class="select-field"
             aria-label="Filtrar servicios por público"
           >
             <option v-for="f in filtros" :key="f" :value="f">
@@ -349,6 +349,18 @@ function formatEur(n: number): string {
 </template>
 
 <style scoped>
+.servicio-panel-card,
+.servicio-panel-kpi {
+  background: #fcfcfd;
+  border: 1px solid rgb(104 111 122 / 0.1);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.06);
+}
+
+.servicio-panel-kpi {
+  padding: 1.5rem;
+}
+
 .slide-right-enter-active, .slide-right-leave-active { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .slide-right-enter-from, .slide-right-leave-to { transform: translateX(100%); }
 </style>

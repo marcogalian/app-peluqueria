@@ -1,5 +1,7 @@
 package com.marcog.peluqueria.chatbot.application.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.marcog.peluqueria.chatbot.domain.model.ChatRequest;
 import com.marcog.peluqueria.chatbot.domain.model.ChatResponse;
 import com.marcog.peluqueria.chatbot.domain.model.LlmResult;
@@ -13,6 +15,7 @@ import com.marcog.peluqueria.security.infrastructure.config.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
@@ -43,6 +46,7 @@ public class ChatbotService implements ChatbotUseCase, RegenerarContextoUseCase 
 
     private static final int MAX_ITERACIONES_FUNCTION_CALLING = 3;
     private static final Locale LOCALE_ES = new Locale("es", "ES");
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static final String SYSTEM_PROMPT = """
             Eres el asistente virtual de Peluqueria Isabella. Respondes en espanol, de forma amable y concisa.
@@ -79,6 +83,11 @@ public class ChatbotService implements ChatbotUseCase, RegenerarContextoUseCase 
     public ChatResponse chat(ChatRequest request, CustomUserDetails userDetails) {
         boolean isAdmin = esAdmin(userDetails);
         UUID peluqueroId = resolverPeluqueroDelUsuario(userDetails);
+
+        ChatResponse respuestaDirecta = responderConsultaDirecta(request, peluqueroId, isAdmin);
+        if (respuestaDirecta != null) {
+            return respuestaDirecta;
+        }
 
         String systemInstruction = construirSystemInstruction();
         List<Map<String, Object>> tools = buildToolDeclarations(isAdmin);
@@ -148,6 +157,79 @@ public class ChatbotService implements ChatbotUseCase, RegenerarContextoUseCase 
                 + "\nFecha actual: " + fechaHoy + " (" + diaSemana + ")\n"
                 + "Cuando el usuario diga 'hoy', usa esta fecha. Para 'mañana' suma un dia.\n\n"
                 + contextLoader.getContext();
+    }
+
+    private ChatResponse responderConsultaDirecta(ChatRequest request, UUID peluqueroId, boolean isAdmin) {
+        String mensaje = normalizar(request.getMessage());
+        if (!esConsultaClientesVip(mensaje)) {
+            return null;
+        }
+
+        if (!isAdmin) {
+            return ChatResponse.builder()
+                    .reply("Solo el administrador puede consultar el listado de clientes VIP.")
+                    .suggestedQuestions(List.of(
+                            "¿Cuántas citas tengo hoy?",
+                            "¿Qué vacaciones tengo aprobadas?"
+                    ))
+                    .build();
+        }
+
+        String resultadoFuncion = functionExecutor.execute("getClientesVip", null, peluqueroId, true);
+        return formatearClientesVip(resultadoFuncion);
+    }
+
+    private boolean esConsultaClientesVip(String mensaje) {
+        return mensaje.contains("cliente") && mensaje.contains("vip");
+    }
+
+    private ChatResponse formatearClientesVip(String resultadoFuncion) {
+        try {
+            JsonNode raiz = MAPPER.readTree(resultadoFuncion);
+            if (raiz.has("error")) {
+                return ChatResponse.builder()
+                        .reply("No he podido consultar los clientes VIP ahora mismo.")
+                        .suggestedQuestions(List.of("¿Cuántos clientes tenemos en total?", "¿Qué servicios tenemos?"))
+                        .build();
+            }
+
+            int totalVip = raiz.path("totalVip").asInt(0);
+            JsonNode clientes = raiz.path("clientes");
+            if (totalVip == 0 || !clientes.isArray() || clientes.isEmpty()) {
+                return ChatResponse.builder()
+                        .reply("Ahora mismo no hay clientes VIP activos.")
+                        .suggestedQuestions(List.of("¿Cuántos clientes tenemos en total?", "¿Qué servicios tenemos?"))
+                        .build();
+            }
+
+            List<String> nombres = new ArrayList<>();
+            clientes.forEach(cliente -> {
+                String nombre = cliente.path("nombre").asText("").trim();
+                if (!nombre.isBlank()) nombres.add(nombre);
+            });
+
+            String reply = "Tenemos " + totalVip + " clientes VIP: " + String.join(", ", nombres) + ".";
+            return ChatResponse.builder()
+                    .reply(reply)
+                    .suggestedQuestions(List.of(
+                            "¿Cuántos clientes tenemos en total?",
+                            "¿Qué clientes tienen descuento?",
+                            "¿Qué servicios son los más vendidos?"
+                    ))
+                    .build();
+        } catch (Exception ex) {
+            return ChatResponse.builder()
+                    .reply("No he podido leer el listado de clientes VIP ahora mismo.")
+                    .suggestedQuestions(List.of("¿Cuántos clientes tenemos en total?", "¿Qué servicios tenemos?"))
+                    .build();
+        }
+    }
+
+    private String normalizar(String texto) {
+        if (texto == null) return "";
+        String sinAcentos = Normalizer.normalize(texto, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return sinAcentos.toLowerCase(LOCALE_ES);
     }
 
     private List<Map<String, Object>> buildToolDeclarations(boolean isAdmin) {

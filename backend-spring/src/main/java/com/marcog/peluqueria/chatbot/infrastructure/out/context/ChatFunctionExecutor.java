@@ -270,7 +270,9 @@ public class ChatFunctionExecutor implements ChatFunctionExecutorPort {
     }
 
     private String getClientesVip() {
-        List<Cliente> clientesVip = clienteRepository.findByFiltros(null, true, false);
+        List<Cliente> clientesVip = clienteRepository.findAllByArchivado(false).stream()
+                .filter(Cliente::isEsVip)
+                .collect(Collectors.toList());
 
         List<Map<String, Object>> detalle = clientesVip.stream()
                 .map(cliente -> Map.<String, Object>of(

@@ -1,5 +1,7 @@
 package com.marcog.peluqueria.chat.infrastructure.in.web;
 
+import com.marcog.peluqueria.chat.infrastructure.out.persistence.JpaMensajeInternoRepository;
+import com.marcog.peluqueria.chat.infrastructure.out.persistence.MensajeInternoEntity;
 import com.marcog.peluqueria.peluqueros.infrastructure.out.persistence.JpaPeluqueroRepository;
 import com.marcog.peluqueria.peluqueros.infrastructure.out.persistence.PeluqueroEntity;
 import com.marcog.peluqueria.security.domain.model.Role;
@@ -19,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -35,6 +38,7 @@ public class MensajesController {
 
     private final JpaUserRepository userRepository;
     private final JpaPeluqueroRepository peluqueroRepository;
+    private final JpaMensajeInternoRepository mensajeInternoRepository;
     private final NotificationService notificationService;
 
     /**
@@ -49,12 +53,38 @@ public class MensajesController {
         return ResponseEntity.ok(construirContactos(auth));
     }
 
-    /** Historial vacío — los mensajes solo viajan por WebSocket sin persistencia */
     @Operation(summary = "Historial mensajes", description = "Retorna el historial de mensajes con un contacto")
-    @ApiResponse(responseCode = "200", description = "Historial (vacio, mensajes via WebSocket)")
+    @ApiResponse(responseCode = "200", description = "Historial de mensajes")
     @GetMapping("/historial/{contactoId}")
-    public ResponseEntity<List<Object>> historial(@PathVariable UUID contactoId) {
-        return ResponseEntity.ok(List.of());
+    public ResponseEntity<List<MensajeDTO>> historial(@PathVariable UUID contactoId, Authentication auth) {
+        UserEntity usuario = usuarioActual(auth);
+        ContactoDTO contacto = obtenerContactoVisible(contactoId, auth);
+
+        List<MensajeDTO> historial = mensajeInternoRepository
+                .findConversacion(usuario.getId(), contacto.getUserId())
+                .stream()
+                .map(this::aDto)
+                .toList();
+
+        return ResponseEntity.ok(historial);
+    }
+
+    @Operation(summary = "Archivar mensaje", description = "Marca un mensaje como archivado para ocultarlo de la bandeja activa")
+    @ApiResponse(responseCode = "200", description = "Mensaje archivado")
+    @PatchMapping("/{mensajeId}/archivar")
+    public ResponseEntity<MensajeDTO> archivarMensaje(@PathVariable UUID mensajeId, Authentication auth) {
+        MensajeInternoEntity mensaje = obtenerMensajeVisibleParaUsuario(mensajeId, auth);
+        mensaje.setArchivado(true);
+        return ResponseEntity.ok(aDto(mensajeInternoRepository.save(mensaje)));
+    }
+
+    @Operation(summary = "Eliminar mensaje", description = "Elimina un mensaje interno")
+    @ApiResponse(responseCode = "204", description = "Mensaje eliminado")
+    @DeleteMapping("/{mensajeId}")
+    public ResponseEntity<Void> eliminarMensaje(@PathVariable UUID mensajeId, Authentication auth) {
+        MensajeInternoEntity mensaje = obtenerMensajeVisibleParaUsuario(mensajeId, auth);
+        mensajeInternoRepository.delete(mensaje);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Enviar email", description = "Envia un email manual a un contacto")
@@ -76,13 +106,27 @@ public class MensajesController {
         String cuerpo = request.getCuerpo().trim();
 
         notificationService.enviarEmail(contacto.getEmail(), asunto, cuerpo);
+        MensajeInternoEntity mensaje = mensajeInternoRepository.save(MensajeInternoEntity.builder()
+                .emisorUserId(usuarioActual(auth).getId())
+                .receptorUserId(contacto.getUserId())
+                .asunto(asunto)
+                .contenido(cuerpo)
+                .enviadoEn(LocalDateTime.now())
+                .build());
+
         log.info("Email manual enviado por {} a {} <{}>", auth.getName(), contacto.getNombre(), contacto.getEmail());
 
         return ResponseEntity.ok(EmailEnviadoDTO.builder()
                 .destinatario(contacto.getEmail())
                 .asunto(asunto)
                 .mensaje("Email enviado correctamente mediante Mailtrap.")
+                .mensajeChat(aDto(mensaje))
                 .build());
+    }
+
+    private UserEntity usuarioActual(Authentication auth) {
+        return userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no autenticado."));
     }
 
     private List<ContactoDTO> construirContactos(Authentication auth) {
@@ -114,12 +158,20 @@ public class MensajesController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contacto no disponible."));
     }
 
+    private MensajeInternoEntity obtenerMensajeVisibleParaUsuario(UUID mensajeId, Authentication auth) {
+        UserEntity usuario = usuarioActual(auth);
+        return mensajeInternoRepository.findById(mensajeId)
+                .filter(m -> usuario.getId().equals(m.getEmisorUserId()) || usuario.getId().equals(m.getReceptorUserId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensaje no disponible."));
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private ContactoDTO desdePeluquero(PeluqueroEntity p) {
         UserEntity u = p.getUser();
         return ContactoDTO.builder()
                 .id(p.getId().toString())
+                .userId(u.getId())
                 .nombre(p.getNombre())
                 .iniciales(iniciales(p.getNombre()))
                 .rol(u.getRole().name())
@@ -131,6 +183,7 @@ public class MensajesController {
     private ContactoDTO desdeUser(UserEntity u) {
         return ContactoDTO.builder()
                 .id(u.getId().toString())
+                .userId(u.getId())
                 .nombre(u.getUsername())
                 .iniciales(iniciales(u.getUsername()))
                 .rol(u.getRole().name())
@@ -144,6 +197,35 @@ public class MensajesController {
         String[] partes = nombre.trim().split("\\s+");
         if (partes.length == 1) return partes[0].substring(0, Math.min(2, partes[0].length())).toUpperCase();
         return (partes[0].charAt(0) + "" + partes[1].charAt(0)).toUpperCase();
+    }
+
+    private MensajeDTO aDto(MensajeInternoEntity mensaje) {
+        return MensajeDTO.builder()
+                .id(mensaje.getId().toString())
+                .emisorId(usernameUsuario(mensaje.getEmisorUserId()))
+                .emisorNombre(nombreUsuario(mensaje.getEmisorUserId()))
+                .asunto(mensaje.getAsunto())
+                .contenido(mensaje.getContenido())
+                .enviadoEn(mensaje.getEnviadoEn().toString())
+                .leido(mensaje.isLeido())
+                .archivado(mensaje.isArchivado())
+                .build();
+    }
+
+    private String nombreUsuario(UUID userId) {
+        return peluqueroRepository.findAll().stream()
+                .filter(p -> p.getUser() != null && userId.equals(p.getUser().getId()))
+                .map(PeluqueroEntity::getNombre)
+                .findFirst()
+                .orElseGet(() -> userRepository.findById(userId)
+                        .map(UserEntity::getUsername)
+                        .orElse("Usuario"));
+    }
+
+    private String usernameUsuario(UUID userId) {
+        return userRepository.findById(userId)
+                .map(UserEntity::getUsername)
+                .orElse(userId.toString());
     }
 
     @Data
@@ -163,17 +245,32 @@ public class MensajesController {
         private String destinatario;
         private String asunto;
         private String mensaje;
+        private MensajeDTO mensajeChat;
     }
 
     @Data
     @Builder
     public static class ContactoDTO {
         private String id;
+        private UUID userId;
         private String nombre;
         private String iniciales;
         private String rol;
         private String email;
         private String telefono;
         private boolean online;
+    }
+
+    @Data
+    @Builder
+    public static class MensajeDTO {
+        private String id;
+        private String emisorId;
+        private String emisorNombre;
+        private String asunto;
+        private String contenido;
+        private String enviadoEn;
+        private boolean leido;
+        private boolean archivado;
     }
 }

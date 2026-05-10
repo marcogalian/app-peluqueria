@@ -6,6 +6,7 @@ import {
   Loader2,
   Plus,
   Search,
+  Trash2,
   Users,
   X,
 } from 'lucide-vue-next'
@@ -25,7 +26,7 @@ import { useToast } from '~/modules/shared/composables/useToast'
 definePageMeta({ middleware: 'auth' })
 
 type EstadoCita = 'PENDIENTE' | 'EN_CURSO' | 'COMPLETADA' | 'CANCELADO'
-type GeneroCliente = 'FEMENINO' | 'MASCULINO' | 'OTRO'
+type GeneroCliente = 'FEMENINO' | 'MASCULINO'
 
 interface ClienteAgenda {
   id: string
@@ -71,11 +72,14 @@ interface CitaAgendaItem {
   horaInicio: string
   duracionMinutos: number
   estado: EstadoCita
+  clienteId: string
   clienteNombre: string
   clienteApellidos: string
   clienteTelefono: string
   clienteEmail: string
   clienteEsVip: boolean
+  peluqueroId: string
+  servicioId: string
   servicioNombre: string
   comentarios: string
   motivoCancelacion: string | null
@@ -101,6 +105,8 @@ const citasDia = ref<CitaAgendaItem[]>([])
 const miPeluqueroId = ref<string | null>(null)
 const peluqueroSeleccionadoId = ref<string | null>(null)
 const mostrandoAgendas = ref(false)
+const modalCitaAbierto = ref(false)
+const citaEditando = ref<CitaAgendaItem | null>(null)
 const horaSeleccionada = ref<string | null>(null)
 
 const clienteQuery = ref('')
@@ -121,7 +127,12 @@ const formCita = reactive({
 const formNuevoCliente = reactive({
   telefono: '',
   email: '',
-  genero: 'OTRO' as GeneroCliente,
+  genero: 'FEMENINO' as GeneroCliente,
+})
+
+const formEdicion = reactive({
+  estado: 'PENDIENTE' as EstadoCita,
+  motivoCancelacion: '',
 })
 
 const slots = computed(() => {
@@ -188,7 +199,9 @@ const clienteEsNuevo = computed(() =>
 
 const telefonoCliente = computed(() => clienteSeleccionado.value?.telefono ?? '')
 const emailCliente = computed(() => clienteSeleccionado.value?.email ?? '')
-const generoCliente = computed(() => clienteSeleccionado.value?.genero ?? 'OTRO')
+const generoCliente = computed(() => clienteSeleccionado.value?.genero ?? 'FEMENINO')
+
+const modalEnEdicion = computed(() => Boolean(citaEditando.value))
 
 watch(clienteQuery, (nuevoValor) => {
   erroresFormulario.cliente = ''
@@ -245,11 +258,14 @@ function mapearCita(cita: CitaApi): CitaAgendaItem {
     horaInicio: format(new Date(cita.fechaHora), 'HH:mm'),
     duracionMinutos: cita.duracionTotal || cita.servicios?.[0]?.duracionMinutos || 30,
     estado: cita.estado,
+    clienteId: cita.cliente?.id ?? '',
     clienteNombre: cita.cliente?.nombre ?? '',
     clienteApellidos: cita.cliente?.apellidos ?? '',
     clienteTelefono: cita.cliente?.telefono ?? '',
     clienteEmail: cita.cliente?.email ?? '',
     clienteEsVip: Boolean(cita.cliente?.esVip),
+    peluqueroId: cita.peluquero?.id ?? '',
+    servicioId: cita.servicios?.[0]?.id ?? '',
     servicioNombre: cita.servicios?.[0]?.nombre ?? 'Sin servicio',
     comentarios: cita.comentarios ?? '',
     motivoCancelacion: cita.motivoCancelacion ?? null,
@@ -332,13 +348,16 @@ function resolverClienteDesdeBusqueda() {
 
 function resetFormularioCita() {
   horaSeleccionada.value = null
+  citaEditando.value = null
   clienteQuery.value = ''
   clienteSeleccionadoId.value = null
   formCita.servicioId = ''
   notasCita.value = ''
   formNuevoCliente.telefono = ''
   formNuevoCliente.email = ''
-  formNuevoCliente.genero = 'OTRO'
+  formNuevoCliente.genero = 'FEMENINO'
+  formEdicion.estado = 'PENDIENTE'
+  formEdicion.motivoCancelacion = ''
   errorGeneralFormulario.value = ''
   erroresFormulario.cliente = ''
   erroresFormulario.telefono = ''
@@ -347,7 +366,35 @@ function resetFormularioCita() {
 
 function seleccionarHora(hora: string) {
   if (!puedeEmpezarCita(hora)) return
+  resetFormularioCita()
   horaSeleccionada.value = hora
+  modalCitaAbierto.value = true
+}
+
+function cerrarModalCita() {
+  modalCitaAbierto.value = false
+  resetFormularioCita()
+}
+
+function abrirEditarCita(cita: CitaAgendaItem) {
+  resetFormularioCita()
+  citaEditando.value = cita
+  horaSeleccionada.value = cita.horaInicio
+  formCita.servicioId = cita.servicioId
+  notasCita.value = cita.comentarios
+  formEdicion.estado = cita.estado
+  formEdicion.motivoCancelacion = cita.motivoCancelacion ?? ''
+
+  const cliente = clientes.value.find(c => c.id === cita.clienteId)
+  if (cliente) {
+    seleccionarCliente(cliente)
+  } else {
+    clienteQuery.value = `${cita.clienteNombre} ${cita.clienteApellidos}`.trim()
+    formNuevoCliente.telefono = cita.clienteTelefono
+    formNuevoCliente.email = cita.clienteEmail
+  }
+
+  modalCitaAbierto.value = true
 }
 
 function irDia(dia: Date) {
@@ -450,7 +497,7 @@ async function guardarCita() {
   erroresFormulario.servicio = ''
 
   if (!horaSeleccionada.value) {
-    errorGeneralFormulario.value = 'Selecciona una hora libre en la agenda antes de guardar.'
+    errorGeneralFormulario.value = 'Selecciona una hora en la agenda antes de guardar.'
     return
   }
   if (!puedeEditarAgendaActual.value) {
@@ -478,21 +525,30 @@ async function guardarCita() {
   guardando.value = true
   try {
     const clienteId = await crearClienteSiHaceFalta()
-
-    await api.post('/citas', {
+    const payload = {
+      id: citaEditando.value?.id,
       fechaHora: getFechaHoraIso(horaSeleccionada.value),
-      estado: 'PENDIENTE',
+      duracionTotal: servicioSeleccionado.value?.duracionMinutos || citaEditando.value?.duracionMinutos || 30,
+      estado: modalEnEdicion.value ? formEdicion.estado : 'PENDIENTE',
       comentarios: notasCita.value.trim(),
+      motivoCancelacion: formEdicion.estado === 'CANCELADO' ? formEdicion.motivoCancelacion.trim() : null,
       cliente: { id: clienteId },
       peluquero: { id: peluqueroSeleccionadoId.value },
       servicios: [{ id: formCita.servicioId }],
-    })
+    }
 
-    toast.success('Cita guardada')
-    resetFormularioCita()
+    if (citaEditando.value) {
+      await api.put(`/citas/${citaEditando.value.id}`, payload)
+      toast.success('Cita actualizada')
+    } else {
+      await api.post('/citas', payload)
+      toast.success('Cita guardada')
+    }
+
+    cerrarModalCita()
     await cargarCitasDia()
   } catch (error) {
-    let message = 'No se pudo guardar la cita.'
+    let message = citaEditando.value ? 'No se pudo actualizar la cita.' : 'No se pudo guardar la cita.'
 
     if (isAxiosError(error)) {
       const status = error.response?.status
@@ -512,6 +568,29 @@ async function guardarCita() {
     }
 
     errorGeneralFormulario.value = message
+  } finally {
+    guardando.value = false
+  }
+}
+
+async function eliminarCita() {
+  if (!citaEditando.value || !authStore.isAdmin) return
+  const confirmar = window.confirm('¿Eliminar esta cita definitivamente?')
+  if (!confirmar) return
+
+  guardando.value = true
+  errorGeneralFormulario.value = ''
+  try {
+    await api.delete(`/citas/${citaEditando.value.id}`)
+    toast.success('Cita eliminada')
+    cerrarModalCita()
+    await cargarCitasDia()
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 403) {
+      errorGeneralFormulario.value = 'No tienes permisos para eliminar esta cita.'
+    } else {
+      errorGeneralFormulario.value = 'No se pudo eliminar la cita.'
+    }
   } finally {
     guardando.value = false
   }
@@ -623,7 +702,7 @@ onMounted(async () => {
       </button>
     </div>
 
-    <div v-else class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] items-start">
+    <div v-else>
       <section class="card overflow-hidden">
         <div class="sticky top-0 z-10 grid grid-cols-[76px_minmax(0,1fr)] border-b border-surface-container bg-surface-container-low/95 backdrop-blur">
           <div class="px-3 py-4 flex items-center justify-center border-r border-surface-container text-on-surface-variant">
@@ -657,25 +736,30 @@ onMounted(async () => {
             >
               <div
                 v-if="esInicioCita(hora)"
-                class="absolute inset-x-2 top-2 rounded-2xl border-l-4 px-4 py-3 z-[1] overflow-hidden"
+                class="absolute inset-x-2 top-2 rounded-xl border-l-4 px-4 py-3 z-[1] overflow-hidden cursor-pointer"
                 :class="esInicioCita(hora)!.estado === 'COMPLETADA'
                   ? 'bg-green-50 border-green-500 text-green-900'
+                  : esInicioCita(hora)!.estado === 'CANCELADO'
+                    ? 'bg-red-50 border-red-400 text-red-900'
                   : 'bg-primary/5 border-primary-container text-primary-container'"
                 :style="{ height: `${slotsCita(esInicioCita(hora)!) * 64 - 8}px` }"
+                role="button"
+                tabindex="0"
+                :aria-label="`Abrir cita de ${esInicioCita(hora)!.clienteNombre} a las ${esInicioCita(hora)!.horaInicio}`"
+                @click.stop="abrirEditarCita(esInicioCita(hora)!)"
+                @keydown.enter.stop.prevent="abrirEditarCita(esInicioCita(hora)!)"
               >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <p class="text-sm font-bold truncate">
-                      {{ esInicioCita(hora)!.clienteNombre }} {{ esInicioCita(hora)!.clienteApellidos }}
-                    </p>
-                    <p class="text-xs opacity-80 truncate">{{ esInicioCita(hora)!.servicioNombre }}</p>
-                    <p class="text-[11px] opacity-70 mt-2">
-                      {{ esInicioCita(hora)!.duracionMinutos }} min
-                    </p>
-                  </div>
+                <div class="flex items-center justify-between gap-3">
+                  <p class="min-w-0 text-sm font-bold truncate">
+                    <span class="font-black">{{ esInicioCita(hora)!.horaInicio }}</span>
+                    <span class="mx-2 opacity-40">·</span>
+                    {{ esInicioCita(hora)!.clienteNombre }} {{ esInicioCita(hora)!.clienteApellidos }}
+                    <span class="mx-2 opacity-40">·</span>
+                    <span class="font-semibold opacity-80">{{ esInicioCita(hora)!.servicioNombre }}</span>
+                  </p>
                   <span
                     v-if="esInicioCita(hora)!.clienteEsVip"
-                    class="px-2 py-1 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold"
+                    class="px-2 py-1 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0"
                   >
                     VIP
                   </span>
@@ -693,207 +777,270 @@ onMounted(async () => {
           </div>
         </div>
       </section>
+    </div>
 
-      <aside class="card p-5 self-start">
-        <div class="flex items-center justify-between gap-3 mb-4">
-          <div>
-            <h2 class="text-base font-bold text-primary">Nueva cita</h2>
-            <p class="text-xs text-on-surface-variant">
-              {{ horaSeleccionada ? `${horaSeleccionada} · ${peluqueroActual?.nombre}` : 'Selecciona una hora en la agenda' }}
-            </p>
-          </div>
-          <button
-            v-if="horaSeleccionada"
-            class="btn-ghost"
-            aria-label="Limpiar formulario de cita"
-            @click="resetFormularioCita"
-          >
-            <X class="w-4 h-4" aria-hidden="true" />
-          </button>
-        </div>
-
-        <div v-if="!horaSeleccionada" class="rounded-2xl bg-surface-container-low px-4 py-8 text-center text-sm text-on-surface-variant">
-          Pulsa sobre un hueco libre de la agenda para crear una cita.
-        </div>
-
-        <div v-else class="space-y-4">
-          <div
-            v-if="errorGeneralFormulario"
-            class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-          >
-            {{ errorGeneralFormulario }}
-          </div>
-
-          <div
-            v-if="viendoAgendaAjena && !authStore.isAdmin"
-            class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-          >
-            Puedes consultar la agenda de tus compañeros, pero las citas nuevas solo se crean en tu agenda.
-          </div>
-
-          <div>
-            <label for="agenda-cliente-nombre" class="label">Cliente</label>
-            <div class="relative">
-              <div class="absolute left-3 inset-y-0 flex items-center pointer-events-none">
-                <Search class="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
+    <Teleport to="body">
+      <Transition name="modal-overlay">
+        <div
+          v-if="modalCitaAbierto"
+          class="fixed inset-0 z-50 bg-black/35 backdrop-blur-sm flex items-center justify-center px-4 py-6"
+          @click.self="cerrarModalCita"
+        >
+          <section class="w-full max-w-2xl max-h-[calc(100dvh-3rem)] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-outline-variant/20">
+            <div class="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-outline-variant/20 px-5 py-4 flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <h2 class="text-lg font-black text-primary truncate">
+                  {{ modalEnEdicion ? 'Editar cita' : 'Nueva cita' }}
+                </h2>
+                <p class="text-xs text-on-surface-variant mt-0.5">
+                  {{ horaSeleccionada ? `${horaSeleccionada} · ${peluqueroActual?.nombre}` : 'Selecciona una hora en la agenda' }}
+                </p>
               </div>
-              <input
-                id="agenda-cliente-nombre"
-                v-model="clienteQuery"
-                type="text"
-                class="input pl-10"
-                placeholder="Escribe nombre y apellidos"
-                autocomplete="off"
-                :disabled="!puedeEditarAgendaActual"
-                @keydown.enter.prevent="resolverClienteDesdeBusqueda"
-              />
+              <button class="btn-ghost shrink-0" aria-label="Cerrar cita" @click="cerrarModalCita">
+                <X class="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div class="p-5 space-y-4">
               <div
-                v-if="coincidenciasClientes.length"
-                class="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 rounded-2xl border border-outline-variant/20 bg-white shadow-card overflow-hidden"
+                v-if="errorGeneralFormulario"
+                class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
               >
-                <button
-                  v-for="cliente in coincidenciasClientes"
-                  :key="cliente.id"
-                  class="w-full px-4 py-3 text-left hover:bg-surface-container-low transition-colors border-b border-outline-variant/10 last:border-b-0"
-                  @click="seleccionarCliente(cliente)"
-                >
-                  <p class="text-sm font-semibold text-primary">{{ nombreCompleto(cliente) }}</p>
-                  <p class="text-xs text-on-surface-variant">{{ cliente.telefono || 'Sin teléfono' }}</p>
+                {{ errorGeneralFormulario }}
+              </div>
+
+              <div
+                v-if="viendoAgendaAjena && !authStore.isAdmin"
+                class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+              >
+                Puedes consultar la agenda de tus compañeros, pero las citas nuevas solo se crean en tu agenda.
+              </div>
+
+              <div class="grid gap-4 sm:grid-cols-[1fr_180px]">
+                <div>
+                  <label for="agenda-cliente-nombre" class="label">Cliente</label>
+                  <div class="relative">
+                    <div class="absolute left-3 inset-y-0 flex items-center pointer-events-none">
+                      <Search class="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
+                    </div>
+                    <input
+                      id="agenda-cliente-nombre"
+                      v-model="clienteQuery"
+                      type="text"
+                      class="input pl-10"
+                      placeholder="Escribe nombre y apellidos"
+                      autocomplete="off"
+                      :disabled="!puedeEditarAgendaActual"
+                      @keydown.enter.prevent="resolverClienteDesdeBusqueda"
+                    />
+                    <div
+                      v-if="coincidenciasClientes.length"
+                      class="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 rounded-xl border border-outline-variant/20 bg-white shadow-card overflow-hidden"
+                    >
+                      <button
+                        v-for="cliente in coincidenciasClientes"
+                        :key="cliente.id"
+                        class="w-full px-4 py-3 text-left hover:bg-surface-container-low transition-colors border-b border-outline-variant/10 last:border-b-0"
+                        @click="seleccionarCliente(cliente)"
+                      >
+                        <p class="text-sm font-semibold text-primary">{{ nombreCompleto(cliente) }}</p>
+                        <p class="text-xs text-on-surface-variant">{{ cliente.telefono || 'Sin teléfono' }}</p>
+                      </button>
+                    </div>
+                  </div>
+                  <p v-if="erroresFormulario.cliente" class="mt-2 text-xs font-semibold text-red-600">
+                    {{ erroresFormulario.cliente }}
+                  </p>
+                  <p v-if="clienteSeleccionado" class="mt-2 text-xs font-semibold text-green-700">
+                    Cliente encontrado. Datos listos para usar.
+                  </p>
+                  <p v-else-if="clienteEsNuevo" class="mt-2 text-xs font-semibold text-primary-container">
+                    Cliente nuevo. Completa el contacto y lo guardamos al crear la cita.
+                  </p>
+                </div>
+
+                <div>
+                  <label for="agenda-hora-modal" class="label">Hora</label>
+                  <select
+                    id="agenda-hora-modal"
+                    v-model="horaSeleccionada"
+                    class="select-field"
+                    :disabled="!puedeEditarAgendaActual"
+                  >
+                    <option v-for="hora in slots" :key="hora" :value="hora">{{ hora }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div
+                v-if="clienteSeleccionado"
+                class="rounded-xl border border-green-200 bg-green-50/70 px-4 py-3 flex items-start justify-between gap-3"
+              >
+                <div class="min-w-0">
+                  <p class="text-sm font-bold text-green-800 truncate">
+                    {{ nombreCompleto(clienteSeleccionado) }}
+                  </p>
+                  <p class="text-xs text-green-700/80">
+                    {{ telefonoCliente || 'Sin teléfono' }} · {{ emailCliente || 'Sin email' }}
+                  </p>
+                </div>
+                <button class="btn-ghost shrink-0" @click="limpiarClienteSeleccionado">
+                  Cambiar
                 </button>
               </div>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label for="agenda-cliente-telefono" class="label">Teléfono</label>
+                  <input
+                    v-if="clienteSeleccionado"
+                    id="agenda-cliente-telefono"
+                    type="text"
+                    class="input"
+                    :value="telefonoCliente"
+                    readonly
+                    placeholder="Sin teléfono"
+                  />
+                  <input
+                    v-else
+                    id="agenda-cliente-telefono"
+                    v-model="formNuevoCliente.telefono"
+                    type="text"
+                    class="input"
+                    placeholder="Ej. 612345678"
+                    :disabled="!puedeEditarAgendaActual"
+                  />
+                  <p v-if="erroresFormulario.telefono" class="mt-2 text-xs font-semibold text-red-600">
+                    {{ erroresFormulario.telefono }}
+                  </p>
+                </div>
+
+                <div>
+                  <label for="agenda-cliente-email" class="label">Email</label>
+                  <input
+                    v-if="clienteSeleccionado"
+                    id="agenda-cliente-email"
+                    type="email"
+                    class="input"
+                    :value="emailCliente"
+                    readonly
+                    placeholder="Sin email"
+                  />
+                  <input
+                    v-else
+                    id="agenda-cliente-email"
+                    v-model="formNuevoCliente.email"
+                    type="email"
+                    class="input"
+                    placeholder="Opcional"
+                    :disabled="!puedeEditarAgendaActual"
+                  />
+                </div>
+              </div>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label for="agenda-cliente-genero" class="label">Género</label>
+                  <select
+                    id="agenda-cliente-genero"
+                    v-model="formNuevoCliente.genero"
+                    class="select-field"
+                    :disabled="Boolean(clienteSeleccionado) || !puedeEditarAgendaActual"
+                  >
+                    <option value="FEMENINO">Femenino</option>
+                    <option value="MASCULINO">Masculino</option>
+                  </select>
+                </div>
+
+                <div v-if="modalEnEdicion">
+                  <label for="agenda-estado" class="label">Estado</label>
+                  <select
+                    id="agenda-estado"
+                    v-model="formEdicion.estado"
+                    class="select-field"
+                    :disabled="!puedeEditarAgendaActual"
+                  >
+                    <option value="PENDIENTE">Pendiente</option>
+                    <option value="EN_CURSO">En curso</option>
+                    <option value="COMPLETADA">Completada</option>
+                    <option value="CANCELADO">Cancelada</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label for="agenda-servicio" class="label">Servicio</label>
+                <select
+                  id="agenda-servicio"
+                  v-model="formCita.servicioId"
+                  class="select-field"
+                  :disabled="!puedeEditarAgendaActual"
+                >
+                  <option value="" disabled>Selecciona un servicio</option>
+                  <option v-for="servicio in servicios" :key="servicio.id" :value="servicio.id">
+                    {{ servicio.nombre }}
+                  </option>
+                </select>
+                <p v-if="erroresFormulario.servicio" class="mt-2 text-xs font-semibold text-red-600">
+                  {{ erroresFormulario.servicio }}
+                </p>
+              </div>
+
+              <div v-if="formEdicion.estado === 'CANCELADO'">
+                <label for="agenda-motivo-cancelacion" class="label">Motivo de cancelación</label>
+                <textarea
+                  id="agenda-motivo-cancelacion"
+                  v-model="formEdicion.motivoCancelacion"
+                  rows="2"
+                  class="input resize-none"
+                  placeholder="Opcional"
+                  :disabled="!puedeEditarAgendaActual"
+                />
+              </div>
+
+              <div>
+                <label for="agenda-notas" class="label">Notas de la cita</label>
+                <textarea
+                  id="agenda-notas"
+                  v-model="notasCita"
+                  rows="3"
+                  class="input resize-none"
+                  placeholder="Opcional"
+                  :disabled="!puedeEditarAgendaActual"
+                />
+              </div>
+
+              <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
+                <button
+                  v-if="modalEnEdicion && authStore.isAdmin"
+                  class="btn-danger"
+                  :disabled="guardando"
+                  @click="eliminarCita"
+                >
+                  <Trash2 class="w-4 h-4" aria-hidden="true" />
+                  Eliminar
+                </button>
+                <span v-else />
+
+                <div class="flex gap-3 sm:justify-end">
+                  <button class="btn-secondary" :disabled="guardando" @click="cerrarModalCita">
+                    Cancelar
+                  </button>
+                  <button
+                    class="btn-primary"
+                    :disabled="guardando || !puedeEditarAgendaActual || !horaSeleccionada || !clienteQuery.trim() || !formCita.servicioId"
+                    @click="guardarCita"
+                  >
+                    <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" aria-hidden="true" />
+                    <span>{{ guardando ? 'Guardando...' : modalEnEdicion ? 'Guardar cambios' : 'Guardar cita' }}</span>
+                  </button>
+                </div>
+              </div>
             </div>
-            <p v-if="erroresFormulario.cliente" class="mt-2 text-xs font-semibold text-red-600">
-              {{ erroresFormulario.cliente }}
-            </p>
-            <p v-if="clienteSeleccionado" class="mt-2 text-xs font-semibold text-green-700">
-              Cliente encontrado. Datos listos para usar.
-            </p>
-            <p v-else-if="clienteEsNuevo" class="mt-2 text-xs font-semibold text-primary-container">
-              Cliente nuevo. Completa el contacto y lo guardamos al crear la cita.
-            </p>
-          </div>
-
-          <div
-            v-if="clienteSeleccionado"
-            class="rounded-2xl border border-green-200 bg-green-50/70 px-4 py-3 flex items-start justify-between gap-3"
-          >
-            <div class="min-w-0">
-              <p class="text-sm font-bold text-green-800 truncate">
-                {{ nombreCompleto(clienteSeleccionado) }}
-              </p>
-              <p class="text-xs text-green-700/80">
-                Cliente existente
-              </p>
-            </div>
-            <button class="btn-ghost shrink-0" @click="limpiarClienteSeleccionado">
-              Cambiar
-            </button>
-          </div>
-
-          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-            <div>
-              <label for="agenda-cliente-telefono" class="label">Teléfono</label>
-              <input
-                v-if="clienteSeleccionado"
-                id="agenda-cliente-telefono"
-                type="text"
-                class="input"
-                :value="telefonoCliente"
-                readonly
-                placeholder="Sin teléfono"
-              />
-              <input
-                v-else
-                id="agenda-cliente-telefono"
-                v-model="formNuevoCliente.telefono"
-                type="text"
-                class="input"
-                placeholder="Ej. 612345678"
-                :disabled="!puedeEditarAgendaActual"
-              />
-              <p v-if="erroresFormulario.telefono" class="mt-2 text-xs font-semibold text-red-600">
-                {{ erroresFormulario.telefono }}
-              </p>
-            </div>
-
-            <div>
-              <label for="agenda-cliente-email" class="label">Email</label>
-              <input
-                v-if="clienteSeleccionado"
-                id="agenda-cliente-email"
-                type="email"
-                class="input"
-                :value="emailCliente"
-                readonly
-                placeholder="Sin email"
-              />
-              <input
-                v-else
-                id="agenda-cliente-email"
-                v-model="formNuevoCliente.email"
-                type="email"
-                class="input"
-                placeholder="Opcional"
-                :disabled="!puedeEditarAgendaActual"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label for="agenda-cliente-genero" class="label">Género</label>
-            <select
-              id="agenda-cliente-genero"
-              v-model="formNuevoCliente.genero"
-              class="select-field"
-              :disabled="Boolean(clienteSeleccionado) || !puedeEditarAgendaActual"
-            >
-              <option value="FEMENINO">Femenino</option>
-              <option value="MASCULINO">Masculino</option>
-              <option value="OTRO">Otro</option>
-            </select>
-          </div>
-
-          <div>
-            <label for="agenda-servicio" class="label">Servicio</label>
-            <select
-              id="agenda-servicio"
-              v-model="formCita.servicioId"
-              class="select-field"
-              :disabled="!puedeEditarAgendaActual"
-            >
-              <option value="" disabled>Selecciona un servicio</option>
-              <option v-for="servicio in servicios" :key="servicio.id" :value="servicio.id">
-                {{ servicio.nombre }}
-              </option>
-            </select>
-            <p v-if="erroresFormulario.servicio" class="mt-2 text-xs font-semibold text-red-600">
-              {{ erroresFormulario.servicio }}
-            </p>
-          </div>
-
-          <div>
-            <label for="agenda-notas" class="label">Notas de la cita</label>
-            <textarea
-              id="agenda-notas"
-              v-model="notasCita"
-              rows="3"
-              class="input resize-none"
-              placeholder="Opcional"
-              :disabled="!puedeEditarAgendaActual"
-            />
-          </div>
-
-          <button
-            class="btn-primary w-full"
-            :disabled="guardando || !puedeEditarAgendaActual || !horaSeleccionada || !clienteQuery.trim() || !formCita.servicioId"
-            @click="guardarCita"
-          >
-            <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" aria-hidden="true" />
-            <span>{{ guardando ? 'Guardando...' : 'Guardar cita' }}</span>
-          </button>
+          </section>
         </div>
-      </aside>
-    </div>
+      </Transition>
+    </Teleport>
 
     <Teleport to="body">
       <Transition name="modal-overlay">

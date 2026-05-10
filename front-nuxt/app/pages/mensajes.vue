@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * Mensajes y correo — chat interno entre empleados/admin y compositor de email.
- * El envío manual de correo usa Mailtrap desde backend.
+ * Mensajes y correo — bandeja de mensajes por contacto con envío manual por email.
  */
-import { Send, Loader2, MessageSquare, Mail, CheckCircle2 } from 'lucide-vue-next'
+import { Send, Loader2, MessageSquare, Mail, CheckCircle2, Archive, Trash2, Clock3 } from 'lucide-vue-next'
+import { useToast } from '~/modules/shared/composables/useToast'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -11,9 +11,11 @@ interface Mensaje {
   id: string
   emisorId: string
   emisorNombre: string
+  asunto?: string
   contenido: string
   enviadoEn: string
   leido: boolean
+  archivado?: boolean
 }
 
 interface Contacto {
@@ -29,6 +31,7 @@ interface Contacto {
 const authStore = useAuthStore()
 const route = useRoute()
 const runtimeConfig = useRuntimeConfig()
+const toast = useToast()
 
 const mensajes = ref<Mensaje[]>([])
 const contactos = ref<Contacto[]>([])
@@ -43,7 +46,6 @@ const emailForm = reactive({
   cuerpo: '',
 })
 
-const chatContainer = ref<HTMLElement | null>(null)
 let stompClient: any = null
 
 function normalizarBrokerURL(raw: string) {
@@ -79,7 +81,6 @@ async function conectarWebSocket() {
         stompClient.subscribe('/user/queue/mensajes', (frame: any) => {
           const msg: Mensaje = JSON.parse(frame.body)
           mensajes.value.push(msg)
-          scrollAbajo()
         })
       },
 
@@ -127,8 +128,6 @@ async function seleccionarContacto(c: Contacto) {
     const { api } = await import('~/infrastructure/http/api')
     const { data } = await api.get(`/mensajes/historial/${c.id}`)
     mensajes.value = data
-    await nextTick()
-    scrollAbajo()
   } catch {
     // vacío
   }
@@ -137,11 +136,13 @@ async function seleccionarContacto(c: Contacto) {
 async function enviarEmailManual() {
   if (!contactoActivo.value?.email) {
     emailEstado.value = { tipo: 'error', texto: 'Este contacto no tiene email configurado.' }
+    toast.error('Este contacto no tiene email configurado.')
     return
   }
 
   if (!emailForm.asunto.trim() || !emailForm.cuerpo.trim()) {
     emailEstado.value = { tipo: 'error', texto: 'Escribe asunto y mensaje antes de enviar.' }
+    toast.error('Escribe asunto y mensaje antes de enviar.')
     return
   }
 
@@ -150,37 +151,65 @@ async function enviarEmailManual() {
 
   try {
     const { api } = await import('~/infrastructure/http/api')
-    await api.post(`/mensajes/email/${contactoActivo.value.id}`, {
+    const { data } = await api.post(`/mensajes/email/${contactoActivo.value.id}`, {
       asunto: emailForm.asunto.trim(),
       cuerpo: emailForm.cuerpo.trim(),
     })
 
-    emailEstado.value = { tipo: 'ok', texto: 'Correo enviado a Mailtrap correctamente.' }
+    if (data?.mensajeChat) {
+      mensajes.value.push(data.mensajeChat)
+    }
+
+    emailEstado.value = { tipo: 'ok', texto: 'Mensaje enviado correctamente.' }
+    toast.success(`Mensaje enviado a ${contactoActivo.value.nombre}.`)
     prepararBorrador(contactoActivo.value)
   } catch (error: any) {
     emailEstado.value = {
       tipo: 'error',
       texto: error?.response?.data?.message || 'No se pudo enviar el correo.',
     }
+    toast.error(emailEstado.value.texto)
   } finally {
     enviandoEmail.value = false
   }
 }
 
-function scrollAbajo() {
-  nextTick(() => {
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
-    }
+function esMio(m: Mensaje): boolean {
+  return m.emisorId === authStore.usuario?.id || m.emisorId === authStore.usuario?.username
+}
+
+function formatFechaLarga(iso: string): string {
+  return new Date(iso).toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
-function esMio(m: Mensaje): boolean {
-  return m.emisorId === authStore.usuario?.id
+const mensajesVisibles = computed(() => mensajes.value.filter(m => !m.archivado))
+
+async function archivarMensaje(mensajeId: string) {
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.patch(`/mensajes/${mensajeId}/archivar`)
+    mensajes.value = mensajes.value.filter(m => m.id !== mensajeId)
+    toast.info('Mensaje archivado.')
+  } catch {
+    toast.error('No se pudo archivar el mensaje.')
+  }
 }
 
-function formatHora(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+async function eliminarMensaje(mensajeId: string) {
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.delete(`/mensajes/${mensajeId}`)
+    mensajes.value = mensajes.value.filter(m => m.id !== mensajeId)
+    toast.success('Mensaje eliminado.')
+  } catch {
+    toast.error('No se pudo eliminar el mensaje.')
+  }
 }
 </script>
 
@@ -251,8 +280,9 @@ function formatHora(iso: string): string {
           </div>
         </div>
 
-        <div class="px-6 pt-5 pb-10 border-b border-surface-container bg-surface-container-low/40 flex-shrink-0">
-          <div class="rounded-3xl bg-white border border-surface-container px-6 pt-6 pb-10 shadow-sm">
+        <div class="px-6 pt-5 pb-10 bg-surface-container-low/40 flex-shrink-0">
+          <div class="space-y-4">
+            <div class="rounded-2xl bg-white border border-surface-container px-6 pt-6 pb-6 shadow-sm">
             <div class="flex items-center gap-2 mb-4">
               <Mail class="w-4 h-4 text-primary-container" />
               <h4 class="font-bold text-primary text-sm">Redactar correo</h4>
@@ -261,7 +291,7 @@ function formatHora(iso: string): string {
             <div v-if="contactoActivo.email" class="space-y-4">
               <div>
                 <label class="label">Para</label>
-                <input :value="contactoActivo.email" type="text" class="input bg-surface-container-low" readonly />
+                <input :value="contactoActivo.email" type="text" class="input" readonly />
               </div>
               <div>
                 <label class="label">Asunto</label>
@@ -278,12 +308,9 @@ function formatHora(iso: string): string {
                 />
               </div>
 
-              <div class="mt-2 rounded-2xl bg-surface-container-low/70 px-4 py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <p class="text-[11px] leading-relaxed text-on-surface-variant max-w-xl">
-                  El correo se enviará desde el backend y lo verás en Mailtrap.
-                </p>
+              <div class="mt-2 rounded-2xl bg-surface-container-low/70 px-4 py-4 flex justify-end">
                 <button
-                  class="self-end lg:self-auto min-w-36 bg-primary-container text-white px-4 py-2.5 rounded-full text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                  class="min-w-36 bg-primary-container text-white px-4 py-2.5 rounded-full text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                   :disabled="enviandoEmail"
                   @click="enviarEmailManual"
                 >
@@ -302,42 +329,81 @@ function formatHora(iso: string): string {
                 <CheckCircle2 v-if="emailEstado.tipo === 'ok'" class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                 <span>{{ emailEstado.texto }}</span>
               </div>
+
             </div>
 
             <div v-else class="rounded-2xl bg-amber-50 text-amber-700 px-4 py-3 text-sm">
               Este contacto no tiene email configurado, así que no se puede enviar por Mailtrap.
             </div>
-          </div>
-        </div>
-
-        <div ref="chatContainer" class="flex-1 min-h-40 overflow-y-auto p-6 space-y-4" aria-live="polite" aria-label="Mensajes del chat">
-          <div
-            v-for="m in mensajes"
-            :key="m.id"
-            class="flex"
-            :class="esMio(m) ? 'justify-end' : 'justify-start'"
-          >
-            <div
-              v-if="!esMio(m)"
-              class="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-[9px] font-bold text-on-surface-variant mr-2 flex-shrink-0 self-end"
-            >
-              {{ m.emisorNombre.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() }}
             </div>
 
-            <div
-              class="max-w-xs px-4 py-2.5 rounded-2xl"
-              :class="esMio(m) ? 'bg-primary-container text-white rounded-br-sm' : 'bg-surface-container-low text-on-surface rounded-bl-sm'"
-            >
-              <p class="text-sm leading-relaxed">{{ m.contenido }}</p>
-              <p class="text-[9px] mt-1 text-right" :class="esMio(m) ? 'text-white/60' : 'text-on-surface-variant'">
-                {{ formatHora(m.enviadoEn) }}
-              </p>
+            <div class="rounded-2xl bg-white border border-surface-container px-6 py-5 shadow-sm space-y-3">
+              <div class="flex items-center justify-between gap-3 border-b border-surface-container pb-3">
+                <div>
+                  <h5 class="text-sm font-bold text-primary">Mensajes para {{ contactoActivo.nombre }}</h5>
+                  <p class="text-[11px] text-on-surface-variant">Se muestran solo los mensajes activos de este peluquero.</p>
+                </div>
+                <div class="rounded-lg bg-surface-container-low px-2.5 py-1 text-xs font-bold text-primary">
+                  {{ mensajesVisibles.length }}
+                </div>
+              </div>
+
+              <div v-if="mensajesVisibles.length === 0" class="rounded-xl border border-dashed border-surface-container px-4 py-6 text-sm text-on-surface-variant">
+                No hay mensajes guardados para este contacto.
+              </div>
+
+              <article
+                v-for="m in mensajesVisibles"
+                :key="m.id"
+                class="rounded-xl border border-surface-container bg-white px-4 py-4 transition-colors hover:bg-surface-container-lowest/60"
+              >
+                <div class="flex flex-col gap-3">
+                  <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="min-w-0 space-y-2 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="rounded-lg bg-primary/8 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary">
+                        {{ esMio(m) ? 'Enviado por ti' : m.emisorNombre }}
+                      </span>
+                      <span class="inline-flex items-center gap-1 text-[11px] text-on-surface-variant">
+                        <Clock3 class="h-3.5 w-3.5" />
+                        {{ formatFechaLarga(m.enviadoEn) }}
+                      </span>
+                    </div>
+                      <h6 class="text-sm font-semibold text-on-surface leading-5">{{ m.asunto || 'Sin asunto' }}</h6>
+                    </div>
+
+                    <div class="flex items-center gap-1 lg:pl-4">
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
+                        title="Archivar mensaje"
+                        aria-label="Archivar mensaje"
+                        @click="archivarMensaje(m.id)"
+                      >
+                        <Archive class="h-3.5 w-3.5" />
+                        Archivar
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-on-surface-variant transition-colors hover:bg-red-50 hover:text-red-700"
+                        title="Eliminar mensaje"
+                        aria-label="Eliminar mensaje"
+                        @click="eliminarMensaje(m.id)"
+                      >
+                        <Trash2 class="h-3.5 w-3.5" />
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+
+                  <p class="whitespace-pre-line text-sm leading-relaxed text-on-surface-variant border-l-2 border-surface-container pl-3">
+                    {{ m.contenido }}
+                  </p>
+                </div>
+              </article>
             </div>
           </div>
-
-          <div v-if="mensajes.length === 0" class="h-full min-h-24" aria-hidden="true" />
         </div>
-
       </template>
     </section>
   </div>

@@ -38,6 +38,9 @@ const cargando        = ref(true)
 const busqueda        = ref('')
 const categoriaFiltro = ref('TODOS')
 const categorias      = ['TODOS', 'CERA', 'CHAMPU', 'ACONDICIONADOR', 'COLORACION', 'HERRAMIENTA', 'OTRO']
+const opcionesCategoria = computed(() =>
+  categorias.map(cat => ({ value: cat, label: etiCategoria(cat) })),
+)
 
 const toast = useToast()
 const carrito         = ref<LineaCarrito[]>([])
@@ -174,8 +177,8 @@ async function confirmarVenta() {
       </div>
 
       <!-- Filtros -->
-      <div class="flex flex-col xl:flex-row gap-3">
-        <div class="relative flex-1">
+      <div class="flex flex-col xl:flex-row xl:items-center gap-4">
+        <div class="relative min-w-[18rem] flex-1">
           <div class="absolute left-3 inset-y-0 flex items-center pointer-events-none">
             <Search class="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
           </div>
@@ -186,21 +189,17 @@ async function confirmarVenta() {
             type="text"
             placeholder="Buscar producto..."
             aria-label="Buscar producto por nombre"
-            class="w-full pl-9 pr-4 py-2.5 rounded-full bg-surface-container text-sm border-none focus:ring-2 focus:ring-primary-container"
+            class="input pl-9"
           />
         </div>
-        <div class="xl:w-64">
+        <div class="w-full xl:w-64">
           <label for="ventas-categoria" class="sr-only">Filtrar por categoría</label>
-          <select
+          <AppSelect
             id="ventas-categoria"
             v-model="categoriaFiltro"
-            class="select-field rounded-full bg-surface-container font-semibold text-on-surface-variant border-none focus:ring-2 focus:ring-primary-container"
+            :options="opcionesCategoria"
             aria-label="Filtrar productos por categoría"
-          >
-            <option v-for="cat in categorias" :key="cat" :value="cat">
-              {{ etiCategoria(cat) }}
-            </option>
-          </select>
+          />
         </div>
       </div>
 

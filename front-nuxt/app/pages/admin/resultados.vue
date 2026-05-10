@@ -4,16 +4,16 @@
  * KPIs de ingresos + gráfica de tendencias (Chart.js) + top servicios + top empleados.
  */
 import { TrendingUp, TrendingDown, Loader2 } from 'lucide-vue-next'
-import { Bar, Line } from 'vue-chartjs'
+import { Bar, Doughnut, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
-  BarElement, LineElement, PointElement,
+  ArcElement, BarElement, LineElement, PointElement,
   Title, Tooltip, Legend, Filler,
 } from 'chart.js'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler)
+ChartJS.register(CategoryScale, LinearScale, ArcElement, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler)
 
 // ── Tipos ─────────────────────────────────────────────────
 type Periodo = 'semana' | 'mes' | 'trimestre' | 'anio'
@@ -74,6 +74,24 @@ const datosGraficaBarras = computed(() => ({
   }],
 }))
 
+const datosGraficaTarta = computed(() => ({
+  labels: datos.value?.topServicios.map(s => s.nombre) ?? [],
+  datasets: [{
+    data: datos.value?.topServicios.map(s => s.ingresos) ?? [],
+    backgroundColor: ['#1a365d', '#2f855a', '#d69e2e', '#9f7aea', '#e53e3e', '#38b2ac'],
+    borderColor: '#ffffff',
+    borderWidth: 4,
+    hoverOffset: 0,
+  }],
+}))
+
+const topServicio = computed(() => datos.value?.topServicios[0] ?? null)
+const topEmpleado = computed(() => datos.value?.topEmpleados[0] ?? null)
+const pesoTopServicio = computed(() => {
+  if (!datos.value || !topServicio.value || datos.value.kpis.ingresosPeriodo <= 0) return 0
+  return Math.round((topServicio.value.ingresos / datos.value.kpis.ingresosPeriodo) * 100)
+})
+
 const opcionesLinea = {
   responsive: true,
   plugins: { legend: { display: false } },
@@ -85,6 +103,17 @@ const opcionesBarras = {
   indexAxis: 'y' as const,
   plugins: { legend: { display: false } },
   scales: { x: { beginAtZero: true } },
+}
+
+const opcionesTarta = {
+  responsive: true,
+  cutout: '58%',
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+      labels: { boxWidth: 10, usePointStyle: true },
+    },
+  },
 }
 
 // ── Carga ─────────────────────────────────────────────────
@@ -108,6 +137,10 @@ onMounted(cargarDatos)
 function formatEur(n: number): string {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n)
 }
+
+function formatPct(n: number): string {
+  return `${n}%`
+}
 </script>
 
 <template>
@@ -117,14 +150,14 @@ function formatEur(n: number): string {
     <div class="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-0 sm:justify-between">
       <div>
         <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Rendimiento Comercial</h2>
-        <p class="text-on-surface-variant text-sm">Análisis detallado de Atelier Sapphire</p>
+        <p class="text-on-surface-variant text-sm">Análisis detallado de Peluquería Isabella</p>
       </div>
       <div class="w-full sm:w-52">
         <label for="resultados-periodo" class="sr-only">Seleccionar período de análisis</label>
         <select
           id="resultados-periodo"
           v-model="periodo"
-          class="select-field rounded-full bg-surface-container-lowest"
+          class="select-field"
           aria-label="Seleccionar período de análisis"
         >
           <option v-for="p in periodos" :key="p.key" :value="p.key">
@@ -145,7 +178,7 @@ function formatEur(n: number): string {
       <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
 
         <!-- Ingresos del período -->
-        <div class="card-kpi relative overflow-hidden">
+        <div class="card-kpi resultados-panel-kpi relative overflow-hidden">
           <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ingresos del período</p>
           <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(datos.kpis.ingresosPeriodo) }}</h3>
           <div class="flex items-center gap-1 mt-2">
@@ -158,21 +191,21 @@ function formatEur(n: number): string {
         </div>
 
         <!-- Ticket medio -->
-        <div class="card-kpi">
+        <div class="card-kpi resultados-panel-kpi">
           <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ticket Medio</p>
           <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(datos.kpis.ticketMedio) }}</h3>
           <p class="text-xs text-on-surface-variant mt-2">Por cita completada</p>
         </div>
 
         <!-- Citas completadas -->
-        <div class="card-kpi !bg-primary-container shadow-lg shadow-primary-container/20">
+        <div class="card-kpi resultados-panel-kpi resultados-panel-kpi-primary">
           <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-1">Citas Completadas</p>
           <h3 class="text-3xl font-extrabold text-white">{{ datos.kpis.citasCompletadas }}</h3>
           <p class="text-xs text-white/60 mt-2">Ingresos: {{ formatEur(datos.kpis.ingresosAnio) }} año</p>
         </div>
 
         <!-- Tasa de cancelación -->
-        <div class="card-kpi">
+        <div class="card-kpi resultados-panel-kpi">
           <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Tasa Cancelación</p>
           <h3 class="text-3xl font-extrabold" :class="datos.kpis.tasaCancelacion > 15 ? 'text-red-500' : 'text-primary'">
             {{ datos.kpis.tasaCancelacion }}%
@@ -186,7 +219,7 @@ function formatEur(n: number): string {
       <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
 
         <!-- Gráfica de línea — evolución de ingresos -->
-        <div class="xl:col-span-3 card p-8">
+        <div class="xl:col-span-3 card resultados-panel-card p-8">
           <div class="flex items-start justify-between mb-6">
             <div>
               <h5 class="text-lg font-bold text-primary">Evolución de Ingresos</h5>
@@ -197,15 +230,56 @@ function formatEur(n: number): string {
         </div>
 
         <!-- Top servicios -->
-        <div class="xl:col-span-2 card p-8">
+        <div class="xl:col-span-2 card resultados-panel-card p-8">
           <h5 class="text-lg font-bold text-primary mb-6">Top Servicios</h5>
           <Bar :data="datosGraficaBarras" :options="opcionesBarras" />
         </div>
 
       </div>
 
+      <!-- ── Mix comercial ─────────────────────────────── -->
+      <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+        <div class="xl:col-span-2 card resultados-panel-card p-8">
+          <h5 class="text-lg font-bold text-primary mb-2">Reparto por Servicio</h5>
+          <p class="text-sm text-on-surface-variant mb-6">Peso de cada servicio en los ingresos del período</p>
+          <div v-if="datos.topServicios.length > 0" class="max-w-sm mx-auto">
+            <Doughnut :data="datosGraficaTarta" :options="opcionesTarta" />
+          </div>
+          <div v-else class="py-12 text-center text-sm text-on-surface-variant">
+            Sin servicios facturados en este período
+          </div>
+        </div>
+
+        <div class="xl:col-span-3 card resultados-panel-card p-8">
+          <h5 class="text-lg font-bold text-primary mb-6">Lectura rápida</h5>
+          <div class="grid gap-4 md:grid-cols-3">
+            <div class="rounded-md border border-outline-variant/40 bg-white p-4 shadow-sm">
+              <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Servicio líder</p>
+              <p class="text-base font-extrabold text-primary truncate">{{ topServicio?.nombre || 'Sin datos' }}</p>
+              <p class="text-xs text-on-surface-variant mt-2">
+                {{ topServicio ? `${formatEur(topServicio.ingresos)} · ${topServicio.citas} citas` : 'Sin ventas registradas' }}
+              </p>
+            </div>
+            <div class="rounded-md border border-outline-variant/40 bg-white p-4 shadow-sm">
+              <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Empleado líder</p>
+              <p class="text-base font-extrabold text-primary truncate">{{ topEmpleado?.nombre || 'Sin datos' }}</p>
+              <p class="text-xs text-on-surface-variant mt-2">
+                {{ topEmpleado ? `${formatEur(topEmpleado.ingresos)} · ${topEmpleado.citas} citas` : 'Sin citas completadas' }}
+              </p>
+            </div>
+            <div class="rounded-md border border-outline-variant/40 bg-white p-4 shadow-sm">
+              <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Concentración</p>
+              <p class="text-base font-extrabold" :class="pesoTopServicio > 45 ? 'text-amber-600' : 'text-primary'">
+                {{ formatPct(pesoTopServicio) }}
+              </p>
+              <p class="text-xs text-on-surface-variant mt-2">Del ingreso viene del servicio líder</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Trabajos por empleado ──────────────────────── -->
-      <div class="card p-8">
+      <div class="card resultados-panel-card p-8">
         <h5 class="text-lg font-bold text-primary mb-6">Trabajos por Empleado</h5>
         <div class="space-y-4">
           <div
@@ -248,3 +322,24 @@ function formatEur(n: number): string {
     </template>
   </div>
 </template>
+
+<style scoped>
+.resultados-panel-card,
+.resultados-panel-kpi {
+  transform: none;
+  background: #fcfcfd;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.resultados-panel-card:hover,
+.resultados-panel-kpi:hover {
+  transform: none;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.resultados-panel-kpi-primary,
+.resultados-panel-kpi-primary:hover {
+  background: #1a365d;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+</style>
