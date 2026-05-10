@@ -22,7 +22,11 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "Mensajes", description = "Contactos y comunicacion por email")
 @RestController
 @RequestMapping("/api/mensajes")
 @RequiredArgsConstructor
@@ -38,17 +42,24 @@ public class MensajesController {
      * Admin → todos los peluqueros.
      * Peluquero → el admin + el resto de peluqueros.
      */
+    @Operation(summary = "Listar contactos", description = "Retorna los contactos disponibles segun el rol del usuario")
+    @ApiResponse(responseCode = "200", description = "Lista de contactos")
     @GetMapping("/contactos")
     public ResponseEntity<List<ContactoDTO>> contactos(Authentication auth) {
         return ResponseEntity.ok(construirContactos(auth));
     }
 
     /** Historial vacío — los mensajes solo viajan por WebSocket sin persistencia */
+    @Operation(summary = "Historial mensajes", description = "Retorna el historial de mensajes con un contacto")
+    @ApiResponse(responseCode = "200", description = "Historial (vacio, mensajes via WebSocket)")
     @GetMapping("/historial/{contactoId}")
     public ResponseEntity<List<Object>> historial(@PathVariable UUID contactoId) {
         return ResponseEntity.ok(List.of());
     }
 
+    @Operation(summary = "Enviar email", description = "Envia un email manual a un contacto")
+    @ApiResponse(responseCode = "200", description = "Email enviado")
+    @ApiResponse(responseCode = "400", description = "Contacto sin email")
     @PostMapping("/email/{contactoId}")
     public ResponseEntity<EmailEnviadoDTO> enviarEmailManual(
             @PathVariable UUID contactoId,
