@@ -51,7 +51,13 @@ public class ChatbotService {
                 .map(p -> p.getId())
                 .orElse(null);
 
-        String systemInstruction = SYSTEM_PROMPT + contextLoader.getContext();
+        String fechaHoy = java.time.LocalDate.now().toString();
+        String diaSemana = java.time.LocalDate.now().getDayOfWeek()
+                .getDisplayName(java.time.format.TextStyle.FULL, new java.util.Locale("es", "ES"));
+        String systemInstruction = SYSTEM_PROMPT
+                + "\nFecha actual: " + fechaHoy + " (" + diaSemana + ")\n"
+                + "Cuando el usuario diga 'hoy', usa esta fecha. Para 'mañana' suma un dia.\n\n"
+                + contextLoader.getContext();
         List<Map<String, Object>> tools = buildToolDeclarations(isAdmin);
 
         GeminiResult result = geminiClient.generateContent(
@@ -84,13 +90,12 @@ public class ChatbotService {
         // Functions for all roles
         tools.add(Map.of(
                 "name", "getCitasEmpleado",
-                "description", "Obtiene las citas del empleado autenticado para una fecha",
+                "description", "Obtiene las citas del empleado autenticado. Si no se indica fecha, usa la de hoy.",
                 "parameters", Map.of(
                         "type", "object",
                         "properties", Map.of(
-                                "fecha", Map.of("type", "string", "description", "Fecha en formato YYYY-MM-DD")
-                        ),
-                        "required", List.of("fecha")
+                                "fecha", Map.of("type", "string", "description", "Fecha YYYY-MM-DD (opcional, default hoy)")
+                        )
                 )
         ));
 

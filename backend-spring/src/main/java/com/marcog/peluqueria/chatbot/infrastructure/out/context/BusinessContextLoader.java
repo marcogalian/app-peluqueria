@@ -3,6 +3,8 @@ package com.marcog.peluqueria.chatbot.infrastructure.out.context;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.marcog.peluqueria.peluqueros.domain.model.Peluquero;
+import com.marcog.peluqueria.peluqueros.domain.port.out.PeluqueroRepositoryPort;
 import com.marcog.peluqueria.productos.domain.model.Producto;
 import com.marcog.peluqueria.productos.domain.port.out.ProductoRepositoryPort;
 import com.marcog.peluqueria.servicios.domain.model.Servicio;
@@ -22,6 +24,7 @@ public class BusinessContextLoader {
 
     private final ServicioRepository servicioRepository;
     private final ProductoRepositoryPort productoRepository;
+    private final PeluqueroRepositoryPort peluqueroRepository;
     private final ObjectMapper mapper = new ObjectMapper();
 
     private volatile String cachedContext = "";
@@ -52,6 +55,20 @@ public class BusinessContextLoader {
             politicas.put("descuentoVip", "Los clientes VIP tienen descuento personalizado según su historial.");
             politicas.put("formasPago", "Efectivo, tarjeta de crédito/débito y transferencia bancaria.");
             root.set("politicas", politicas);
+
+            // Equipo (peluqueros activos)
+            List<Peluquero> peluqueros = peluqueroRepository.findAll();
+            ArrayNode equipoNode = mapper.createArrayNode();
+            for (Peluquero p : peluqueros) {
+                ObjectNode pn = mapper.createObjectNode();
+                pn.put("nombre", p.getNombre());
+                if (p.getEspecialidad() != null) pn.put("especialidad", p.getEspecialidad());
+                if (p.getHorarioBase() != null) pn.put("horario", p.getHorarioBase());
+                pn.put("disponible", p.isDisponible() && !p.isEnBaja() && !p.isEnVacaciones());
+                equipoNode.add(pn);
+            }
+            root.set("equipo", equipoNode);
+            root.put("totalEmpleados", peluqueros.size());
 
             // Servicios desde BD
             List<Servicio> servicios = servicioRepository.findAll();
