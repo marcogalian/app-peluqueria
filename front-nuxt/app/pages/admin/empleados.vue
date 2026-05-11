@@ -415,7 +415,7 @@ function abrirEmail(empleado: Empleado) {
           </button>
           <button
             v-if="!empleadoSeleccionado.enBaja"
-            class="w-full bg-red-50 hover:bg-red-100 text-red-700 font-bold py-2.5 rounded-xl text-sm transition-colors"
+            class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors shadow-sm"
             @click="modalBaja = true"
           >
             Registrar baja médica

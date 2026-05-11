@@ -27,6 +27,12 @@ public class ConfiguracionService {
         actual.setEmail(valorOrFallback(cambios.getEmail(), actual.getEmail()));
         actual.setDireccion(valorOrFallback(cambios.getDireccion(), actual.getDireccion()));
         actual.setPoliticaFotos(valorOrFallback(cambios.getPoliticaFotos(), actual.getPoliticaFotos()));
+        // Horario laboral
+        actual.setHorarioApertura(valorOrFallback(cambios.getHorarioApertura(), actual.getHorarioApertura()));
+        actual.setHorarioCierre(valorOrFallback(cambios.getHorarioCierre(), actual.getHorarioCierre()));
+        actual.setHorarioCierreSabado(valorOrFallback(cambios.getHorarioCierreSabado(), actual.getHorarioCierreSabado()));
+        actual.setAbreSabado(cambios.isAbreSabado());
+        actual.setAbreDomingo(cambios.isAbreDomingo());
         return configuracionRepository.save(actual);
     }
 
@@ -43,14 +49,26 @@ public class ConfiguracionService {
 
     public Map<String, Object> construirRespuesta() {
         ConfiguracionEntity actual = obtener();
+
+        // Defaults para datos viejos sin horario configurado todavia.
+        String apertura = actual.getHorarioApertura() != null ? actual.getHorarioApertura() : "09:00";
+        String cierre = actual.getHorarioCierre() != null ? actual.getHorarioCierre() : "21:00";
+        String cierreSabado = actual.getHorarioCierreSabado() != null ? actual.getHorarioCierreSabado() : "14:00";
+
+        Map<String, Object> centro = new java.util.HashMap<>();
+        centro.put("nombreNegocio", actual.getNombreNegocio());
+        centro.put("telefono", actual.getTelefono());
+        centro.put("email", actual.getEmail());
+        centro.put("direccion", actual.getDireccion());
+        centro.put("politicaFotos", actual.getPoliticaFotos());
+        centro.put("horarioApertura", apertura);
+        centro.put("horarioCierre", cierre);
+        centro.put("horarioCierreSabado", cierreSabado);
+        centro.put("abreSabado", actual.isAbreSabado());
+        centro.put("abreDomingo", actual.isAbreDomingo());
+
         return Map.of(
-                "centro", Map.of(
-                        "nombreNegocio", actual.getNombreNegocio(),
-                        "telefono", actual.getTelefono(),
-                        "email", actual.getEmail(),
-                        "direccion", actual.getDireccion(),
-                        "politicaFotos", actual.getPoliticaFotos()
-                ),
+                "centro", centro,
                 "comunicacion", Map.of(
                         "emailRecordatorio", actual.isEmailRecordatorio(),
                         "horasAntelacionRecordatorio", actual.getHorasAntelacionRecordatorio()
@@ -68,6 +86,11 @@ public class ConfiguracionService {
                 .politicaFotos("Las fotos de clientes solo podrán usarse con consentimiento expreso y podrán eliminarse a petición del cliente.")
                 .emailRecordatorio(true)
                 .horasAntelacionRecordatorio(24)
+                .horarioApertura("09:00")
+                .horarioCierre("21:00")
+                .horarioCierreSabado("14:00")
+                .abreSabado(true)
+                .abreDomingo(false)
                 .build();
         return configuracionRepository.save(inicial);
     }

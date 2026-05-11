@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.marcog.peluqueria.chatbot.domain.port.out.BusinessContextPort;
+import com.marcog.peluqueria.configuracion.application.service.ConfiguracionService;
+import com.marcog.peluqueria.configuracion.infrastructure.out.persistence.ConfiguracionEntity;
 import com.marcog.peluqueria.ofertas.domain.model.Oferta;
 import com.marcog.peluqueria.ofertas.domain.port.out.OfertaRepositoryPort;
 import com.marcog.peluqueria.peluqueros.domain.model.Peluquero;
@@ -39,6 +41,7 @@ public class BusinessContextLoader implements BusinessContextPort {
     private final ProductoRepositoryPort productoRepository;
     private final PeluqueroRepositoryPort peluqueroRepository;
     private final OfertaRepositoryPort ofertaRepository;
+    private final ConfiguracionService configuracionService;
     // ObjectMapper inyectado de Spring (autoconfigurado, con modulo JavaTime)
     // en lugar de new ObjectMapper() para mantener configuracion consistente.
     private final ObjectMapper mapper;
@@ -77,16 +80,24 @@ public class BusinessContextLoader implements BusinessContextPort {
     // ── Construccion del JSON ───────────────────────────────────────
 
     private ObjectNode construirNegocio() {
+        // Lee la configuracion del centro desde BD para que los datos del chatbot
+        // (horario, telefono, email, direccion) reflejen lo que el admin ha guardado.
+        ConfiguracionEntity config = configuracionService.obtener();
+
         ObjectNode negocio = mapper.createObjectNode();
-        negocio.put("nombre", "Peluquería Isabella");
-        negocio.put("direccion", "Calle Principal 15, Madrid");
-        negocio.put("telefono", "+34 600 123 456");
-        negocio.put("email", "admin@peluqueria.com");
+        negocio.put("nombre", config.getNombreNegocio());
+        negocio.put("direccion", config.getDireccion());
+        negocio.put("telefono", config.getTelefono());
+        negocio.put("email", config.getEmail());
 
         ObjectNode horario = mapper.createObjectNode();
-        horario.put("lunesViernes", "09:00 - 21:00");
-        horario.put("sabado", "09:00 - 14:00");
-        horario.put("domingo", "Cerrado");
+        String apertura = config.getHorarioApertura() != null ? config.getHorarioApertura() : "09:00";
+        String cierre = config.getHorarioCierre() != null ? config.getHorarioCierre() : "21:00";
+        String cierreSabado = config.getHorarioCierreSabado() != null ? config.getHorarioCierreSabado() : "14:00";
+
+        horario.put("lunesViernes", apertura + " - " + cierre);
+        horario.put("sabado", config.isAbreSabado() ? (apertura + " - " + cierreSabado) : "Cerrado");
+        horario.put("domingo", config.isAbreDomingo() ? (apertura + " - " + cierreSabado) : "Cerrado");
         negocio.set("horario", horario);
 
         return negocio;

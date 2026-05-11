@@ -34,6 +34,12 @@ interface ConfigCentro {
   email: string
   direccion: string
   politicaFotos: string
+  // Horario laboral del salon. El admin lo configura aqui y se aplica en agenda y calendarios.
+  horarioApertura: string         // formato HH:mm, ej "09:00"
+  horarioCierre: string           // formato HH:mm, ej "21:00"
+  horarioCierreSabado: string     // formato HH:mm, ej "14:00"
+  abreSabado: boolean
+  abreDomingo: boolean
 }
 
 interface ConfigComunicacion {
@@ -48,6 +54,8 @@ const ofertas     = ref<Oferta[]>([])
 const dias        = ref<DiaEspecial[]>([])
 const configCentro = ref<ConfigCentro>({
   nombreNegocio: '', telefono: '', email: '', direccion: '', politicaFotos: '',
+  horarioApertura: '09:00', horarioCierre: '21:00',
+  horarioCierreSabado: '14:00', abreSabado: true, abreDomingo: false,
 })
 const configComun = ref<ConfigComunicacion>({
   emailRecordatorio: true, horasAntelacionRecordatorio: 24,
@@ -263,6 +271,39 @@ async function eliminarDia(id: number) {
             <label class="label">Dirección</label>
             <input v-model="configCentro.direccion" type="text" class="input" />
           </div>
+
+          <!-- ── Horario laboral del salón ─────────────────── -->
+          <div class="pt-4 border-t border-outline-variant/20 space-y-4">
+            <h4 class="text-sm font-bold text-on-surface uppercase tracking-wider">
+              Horario laboral
+            </h4>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="label">Apertura (L-V)</label>
+                <input v-model="configCentro.horarioApertura" type="time" class="input" />
+              </div>
+              <div>
+                <label class="label">Cierre (L-V)</label>
+                <input v-model="configCentro.horarioCierre" type="time" class="input" />
+              </div>
+            </div>
+
+            <label class="flex items-center gap-2 text-sm">
+              <input v-model="configCentro.abreSabado" type="checkbox" class="rounded" />
+              <span>Abrimos sábados</span>
+            </label>
+            <div v-if="configCentro.abreSabado">
+              <label class="label">Cierre del sábado</label>
+              <input v-model="configCentro.horarioCierreSabado" type="time" class="input" />
+            </div>
+
+            <label class="flex items-center gap-2 text-sm">
+              <input v-model="configCentro.abreDomingo" type="checkbox" class="rounded" />
+              <span>Abrimos domingos</span>
+            </label>
+          </div>
+
           <button
             type="submit"
             class="w-full bg-primary-container text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-primary-container/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"

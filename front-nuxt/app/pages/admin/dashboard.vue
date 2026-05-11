@@ -218,7 +218,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-6">
+  <div class="space-y-6">
 
     <!-- ══════════════════════════════════════════════════════
          FILTROS SUPERIORES
@@ -243,7 +243,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
     </div>
 
     <!-- LOADER -->
-    <div v-if="cargando" class="flex-1 flex items-center justify-center">
+    <div v-if="cargando" class="min-h-[300px] flex items-center justify-center">
       <Loader2 class="w-8 h-8 animate-spin text-primary" />
     </div>
 

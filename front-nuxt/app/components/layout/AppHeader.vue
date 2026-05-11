@@ -5,13 +5,15 @@
  * Izquierda: búsqueda global (rounded-full, fondo gris)
  * Derecha: notificaciones (campana con contador WS), ajustes, divisor, nombre usuario + avatar
  */
-import { Bell, Settings } from 'lucide-vue-next'
+import { Bell, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
+import { useSidebarCollapsed } from '~/modules/shared/composables/useSidebarCollapsed'
 
 const authStore = useAuthStore()
 const route     = useRoute()
 const router    = useRouter()
 
 const { noLeidos, conteo, conectar, limpiarConteo } = useNotificacionesChat()
+const { collapsed, toggle: toggleSidebar } = useSidebarCollapsed()
 
 // Conectar al WebSocket al montar el header
 onMounted(() => conectar())
@@ -54,6 +56,19 @@ function formatHora(timestamp: number): string {
 
 <template>
   <header class="h-16 flex-shrink-0 flex items-center justify-between px-8">
+
+    <!-- Boton para colapsar / expandir el sidebar -->
+    <button
+      class="p-2 rounded-lg text-on-surface-variant
+             hover:text-primary-container hover:bg-surface-container-low
+             transition-colors"
+      :aria-label="collapsed ? 'Expandir menú lateral' : 'Colapsar menú lateral'"
+      :aria-pressed="collapsed"
+      @click="toggleSidebar"
+    >
+      <PanelLeftOpen v-if="collapsed" class="w-5 h-5" aria-hidden="true" />
+      <PanelLeftClose v-else class="w-5 h-5" aria-hidden="true" />
+    </button>
 
     <div class="flex-1" />
 
@@ -157,8 +172,9 @@ function formatHora(timestamp: number): string {
         </Transition>
       </div>
 
-      <!-- Ajustes rápidos -->
+      <!-- Ajustes (solo admin) -->
       <button
+        v-if="authStore.isAdmin"
         class="p-2 rounded-lg text-on-surface-variant
                hover:text-primary-container hover:bg-surface-container-low
                transition-colors"

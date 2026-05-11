@@ -35,6 +35,11 @@ public class ConfiguracionController {
                 .email(request.getEmail())
                 .direccion(request.getDireccion())
                 .politicaFotos(request.getPoliticaFotos())
+                .horarioApertura(request.getHorarioApertura())
+                .horarioCierre(request.getHorarioCierre())
+                .horarioCierreSabado(request.getHorarioCierreSabado())
+                .abreSabado(Boolean.TRUE.equals(request.getAbreSabado()))
+                .abreDomingo(Boolean.TRUE.equals(request.getAbreDomingo()))
                 .build();
         configuracionService.guardarCentro(cambios);
         return ResponseEntity.ok(configuracionService.construirRespuesta());
@@ -56,6 +61,12 @@ public class ConfiguracionController {
         private String email;
         private String direccion;
         private String politicaFotos;
+        // Horario laboral del salon
+        private String horarioApertura;
+        private String horarioCierre;
+        private String horarioCierreSabado;
+        private Boolean abreSabado;
+        private Boolean abreDomingo;
     }
 
     @Data

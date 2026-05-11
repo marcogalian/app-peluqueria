@@ -40,4 +40,21 @@ public class ConfiguracionEntity {
 
     @Column(name = "horas_antelacion_recordatorio", nullable = false)
     private Integer horasAntelacionRecordatorio;
+
+    // ── Horario laboral del salon ────────────────────────────
+    // Hora apertura/cierre de lunes a viernes en formato HH:mm.
+    @Column(name = "horario_apertura", length = 5)
+    private String horarioApertura;
+
+    @Column(name = "horario_cierre", length = 5)
+    private String horarioCierre;
+
+    @Column(name = "horario_cierre_sabado", length = 5)
+    private String horarioCierreSabado;
+
+    @Column(name = "abre_sabado")
+    private boolean abreSabado;
+
+    @Column(name = "abre_domingo")
+    private boolean abreDomingo;
 }

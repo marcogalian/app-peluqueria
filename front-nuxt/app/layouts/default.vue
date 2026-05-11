@@ -7,7 +7,7 @@ import ToastContainer from '~/modules/shared/components/ToastContainer.vue'
     <AppSidebar />
     <div class="flex flex-col flex-1 overflow-hidden">
       <AppHeader />
-      <main class="flex-1 overflow-y-auto bg-surface rounded-tl-[28px]">
+      <main class="flex-1 overflow-y-auto bg-surface">
         <div class="min-h-full px-8 pt-8 pb-14 lg:pb-16">
           <slot />
         </div>
