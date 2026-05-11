@@ -14,6 +14,7 @@ import {
   Phone, Mail, Loader2, ChevronRight,
   Upload, X, ZoomIn, Trash2, CalendarDays, Scissors,
 } from 'lucide-vue-next'
+import { useToast } from '~/modules/shared/composables/useToast'
 import type {
   Cliente,
   FotoCliente,
@@ -24,6 +25,7 @@ import type {
 definePageMeta({ middleware: ['auth', 'admin'] })
 
 const config = useRuntimeConfig()
+const toast = useToast()
 
 // ── Estado ────────────────────────────────────────────────
 const clientes    = ref<Cliente[]>([])
@@ -341,6 +343,9 @@ async function guardarCliente() {
       clientes.value.unshift(data)
     }
     modalClienteAbierto.value = false
+    toast.success(clienteEditandoId.value ? 'Cliente actualizado' : 'Cliente creado')
+  } catch {
+    toast.error('Error al guardar el cliente')
   } finally {
     guardandoCliente.value = false
   }
