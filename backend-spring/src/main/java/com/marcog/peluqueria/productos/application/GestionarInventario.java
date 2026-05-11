@@ -8,6 +8,7 @@ import com.marcog.peluqueria.productos.domain.CategoriaProducto;
 import com.marcog.peluqueria.productos.domain.Producto;
 import com.marcog.peluqueria.productos.application.GestionarProducto;
 import com.marcog.peluqueria.productos.domain.ProductoRepository;
+import com.marcog.peluqueria.productos.domain.GeneroProducto;
 import com.marcog.peluqueria.productos.infrastructure.persistence.JpaProductoRepository;
 import com.marcog.peluqueria.productos.infrastructure.persistence.JpaVentaProductoRepository;
 import com.marcog.peluqueria.productos.infrastructure.persistence.JpaVentaRepository;
@@ -60,6 +61,7 @@ public class GestionarInventario implements GestionarProducto {
     @Override
     @CacheEvict(value = "productos", allEntries = true)
     public Producto crear(Producto producto) {
+        aplicarDefaults(producto);
         producto.setActivo(true);
         return repository.guardar(producto);
     }
@@ -78,6 +80,12 @@ public class GestionarInventario implements GestionarProducto {
         if (detalles.getCategoria() != null)       existente.setCategoria(detalles.getCategoria());
         if (detalles.getImageUrl() != null)        existente.setImageUrl(detalles.getImageUrl());
         return repository.guardar(existente);
+    }
+
+    private void aplicarDefaults(Producto producto) {
+        if (producto.getGenero() == null) producto.setGenero(GeneroProducto.UNISEX);
+        if (producto.getStock() == null) producto.setStock(0);
+        if (producto.getStockMinimo() == null) producto.setStockMinimo(5);
     }
 
     @Override

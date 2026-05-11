@@ -15,6 +15,7 @@ interface Producto {
   id: string
   nombre: string
   categoria: string
+  genero: 'MASCULINO' | 'FEMENINO' | 'UNISEX'
   precio: number
   precioDescuento: number | null
   stock: number
@@ -127,7 +128,7 @@ onMounted(async () => {
 
 // ── Acciones ──────────────────────────────────────────────
 function abrirCrear() {
-  productoEditar.value = { categoria: 'OTRO', precio: 0, stock: 0, stockMinimo: 5, activo: true }
+  productoEditar.value = { categoria: 'OTRO', genero: 'UNISEX', precio: 0, stock: 0, stockMinimo: 5, activo: true }
   drawerAbierto.value = true
 }
 
@@ -150,11 +151,21 @@ async function guardar() {
     }
     drawerAbierto.value = false
     toast.success(productoEditar.value.id ? 'Producto actualizado' : 'Producto creado')
-  } catch {
-    toast.error('Error al guardar el producto')
+  } catch (error) {
+    toast.error(mensajeErrorProducto(error))
   } finally {
     guardando.value = false
   }
+}
+
+function mensajeErrorProducto(error: unknown): string {
+  const responseData = (error as { response?: { data?: unknown } })?.response?.data
+  if (typeof responseData === 'string' && responseData.trim()) return responseData
+  if (responseData && typeof responseData === 'object') {
+    const data = responseData as { message?: string, error?: string, detail?: string }
+    return data.message || data.detail || data.error || 'Error al guardar el producto'
+  }
+  return 'Error al guardar el producto'
 }
 
 async function eliminar(id: string) {
