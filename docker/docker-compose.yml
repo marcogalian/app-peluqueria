@@ -36,6 +36,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       CHAT_AES_KEY: ${CHAT_AES_KEY}
+      APP_DEMO_PASSWORD: ${APP_DEMO_PASSWORD}
     volumes:
       - uploads_data:/app/uploads
     depends_on:

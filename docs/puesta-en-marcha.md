@@ -1,4 +1,4 @@
-# Arranque y configuracion
+# Puesta en marcha
 
 ## Requisitos
 
@@ -27,18 +27,19 @@ Existe un ejemplo en:
 docker/.env.example
 ```
 
-Variables principales:
+Variables principales. El repositorio solo incluye nombres de variables y placeholders, no credenciales reales.
 
 | Variable | Uso |
 |---|---|
 | `DB_USER` | Usuario PostgreSQL |
-| `DB_PASSWORD` | Password PostgreSQL |
+| `DB_PASSWORD` | Contrasena PostgreSQL |
 | `DB_NAME` | Nombre de base de datos |
 | `JWT_SECRET_KEY` | Clave para firmar JWT |
 | `CHAT_AES_KEY` | Clave AES para chat interno |
 | `MAILTRAP_USERNAME` | Usuario Mailtrap |
-| `MAILTRAP_PASSWORD` | Password Mailtrap |
+| `MAILTRAP_PASSWORD` | Contrasena Mailtrap |
 | `GEMINI_API_KEY` | Clave del asistente IA |
+| `APP_DEMO_PASSWORD` | Contrasena local para usuarios demo |
 
 ## Arranque con Docker
 
@@ -107,12 +108,7 @@ npm run dev
 
 ## Usuarios demo
 
-| Usuario | Contrasena | Rol |
-|---|---|---|
-| `admin` | `1234` | Administrador |
-| `sofia` | `1234` | Empleada |
-| `carmen` | `1234` | Empleada |
-| `lucia` | `1234` | Empleada |
+El backend crea usuarios demo en el primer arranque. Sus nombres de usuario son visibles en el seed, pero la contrasena se lee desde `APP_DEMO_PASSWORD` y no se documenta en el repositorio publico.
 
 ## Datos iniciales
 

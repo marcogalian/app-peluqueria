@@ -14,9 +14,9 @@ describe('authService', () => {
     const mockResponse = { token: 'abc.def.ghi', refreshToken: 'refresh123' }
     vi.mocked(api.post).mockResolvedValue({ data: mockResponse })
 
-    const result = await authService.login({ username: 'admin', password: '1234' })
+    const result = await authService.login({ username: 'admin', password: 'test-demo-password' })
 
-    expect(api.post).toHaveBeenCalledWith('/auth/login', { username: 'admin', password: '1234' })
+    expect(api.post).toHaveBeenCalledWith('/auth/login', { username: 'admin', password: 'test-demo-password' })
     expect(result).toEqual(mockResponse)
   })
 

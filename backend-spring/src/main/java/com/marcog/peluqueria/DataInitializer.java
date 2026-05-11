@@ -47,6 +47,8 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder        passwordEncoder;
     @Value("${app.seed.remote-clients.enabled:true}")
     private boolean remoteClientsEnabled;
+    @Value("${app.seed.demo-password:}")
+    private String demoPassword;
 
     @Override
     public void run(String... args) {
@@ -73,7 +75,7 @@ public class DataInitializer implements CommandLineRunner {
 
         userRepository.save(UserEntity.builder()
                 .username("admin")
-                .password(passwordEncoder.encode("1234"))
+                .password(passwordEncoder.encode(requireDemoPassword()))
                 .role(Role.ROLE_ADMIN)
                 .email("admin@peluqueria.com")
                 .active(true)
@@ -94,7 +96,7 @@ public class DataInitializer implements CommandLineRunner {
         for (P p : datos) {
             UserEntity u = userRepository.save(UserEntity.builder()
                     .username(p.user())
-                    .password(passwordEncoder.encode("1234"))
+                    .password(passwordEncoder.encode(requireDemoPassword()))
                     .role(Role.ROLE_HAIRDRESSER)
                     .email(p.user() + "@peluqueria.com")
                     .active(true)
@@ -112,6 +114,14 @@ public class DataInitializer implements CommandLineRunner {
                     .build());
         }
         log.info("DataInitializer: 3 peluqueras demo creadas.");
+    }
+
+    private String requireDemoPassword() {
+        if (demoPassword == null || demoPassword.isBlank()) {
+            throw new IllegalStateException(
+                    "APP_DEMO_PASSWORD debe estar configurada para crear usuarios demo.");
+        }
+        return demoPassword;
     }
 
     private void crearServicios() {

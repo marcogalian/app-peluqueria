@@ -11,7 +11,6 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 - [Arquitectura](#arquitectura)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Arranque rapido](#arranque-rapido)
-- [Usuarios demo](#usuarios-demo)
 - [Documentacion](#documentacion)
 - [Comandos utiles](#comandos-utiles)
 
@@ -114,9 +113,7 @@ peluqueria/
 ├── backend-spring/       # API Spring Boot
 ├── front-nuxt/           # Aplicacion Nuxt
 ├── docker/               # Docker Compose y variables de entorno
-├── docs/                 # Documentacion funcional y tecnica
-├── specs/                # Especificaciones y decisiones de arquitectura
-└── plan-*.md             # Planes de mejora y release
+└── docs/                 # Puesta en marcha publica
 ```
 
 ## Arranque rapido
@@ -160,25 +157,11 @@ npm install
 npm run dev
 ```
 
-## Usuarios demo
-
-| Usuario | Contrasena | Rol |
-|---|---|---|
-| `admin` | `1234` | Administrador |
-| `sofia` | `1234` | Empleada |
-| `carmen` | `1234` | Empleada |
-| `lucia` | `1234` | Empleada |
-
 ## Documentacion
 
-- [Guia funcional](docs/guia-funcional.md)
-- [Guia tecnica](docs/guia-tecnica.md)
-- [Arranque y configuracion](docs/arranque-y-configuracion.md)
-- [Pruebas y validacion](docs/pruebas-y-validacion.md)
-- [Javadoc y documentacion de codigo](docs/javadoc.md)
-- [Arquitectura backend](specs/arquitectura-backend-hexagonal.md)
-- [Arquitectura frontend](specs/arquitectura-frontend-vertical-slicing.md)
-- [Memoria de progreso](specs/memoria_progreso_2026-05-09.md)
+- [Puesta en marcha](docs/puesta-en-marcha.md)
+
+Las credenciales demo y notas internas se mantienen fuera del repositorio publico, dentro de `documentacion-no-github/`.
 
 ## Comandos utiles
 
