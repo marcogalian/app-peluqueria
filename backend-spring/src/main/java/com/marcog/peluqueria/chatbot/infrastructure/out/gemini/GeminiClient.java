@@ -31,9 +31,10 @@ public class GeminiClient {
     private String model;
 
     private static final List<String> FALLBACK_MODELS = List.of(
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
         "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-1.5-flash-latest"
+        "gemini-2.0-flash-lite"
     );
 
     public GeminiClient(@Qualifier("geminiRestTemplate") RestTemplate restTemplate) {

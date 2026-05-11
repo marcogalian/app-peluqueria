@@ -45,7 +45,6 @@ watch(messages, () => {
         </div>
         <div>
           <h1 class="text-xl font-bold text-on-surface">Asistente IA</h1>
-          <p class="text-sm text-on-surface-variant">Powered by Gemini 2.0 Flash</p>
         </div>
       </div>
       <button

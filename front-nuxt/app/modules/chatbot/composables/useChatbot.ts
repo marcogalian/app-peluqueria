@@ -23,10 +23,15 @@ export function useChatbot() {
       })
       messages.value.push({ role: 'assistant', content: data.reply })
       suggestedQuestions.value = data.suggestedQuestions || []
-    } catch {
+    } catch (err: any) {
+      const status = err?.response?.status
+      const detail = err?.response?.data?.message || err?.message || 'sin detalles'
+      console.error('[Chatbot] Error:', status, detail)
       messages.value.push({
         role: 'assistant',
-        content: 'Lo siento, no puedo responder ahora. Inténtalo de nuevo.',
+        content: status
+          ? `Error ${status}: ${detail}`
+          : 'No se pudo conectar con el servidor. ¿Está arrancado el backend?',
       })
     } finally {
       loading.value = false
