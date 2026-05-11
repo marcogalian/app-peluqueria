@@ -1,6 +1,6 @@
 package com.marcog.peluqueria.security.infrastructure.config;
 
-import com.marcog.peluqueria.security.infrastructure.out.persistence.JpaUserRepository;
+import com.marcog.peluqueria.security.infrastructure.persistence.JpaUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

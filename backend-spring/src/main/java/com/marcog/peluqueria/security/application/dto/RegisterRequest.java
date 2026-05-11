@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
  * El campo role fue eliminado deliberadamente: el endpoint es publico y
  * permitir asignar rol desde el cliente expondria una via de escalada de
  * privilegios (cualquiera podria registrarse como ROLE_ADMIN).
- * El rol se asigna siempre a ROLE_HAIRDRESSER en AuthenticationService.
+ * El rol se asigna siempre a ROLE_HAIRDRESSER en autenticarUsuario.
  */
 @Data
 @Builder

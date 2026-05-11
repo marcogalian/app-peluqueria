@@ -1,6 +1,6 @@
 package com.marcog.peluqueria.security.infrastructure.config;
 
-import com.marcog.peluqueria.security.infrastructure.out.persistence.UserEntity;
+import com.marcog.peluqueria.security.infrastructure.persistence.UserEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

@@ -1,7 +1,7 @@
 package com.marcog.peluqueria.productos.application.dto;
 
-import com.marcog.peluqueria.productos.domain.model.MetodoPago;
-import com.marcog.peluqueria.productos.domain.model.Producto;
+import com.marcog.peluqueria.productos.domain.MetodoPago;
+import com.marcog.peluqueria.productos.domain.Producto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

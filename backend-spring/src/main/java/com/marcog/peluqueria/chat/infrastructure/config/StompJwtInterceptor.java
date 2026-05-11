@@ -2,8 +2,8 @@ package com.marcog.peluqueria.chat.infrastructure.config;
 
 import com.marcog.peluqueria.security.infrastructure.config.CustomUserDetails;
 import com.marcog.peluqueria.security.infrastructure.config.JwtService;
-import com.marcog.peluqueria.security.infrastructure.out.persistence.JpaUserRepository;
-import com.marcog.peluqueria.security.infrastructure.out.persistence.UserEntity;
+import com.marcog.peluqueria.security.infrastructure.persistence.JpaUserRepository;
+import com.marcog.peluqueria.security.infrastructure.persistence.UserEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
