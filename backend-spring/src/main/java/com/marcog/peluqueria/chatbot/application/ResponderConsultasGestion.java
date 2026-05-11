@@ -162,6 +162,9 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
     private ChatResponse responderConsultaDirecta(ChatRequest request, UUID peluqueroId, boolean isAdmin) {
         String mensaje = normalizar(request.getMessage());
         if (!esConsultaClientesVip(mensaje)) {
+            if (esConsultaTotalClientes(mensaje)) {
+                return responderTotalClientes(peluqueroId, isAdmin);
+            }
             return null;
         }
 
@@ -181,6 +184,29 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
 
     private boolean esConsultaClientesVip(String mensaje) {
         return mensaje.contains("cliente") && mensaje.contains("vip");
+    }
+
+    private boolean esConsultaTotalClientes(String mensaje) {
+        return mensaje.contains("cliente")
+                && (mensaje.contains("total")
+                || mensaje.contains("cuanto")
+                || mensaje.contains("cuantos")
+                || mensaje.contains("cantidad"));
+    }
+
+    private ChatResponse responderTotalClientes(UUID peluqueroId, boolean isAdmin) {
+        if (!isAdmin) {
+            return ChatResponse.builder()
+                    .reply("Solo el administrador puede consultar el total de clientes.")
+                    .suggestedQuestions(List.of(
+                            "¿Cuántas citas tengo hoy?",
+                            "¿Qué vacaciones tengo aprobadas?"
+                    ))
+                    .build();
+        }
+
+        String resultadoFuncion = functionExecutor.execute("getTotalClientes", null, peluqueroId, true);
+        return formatearTotalClientes(resultadoFuncion);
     }
 
     private ChatResponse formatearClientesVip(String resultadoFuncion) {
@@ -221,6 +247,37 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
             return ChatResponse.builder()
                     .reply("No he podido leer el listado de clientes VIP ahora mismo.")
                     .suggestedQuestions(List.of("¿Cuántos clientes tenemos en total?", "¿Qué servicios tenemos?"))
+                    .build();
+        }
+    }
+
+    private ChatResponse formatearTotalClientes(String resultadoFuncion) {
+        try {
+            JsonNode raiz = MAPPER.readTree(resultadoFuncion);
+            if (raiz.has("error")) {
+                return ChatResponse.builder()
+                        .reply("No he podido consultar el total de clientes ahora mismo.")
+                        .suggestedQuestions(List.of("¿Quiénes son los clientes VIP?", "¿Qué servicios tenemos?"))
+                        .build();
+            }
+
+            int activos = raiz.path("activos").asInt(0);
+            int archivados = raiz.path("archivados").asInt(0);
+            int vip = raiz.path("vip").asInt(0);
+
+            return ChatResponse.builder()
+                    .reply("En Peluquería Isabella tenemos " + activos + " clientes activos, "
+                            + vip + " VIP y " + archivados + " archivados.")
+                    .suggestedQuestions(List.of(
+                            "¿Quiénes son los clientes VIP?",
+                            "¿Qué servicios tenemos?",
+                            "¿Qué productos tienen bajo stock?"
+                    ))
+                    .build();
+        } catch (Exception ex) {
+            return ChatResponse.builder()
+                    .reply("No he podido leer el total de clientes ahora mismo.")
+                    .suggestedQuestions(List.of("¿Quiénes son los clientes VIP?", "¿Qué servicios tenemos?"))
                     .build();
         }
     }

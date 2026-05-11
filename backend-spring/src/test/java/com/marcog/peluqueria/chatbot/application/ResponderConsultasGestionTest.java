@@ -137,6 +137,21 @@ class ResponderConsultasGestionTest {
     }
 
     @Test
+    @DisplayName("Consulta total clientes: responde desde funcion directa sin depender del modelo")
+    void chat_totalClientes_respuestaDirecta() {
+        when(functionExecutor.execute(eq("getTotalClientes"), any(), any(), eq(true)))
+                .thenReturn("{\"activos\":30,\"archivados\":2,\"vip\":4}");
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("Cuantos clientes tenemos en total?"), adminUser);
+
+        assertEquals("En Peluquería Isabella tenemos 30 clientes activos, 4 VIP y 2 archivados.",
+                respuesta.getReply());
+        verify(functionExecutor).execute(eq("getTotalClientes"), any(), any(), eq(true));
+        verify(llmClient, never()).generateContent(any(), any(), any(), anyList());
+    }
+
+    @Test
     @DisplayName("Empleado solo recibe 2 tools (citas + vacaciones)")
     void chat_empleado_pasaSolo2Tools() {
         when(llmClient.generateContent(any(), any(), any(),
