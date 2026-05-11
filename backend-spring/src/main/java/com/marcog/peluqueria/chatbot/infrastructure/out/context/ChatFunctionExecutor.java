@@ -6,6 +6,8 @@ import com.marcog.peluqueria.citas.domain.model.Cita;
 import com.marcog.peluqueria.citas.domain.port.out.CitaRepositoryPort;
 import com.marcog.peluqueria.ausencias.domain.model.SolicitudAusencia;
 import com.marcog.peluqueria.ausencias.domain.port.out.AusenciaRepositoryPort;
+import com.marcog.peluqueria.clientes.domain.model.Cliente;
+import com.marcog.peluqueria.clientes.domain.port.out.ClienteRepository;
 import com.marcog.peluqueria.finanzas.application.service.FinanzasDashboardService;
 import com.marcog.peluqueria.finanzas.domain.model.DashboardStats;
 import com.marcog.peluqueria.productos.domain.model.Producto;
@@ -36,6 +38,7 @@ public class ChatFunctionExecutor {
     private final FinanzasDashboardService dashboardService;
     private final JpaVentaProductoRepository ventaProductoRepository;
     private final ProductoRepositoryPort productoRepository;
+    private final ClienteRepository clienteRepository;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public String execute(String functionName, JsonNode args, UUID peluqueroId, boolean isAdmin) {
@@ -62,6 +65,14 @@ public class ChatFunctionExecutor {
                 case "getInventario" -> {
                     if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar inventario\"}";
                     yield getInventario();
+                }
+                case "getClientesVip" -> {
+                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar clientes\"}";
+                    yield getClientesVip();
+                }
+                case "getTotalClientes" -> {
+                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar clientes\"}";
+                    yield getTotalClientes();
                 }
                 default -> "{\"error\": \"Funcion no reconocida: " + functionName + "\"}";
             };
@@ -181,6 +192,37 @@ public class ChatFunctionExecutor {
             return mapper.writeValueAsString(Map.of("productosStockBajo", stockBajo, "total", stockBajo.size()));
         } catch (Exception e) {
             return "{\"error\": \"Error serializando productos\"}";
+        }
+    }
+
+    private String getClientesVip() {
+        List<Cliente> vips = clienteRepository.findByFiltros(null, true, false);
+        List<Map<String, Object>> detalle = vips.stream()
+                .map(c -> Map.<String, Object>of(
+                        "nombre", c.getNombre() + " " + (c.getApellidos() != null ? c.getApellidos() : ""),
+                        "telefono", c.getTelefono() != null ? c.getTelefono() : "",
+                        "descuento", c.getDescuentoPorcentaje() != null ? c.getDescuentoPorcentaje() : 0
+                ))
+                .collect(Collectors.toList());
+        try {
+            return mapper.writeValueAsString(Map.of("totalVip", vips.size(), "clientes", detalle));
+        } catch (Exception e) {
+            return "{\"error\": \"Error serializando VIPs\"}";
+        }
+    }
+
+    private String getTotalClientes() {
+        List<Cliente> activos = clienteRepository.findAllByArchivado(false);
+        List<Cliente> archivados = clienteRepository.findAllByArchivado(true);
+        long vips = activos.stream().filter(Cliente::isEsVip).count();
+        try {
+            return mapper.writeValueAsString(Map.of(
+                    "activos", activos.size(),
+                    "archivados", archivados.size(),
+                    "vip", vips
+            ));
+        } catch (Exception e) {
+            return "{\"error\": \"Error serializando clientes\"}";
         }
     }
 

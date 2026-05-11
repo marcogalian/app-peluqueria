@@ -163,6 +163,18 @@ public class ChatbotService {
                     "description", "Obtiene el inventario completo: numero total de productos distintos, unidades totales en stock y detalle por producto",
                     "parameters", Map.of("type", "object", "properties", Map.of())
             ));
+
+            tools.add(Map.of(
+                    "name", "getClientesVip",
+                    "description", "Obtiene el listado de clientes VIP con nombre, telefono y descuento personalizado",
+                    "parameters", Map.of("type", "object", "properties", Map.of())
+            ));
+
+            tools.add(Map.of(
+                    "name", "getTotalClientes",
+                    "description", "Obtiene el numero total de clientes (activos, archivados y cuantos son VIP)",
+                    "parameters", Map.of("type", "object", "properties", Map.of())
+            ));
         }
 
         return tools;
