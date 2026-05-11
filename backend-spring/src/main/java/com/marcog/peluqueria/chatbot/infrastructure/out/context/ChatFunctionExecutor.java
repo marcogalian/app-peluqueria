@@ -8,8 +8,8 @@ import com.marcog.peluqueria.ausencias.domain.model.SolicitudAusencia;
 import com.marcog.peluqueria.ausencias.domain.port.out.AusenciaRepositoryPort;
 import com.marcog.peluqueria.finanzas.application.service.FinanzasDashboardService;
 import com.marcog.peluqueria.finanzas.domain.model.DashboardStats;
-import com.marcog.peluqueria.productos.domain.model.Producto;
-import com.marcog.peluqueria.productos.domain.port.out.ProductoRepositoryPort;
+import com.marcog.peluqueria.productos.infrastructure.out.persistence.JpaVentaProductoRepository;
+import com.marcog.peluqueria.productos.infrastructure.out.persistence.VentaProductoEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,6 +18,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,7 +32,7 @@ public class ChatFunctionExecutor {
     private final CitaRepositoryPort citaRepository;
     private final AusenciaRepositoryPort ausenciaRepository;
     private final FinanzasDashboardService dashboardService;
-    private final ProductoRepositoryPort productoRepository;
+    private final JpaVentaProductoRepository ventaProductoRepository;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public String execute(String functionName, JsonNode args, UUID peluqueroId, boolean isAdmin) {
@@ -50,6 +51,10 @@ public class ChatFunctionExecutor {
                 case "getProductosStockBajo" -> {
                     if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar stock\"}";
                     yield getProductosStockBajo();
+                }
+                case "getProductosMasVendidos" -> {
+                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar ventas\"}";
+                    yield getProductosMasVendidos(args);
                 }
                 default -> "{\"error\": \"Funcion no reconocida: " + functionName + "\"}";
             };
@@ -156,21 +161,49 @@ public class ChatFunctionExecutor {
     }
 
     private String getProductosStockBajo() {
-        List<Producto> productos = productoRepository.findAll();
-        List<Map<String, Object>> stockBajo = productos.stream()
-                .filter(Producto::isActivo)
-                .filter(p -> p.getStock() != null && p.getStockMinimo() != null && p.getStock() <= p.getStockMinimo())
+        DashboardStats stats = dashboardService.getStatsByMesAndAnio(
+                LocalDate.now().getMonthValue(), LocalDate.now().getYear());
+        List<Map<String, Object>> stockBajo = stats.getProductosStats().getPocoStock().stream()
                 .map(p -> Map.<String, Object>of(
                         "nombre", p.getNombre(),
                         "stock", p.getStock(),
                         "stockMinimo", p.getStockMinimo()
                 ))
                 .collect(Collectors.toList());
-
         try {
             return mapper.writeValueAsString(Map.of("productosStockBajo", stockBajo, "total", stockBajo.size()));
         } catch (Exception e) {
             return "{\"error\": \"Error serializando productos\"}";
+        }
+    }
+
+    private String getProductosMasVendidos(JsonNode args) {
+        String periodo = args != null && args.has("periodo") ? args.get("periodo").asText() : "mes";
+        LocalDate hoy = LocalDate.now();
+        LocalDateTime inicio = switch (periodo) {
+            case "hoy"    -> hoy.atStartOfDay();
+            case "semana" -> hoy.with(DayOfWeek.MONDAY).atStartOfDay();
+            default       -> hoy.withDayOfMonth(1).atStartOfDay();
+        };
+        LocalDateTime fin = hoy.atTime(23, 59, 59);
+
+        List<VentaProductoEntity> ventas = ventaProductoRepository.findByFechaVentaBetween(inicio, fin);
+
+        Map<String, Integer> totales = new java.util.HashMap<>();
+        for (VentaProductoEntity v : ventas) {
+            totales.merge(v.getProductoNombre(), v.getCantidad() != null ? v.getCantidad() : 0, Integer::sum);
+        }
+
+        List<Map<String, Object>> ranking = totales.entrySet().stream()
+                .sorted(Comparator.<Map.Entry<String, Integer>>comparingByValue().reversed())
+                .limit(10)
+                .map(e -> Map.<String, Object>of("producto", e.getKey(), "unidadesVendidas", e.getValue()))
+                .collect(Collectors.toList());
+
+        try {
+            return mapper.writeValueAsString(Map.of("periodo", periodo, "ranking", ranking));
+        } catch (Exception e) {
+            return "{\"error\": \"Error serializando ranking\"}";
         }
     }
 }

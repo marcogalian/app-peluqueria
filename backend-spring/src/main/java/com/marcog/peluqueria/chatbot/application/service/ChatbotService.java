@@ -132,6 +132,18 @@ public class ChatbotService {
                     "description", "Obtiene los productos con stock por debajo del minimo",
                     "parameters", Map.of("type", "object", "properties", Map.of())
             ));
+
+            tools.add(Map.of(
+                    "name", "getProductosMasVendidos",
+                    "description", "Obtiene el ranking de productos mas vendidos por unidades en un periodo",
+                    "parameters", Map.of(
+                            "type", "object",
+                            "properties", Map.of(
+                                    "periodo", Map.of("type", "string", "description", "Periodo: hoy, semana o mes")
+                            ),
+                            "required", List.of("periodo")
+                    )
+            ));
         }
 
         return tools;
