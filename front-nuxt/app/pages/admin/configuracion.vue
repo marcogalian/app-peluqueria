@@ -3,7 +3,7 @@
  * Configuración — ajustes del centro, ofertas/promociones, días especiales y comunicación.
  * Diseño en bento grid de 12 columnas: 2 bloques grandes + 2 laterales.
  */
-import { Plus, Save, X, Loader2, Trash2 } from 'lucide-vue-next'
+import { Plus, Save, X, Loader2, Trash2, CalendarOff } from 'lucide-vue-next'
 import { useToast } from '~/modules/shared/composables/useToast'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
@@ -26,6 +26,13 @@ interface DiaEspecial {
   fecha: string
   nombre: string
   multiplicadorPrecio: number
+}
+
+interface DiaBloqueado {
+  id: string
+  fechaInicio: string
+  fechaFin: string
+  motivo: string
 }
 
 interface ConfigCentro {
@@ -52,6 +59,15 @@ const cargando    = ref(true)
 const guardando   = ref(false)
 const ofertas     = ref<Oferta[]>([])
 const dias        = ref<DiaEspecial[]>([])
+const diasBloqueados = ref<DiaBloqueado[]>([])
+
+// Form para añadir un nuevo dia bloqueado (todo en linea, sin modal)
+const formBloqueado = reactive({
+  fechaInicio: '',
+  fechaFin: '',
+  motivo: '',
+})
+const guardandoBloqueado = ref(false)
 const configCentro = ref<ConfigCentro>({
   nombreNegocio: '', telefono: '', email: '', direccion: '', politicaFotos: '',
   horarioApertura: '09:00', horarioCierre: '21:00',
@@ -72,15 +88,17 @@ const guardandoModal  = ref(false)
 onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
-    const [resOfertas, resDias, resConfig] = await Promise.all([
+    const [resOfertas, resDias, resConfig, resBloqueados] = await Promise.all([
       api.get('/v1/ofertas'),
       api.get('/v1/dias-especiales'),
       api.get('/configuracion'),
+      api.get('/v1/dias-bloqueados'),
     ])
     ofertas.value     = resOfertas.data
     dias.value        = resDias.data
     configCentro.value = resConfig.data.centro
     configComun.value  = resConfig.data.comunicacion
+    diasBloqueados.value = resBloqueados.data
   } catch { /* valores por defecto */ }
   finally { cargando.value = false }
 })
@@ -172,6 +190,48 @@ async function eliminarDia(id: number) {
   const { api } = await import('~/infrastructure/http/api')
   await api.delete(`/v1/dias-especiales/${id}`)
   dias.value = dias.value.filter(d => d.id !== id)
+}
+
+// ── Días bloqueados para vacaciones ──────────────────────
+async function anadirDiaBloqueado() {
+  if (!formBloqueado.fechaInicio) {
+    toast.error('Indica al menos la fecha de inicio')
+    return
+  }
+  guardandoBloqueado.value = true
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    const { data } = await api.post('/v1/dias-bloqueados', {
+      fechaInicio: formBloqueado.fechaInicio,
+      fechaFin: formBloqueado.fechaFin || formBloqueado.fechaInicio,
+      motivo: formBloqueado.motivo,
+    })
+    diasBloqueados.value.push(data)
+    formBloqueado.fechaInicio = ''
+    formBloqueado.fechaFin = ''
+    formBloqueado.motivo = ''
+    toast.success('Día bloqueado añadido')
+  } catch {
+    toast.error('No se pudo añadir el día bloqueado')
+  } finally {
+    guardandoBloqueado.value = false
+  }
+}
+
+async function eliminarDiaBloqueado(id: string) {
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.delete(`/v1/dias-bloqueados/${id}`)
+    diasBloqueados.value = diasBloqueados.value.filter(d => d.id !== id)
+    toast.success('Día bloqueado eliminado')
+  } catch {
+    toast.error('No se pudo eliminar el día bloqueado')
+  }
+}
+
+function formatearRangoFechas(d: DiaBloqueado): string {
+  if (d.fechaInicio === d.fechaFin) return d.fechaInicio
+  return `${d.fechaInicio} → ${d.fechaFin}`
 }
 </script>
 
@@ -358,7 +418,81 @@ async function eliminarDia(id: number) {
         </div>
       </section>
 
-      <!-- ── 4. Preferencias de Comunicación (4 cols) ──────── -->
+      <!-- ── 4. Días bloqueados para vacaciones (12 cols) ─── -->
+      <section class="col-span-12 card p-8">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+            <CalendarOff class="w-5 h-5 text-red-600" />
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-primary">Días bloqueados para vacaciones</h3>
+            <p class="text-sm text-on-surface-variant">
+              Fechas en las que ningún empleado puede solicitar vacaciones (eventos, picos de demanda, etc.)
+            </p>
+          </div>
+        </div>
+
+        <!-- Form para añadir nuevo bloqueo -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-5 p-4 bg-surface-container-low rounded-2xl">
+          <div class="md:col-span-3">
+            <label class="label">Fecha inicio</label>
+            <input v-model="formBloqueado.fechaInicio" type="date" class="input" />
+          </div>
+          <div class="md:col-span-3">
+            <label class="label">Fecha fin <span class="text-on-surface-variant/60">(opcional)</span></label>
+            <input v-model="formBloqueado.fechaFin" type="date" :min="formBloqueado.fechaInicio" class="input" />
+          </div>
+          <div class="md:col-span-4">
+            <label class="label">Motivo</label>
+            <input
+              v-model="formBloqueado.motivo"
+              type="text"
+              class="input"
+              placeholder="Ej: Black Friday, Navidad, evento especial..."
+            />
+          </div>
+          <div class="md:col-span-2 flex items-end">
+            <button
+              class="w-full bg-primary-container text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-40"
+              :disabled="guardandoBloqueado || !formBloqueado.fechaInicio"
+              @click="anadirDiaBloqueado"
+            >
+              <Loader2 v-if="guardandoBloqueado" class="w-4 h-4 animate-spin" />
+              <Plus v-else class="w-4 h-4" />
+              Añadir
+            </button>
+          </div>
+        </div>
+
+        <!-- Lista de días bloqueados -->
+        <div class="space-y-2">
+          <div
+            v-for="dia in diasBloqueados"
+            :key="dia.id"
+            class="flex items-center justify-between p-3 bg-red-50 border border-red-100 rounded-xl"
+          >
+            <div class="flex items-center gap-3">
+              <CalendarOff class="w-4 h-4 text-red-600 flex-shrink-0" />
+              <div>
+                <p class="font-bold text-red-700 text-sm">{{ formatearRangoFechas(dia) }}</p>
+                <p v-if="dia.motivo" class="text-xs text-red-600/80">{{ dia.motivo }}</p>
+              </div>
+            </div>
+            <button
+              class="p-2 rounded-lg hover:bg-red-100 text-red-600 transition-colors"
+              :aria-label="`Eliminar bloqueo del ${dia.fechaInicio}`"
+              @click="eliminarDiaBloqueado(dia.id)"
+            >
+              <Trash2 class="w-4 h-4" />
+            </button>
+          </div>
+          <div v-if="diasBloqueados.length === 0" class="text-center py-6 text-sm text-on-surface-variant">
+            No hay días bloqueados configurados
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 5. Preferencias de Comunicación (4 cols) ──────── -->
       <section class="col-span-12 lg:col-span-4 space-y-6">
 
         <!-- Comunicación -->

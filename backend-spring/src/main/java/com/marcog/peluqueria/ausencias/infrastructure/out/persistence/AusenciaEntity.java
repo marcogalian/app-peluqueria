@@ -29,4 +29,6 @@ public class AusenciaEntity {
     @CreationTimestamp @Column(name = "solicitada_en", updatable = false) private LocalDateTime solicitadaEn;
     @Column(name = "resuelta_en") private LocalDateTime resueltaEn;
     @Column(name = "motivo_rechazo", columnDefinition = "TEXT") private String motivoRechazo;
+
+    @Column(name = "vista_por_empleado", nullable = false) @Builder.Default private boolean vistaPorEmpleado = true;
 }

@@ -250,12 +250,12 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
     <template v-else>
 
       <!-- ══════════════════════════════════════════════════════
-           SECCIÓN 1 · FINANCIERO
+           SECCIÓN 1 · FINANCIERO  (KPIs arriba, gráfica debajo)
            ════════════════════════════════════════════════════ -->
-      <div class="flex flex-col xl:flex-row gap-6">
+      <div class="flex flex-col gap-6">
 
         <!-- Gráfica principal -->
-        <div class="card p-6 flex-1 flex flex-col min-h-[360px]">
+        <div class="card p-6 w-full flex flex-col min-h-[360px]">
           <div class="flex items-center justify-between mb-4">
             <div>
               <h3 class="text-base font-bold text-text-primary">Evolución mensual</h3>
@@ -297,8 +297,8 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
           </div>
         </div>
 
-        <!-- KPIs financieros laterales -->
-        <div class="w-full xl:w-72 flex flex-col gap-4">
+        <!-- KPIs financieros (fila de 3 abajo, full width) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
 
           <!-- Ingresos -->
           <div class="card-kpi flex items-center gap-4">

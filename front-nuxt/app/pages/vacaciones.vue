@@ -1,11 +1,23 @@
 <script setup lang="ts">
 /**
  * Vacaciones — empleado solicita ausencias, ve el estado de sus peticiones.
- * Reglas: vacaciones = mín. 7 días antelación, asuntos propios = 5 días.
+ *
+ * - Vacaciones: minimo 7 dias de antelacion.
+ * - Asunto propio: minimo 5 dias.
+ * - Baja medica: sin antelacion.
+ *
+ * Al entrar, se muestra un card de notificacion para cada solicitud que ha
+ * sido aprobada o rechazada y aun no se ha confirmado lectura
+ * (vistaPorEmpleado=false). Cuando el empleado cierra el card, se hace
+ * PATCH /api/v1/ausencias/{id}/marcar-vista.
+ *
+ * Se cargan los dias bloqueados por el admin: si las fechas seleccionadas
+ * solapan con uno, se avisa antes de enviar (y el backend tambien valida).
+ *
  * Admin ve todas las solicitudes con botones de aprobar/rechazar.
  */
-import { Plus, Check, X, Loader2, Calendar } from 'lucide-vue-next'
-import { addDays, differenceInDays, parseISO, format, isBefore } from 'date-fns'
+import { Plus, Check, X, Loader2, Calendar, AlertTriangle, CheckCircle2 } from 'lucide-vue-next'
+import { addDays, differenceInDays, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useToast } from '~/modules/shared/composables/useToast'
 
@@ -15,23 +27,32 @@ const toast = useToast()
 
 // ── Tipos ─────────────────────────────────────────────────
 type TipoAusencia = 'VACACIONES' | 'ASUNTO_PROPIO' | 'BAJA'
-type EstadoSolicitud = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA'
+type EstadoSolicitud = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'CANCELADA'
 
 interface Solicitud {
-  id: number
+  id: string
   tipo: TipoAusencia
   fechaInicio: string
   fechaFin: string
   motivo: string
   estado: EstadoSolicitud
   solicitadaEn: string
-  empleadoNombre?: string    // solo visible para admin
+  empleadoNombre?: string
   motivoRechazo?: string
+  vistaPorEmpleado?: boolean
+}
+
+interface DiaBloqueado {
+  id: string
+  fechaInicio: string
+  fechaFin: string
+  motivo: string
 }
 
 // ── Estado ────────────────────────────────────────────────
 const authStore  = useAuthStore()
 const solicitudes = ref<Solicitud[]>([])
+const diasBloqueados = ref<DiaBloqueado[]>([])
 const cargando   = ref(true)
 const modalAbierto = ref(false)
 const enviando   = ref(false)
@@ -52,7 +73,7 @@ const form = reactive<{
 
 // Modal de rechazo (solo admin)
 const modalRechazo  = ref(false)
-const solicitudId   = ref<number | null>(null)
+const solicitudIdSeleccionada = ref<string | null>(null)
 const motivoRechazo = ref('')
 const procesando    = ref(false)
 
@@ -61,31 +82,57 @@ const pendientes = computed(() => solicitudes.value.filter(s => s.estado === 'PE
 const aprobadas  = computed(() => solicitudes.value.filter(s => s.estado === 'APROBADA'))
 const rechazadas = computed(() => solicitudes.value.filter(s => s.estado === 'RECHAZADA'))
 
-/** Mínimo de días de antelación según el tipo de ausencia */
+// Solicitudes propias resueltas que el empleado todavia no ha confirmado leer.
+// Estas se muestran como cards de notificacion al entrar.
+const notificacionesPendientes = computed(() => {
+  if (authStore.isAdmin) return []
+  return solicitudes.value.filter(s =>
+    !s.vistaPorEmpleado &&
+    (s.estado === 'APROBADA' || s.estado === 'RECHAZADA'),
+  )
+})
+
 const diasAntelacionMinimos = computed(() =>
   form.tipo === 'VACACIONES' ? 7 : form.tipo === 'ASUNTO_PROPIO' ? 5 : 0,
 )
 
-/** Fecha mínima de inicio según tipo */
 const fechaInicioMinima = computed(() => {
-  const min = addDays(new Date(), diasAntelacionMinimos.value)
-  return format(min, 'yyyy-MM-dd')
+  const minima = addDays(new Date(), diasAntelacionMinimos.value)
+  return format(minima, 'yyyy-MM-dd')
 })
 
-/** Duración en días de la solicitud en curso */
 const duracionDias = computed(() => {
   if (!form.fechaInicio || !form.fechaFin) return 0
   return differenceInDays(parseISO(form.fechaFin), parseISO(form.fechaInicio)) + 1
+})
+
+// ¿Las fechas seleccionadas solapan con algun día bloqueado por el admin?
+const bloqueoSolapado = computed<DiaBloqueado | null>(() => {
+  if (!form.fechaInicio || !form.fechaFin) return null
+  const inicio = parseISO(form.fechaInicio)
+  const fin = parseISO(form.fechaFin)
+  for (const dia of diasBloqueados.value) {
+    const bInicio = parseISO(dia.fechaInicio)
+    const bFin = parseISO(dia.fechaFin)
+    // Solapamiento: inicio <= bFin AND fin >= bInicio
+    if (inicio <= bFin && fin >= bInicio) {
+      return dia
+    }
+  }
+  return null
 })
 
 // ── Carga ─────────────────────────────────────────────────
 onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
-    // Admin ve todas; empleado solo las suyas (el backend filtra según JWT)
-    const { data } = await api.get('/v1/ausencias')
-    solicitudes.value = data
-  } catch { /* vacío */ }
+    const [resAusencias, resBloqueados] = await Promise.all([
+      api.get('/v1/ausencias'),
+      api.get('/v1/dias-bloqueados'),
+    ])
+    solicitudes.value = resAusencias.data
+    diasBloqueados.value = resBloqueados.data
+  } catch { /* vacio */ }
   finally { cargando.value = false }
 })
 
@@ -93,18 +140,21 @@ onMounted(async () => {
 async function enviarSolicitud() {
   errorForm.value = ''
 
-  // Validar antelación mínima
-  if (form.tipo !== 'BAJA' && form.fechaInicio) {
-    const diasHastaInicio = differenceInDays(parseISO(form.fechaInicio), new Date())
-    if (diasHastaInicio < diasAntelacionMinimos.value) {
-      errorForm.value = `Las ${form.tipo === 'VACACIONES' ? 'vacaciones' : 'ausencias por asunto propio'} requieren mínimo ${diasAntelacionMinimos.value} días de antelación.`
-      return
-    }
-  }
-
   if (!form.fechaInicio || !form.fechaFin) {
     errorForm.value = 'Selecciona fechas de inicio y fin.'
     return
+  }
+
+  if (form.tipo !== 'BAJA') {
+    const diasHastaInicio = differenceInDays(parseISO(form.fechaInicio), new Date())
+    if (diasHastaInicio < diasAntelacionMinimos.value) {
+      errorForm.value = `Las ${form.tipo === 'VACACIONES' ? 'vacaciones' : 'ausencias por asunto propio'} requieren minimo ${diasAntelacionMinimos.value} dias de antelacion.`
+      return
+    }
+    if (bloqueoSolapado.value) {
+      errorForm.value = `Las fechas seleccionadas chocan con un dia bloqueado: "${bloqueoSolapado.value.motivo || 'fecha bloqueada'}".`
+      return
+    }
   }
 
   enviando.value = true
@@ -115,12 +165,15 @@ async function enviarSolicitud() {
     modalAbierto.value = false
     Object.assign(form, { tipo: 'VACACIONES', fechaInicio: '', fechaFin: '', motivo: '' })
     toast.success('Solicitud enviada')
-  } catch { errorForm.value = 'No se pudo enviar la solicitud.' }
-  finally { enviando.value = false }
+  } catch (err: any) {
+    errorForm.value = err?.response?.data?.message || 'No se pudo enviar la solicitud.'
+  } finally {
+    enviando.value = false
+  }
 }
 
 // ── Aprobar / rechazar (solo admin) ──────────────────────
-async function aprobar(id: number) {
+async function aprobar(id: string) {
   procesando.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
@@ -132,12 +185,12 @@ async function aprobar(id: number) {
 }
 
 async function rechazar() {
-  if (!solicitudId.value) return
+  if (!solicitudIdSeleccionada.value) return
   procesando.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
-    await api.patch(`/v1/ausencias/${solicitudId.value}/rechazar`, { motivo: motivoRechazo.value })
-    const sol = solicitudes.value.find(s => s.id === solicitudId.value)
+    await api.patch(`/v1/ausencias/${solicitudIdSeleccionada.value}/rechazar`, { motivo: motivoRechazo.value })
+    const sol = solicitudes.value.find(s => s.id === solicitudIdSeleccionada.value)
     if (sol) { sol.estado = 'RECHAZADA'; sol.motivoRechazo = motivoRechazo.value }
     modalRechazo.value = false
     motivoRechazo.value = ''
@@ -145,8 +198,7 @@ async function rechazar() {
   } catch { toast.error('Error al rechazar') } finally { procesando.value = false }
 }
 
-// ── Cancelar solicitud propia (empleado, solo si está PENDIENTE) ─────────────
-async function cancelarSolicitud(id: number) {
+async function cancelarSolicitud(id: string) {
   procesando.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
@@ -156,26 +208,92 @@ async function cancelarSolicitud(id: number) {
   } catch { toast.error('Error al cancelar') } finally { procesando.value = false }
 }
 
+// ── Cerrar card de notificacion ──────────────────────────
+async function cerrarNotificacion(solicitud: Solicitud) {
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.patch(`/v1/ausencias/${solicitud.id}/marcar-vista`)
+    solicitud.vistaPorEmpleado = true
+  } catch {
+    // Si falla, marca igualmente para no bloquear al empleado en esta sesion
+    solicitud.vistaPorEmpleado = true
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────
-function badgeEstado(e: EstadoSolicitud): string {
+function badgeEstado(estado: EstadoSolicitud): string {
   return {
     PENDIENTE:  'bg-amber-100 text-amber-700',
     APROBADA:   'bg-green-100 text-green-700',
     RECHAZADA:  'bg-red-100 text-red-700',
-  }[e] ?? 'bg-surface-container text-on-surface-variant'
+    CANCELADA:  'bg-surface-container text-on-surface-variant',
+  }[estado] ?? 'bg-surface-container text-on-surface-variant'
 }
 
-function labelTipo(t: TipoAusencia): string {
-  return { VACACIONES: 'Vacaciones', ASUNTO_PROPIO: 'Asunto propio', BAJA: 'Baja médica' }[t]
+function labelTipo(tipo: TipoAusencia): string {
+  return { VACACIONES: 'Vacaciones', ASUNTO_PROPIO: 'Asunto propio', BAJA: 'Baja médica' }[tipo]
 }
 
-function formatFecha(f: string): string {
-  return format(parseISO(f), "d 'de' MMMM yyyy", { locale: es })
+function formatFecha(fecha: string): string {
+  return format(parseISO(fecha), "d 'de' MMMM yyyy", { locale: es })
 }
 </script>
 
 <template>
   <div class="space-y-8">
+
+    <!-- ── Cards de notificacion (solo empleado, solo si hay sin leer) ── -->
+    <div v-if="notificacionesPendientes.length > 0" class="space-y-3">
+      <div
+        v-for="notif in notificacionesPendientes"
+        :key="notif.id"
+        :class="[
+          'card p-5 border-l-4 flex items-start gap-4',
+          notif.estado === 'APROBADA'
+            ? 'bg-green-50 border-green-500'
+            : 'bg-red-50 border-red-500',
+        ]"
+      >
+        <div
+          :class="[
+            'w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0',
+            notif.estado === 'APROBADA' ? 'bg-green-200' : 'bg-red-200',
+          ]"
+        >
+          <CheckCircle2 v-if="notif.estado === 'APROBADA'" class="w-5 h-5 text-green-700" />
+          <AlertTriangle v-else class="w-5 h-5 text-red-700" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <p
+            :class="[
+              'text-sm font-bold',
+              notif.estado === 'APROBADA' ? 'text-green-800' : 'text-red-800',
+            ]"
+          >
+            {{ notif.estado === 'APROBADA' ? 'Solicitud aprobada' : 'Solicitud denegada' }}
+          </p>
+          <p class="text-sm text-on-surface mt-1">
+            Tu solicitud de <span class="font-bold">{{ labelTipo(notif.tipo).toLowerCase() }}</span>
+            del <span class="font-bold">{{ formatFecha(notif.fechaInicio) }}</span>
+            al <span class="font-bold">{{ formatFecha(notif.fechaFin) }}</span>
+            ha sido <span class="font-bold">{{ notif.estado === 'APROBADA' ? 'aprobada' : 'denegada' }}</span>.
+          </p>
+          <p
+            v-if="notif.estado === 'RECHAZADA' && notif.motivoRechazo"
+            class="text-sm text-red-700 mt-2 bg-white/50 p-2 rounded-lg"
+          >
+            <span class="font-bold">Motivo:</span> {{ notif.motivoRechazo }}
+          </p>
+        </div>
+        <button
+          class="p-2 rounded-lg hover:bg-white/50 transition-colors flex-shrink-0"
+          aria-label="Cerrar notificación"
+          @click="cerrarNotificacion(notif)"
+        >
+          <X class="w-4 h-4" />
+        </button>
+      </div>
+    </div>
 
     <!-- ── Cabecera ──────────────────────────────────────── -->
     <div class="flex items-end justify-between">
@@ -190,12 +308,32 @@ function formatFecha(f: string): string {
         </p>
       </div>
       <button
+        v-if="!authStore.isAdmin"
         class="flex items-center gap-2 bg-primary-container text-white px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all"
         @click="modalAbierto = true"
       >
         <Plus class="w-4 h-4" />
         Nueva solicitud
       </button>
+    </div>
+
+    <!-- ── Aviso de días bloqueados (visible siempre) ───── -->
+    <div
+      v-if="!authStore.isAdmin && diasBloqueados.length > 0"
+      class="card p-4 bg-amber-50 border border-amber-200 flex items-start gap-3"
+    >
+      <AlertTriangle class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+      <div class="flex-1">
+        <p class="text-sm font-bold text-amber-800 mb-1">
+          Hay {{ diasBloqueados.length }} fecha{{ diasBloqueados.length !== 1 ? 's' : '' }} bloqueada{{ diasBloqueados.length !== 1 ? 's' : '' }} para vacaciones
+        </p>
+        <ul class="text-xs text-amber-700 space-y-0.5">
+          <li v-for="dia in diasBloqueados" :key="dia.id">
+            <span class="font-bold">{{ dia.fechaInicio === dia.fechaFin ? dia.fechaInicio : `${dia.fechaInicio} → ${dia.fechaFin}` }}</span>
+            <span v-if="dia.motivo"> — {{ dia.motivo }}</span>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <!-- ── KPI cards (solo empleado) ─────────────────────── -->
@@ -222,62 +360,67 @@ function formatFecha(f: string): string {
     <!-- ── Lista de solicitudes ───────────────────────────── -->
     <div v-else class="space-y-3">
       <div
-        v-for="s in solicitudes"
-        :key="s.id"
+        v-for="solicitud in solicitudes"
+        :key="solicitud.id"
         class="card p-5 flex items-start gap-4"
       >
-        <!-- Icono -->
         <div class="w-10 h-10 bg-primary-fixed rounded-xl flex items-center justify-center flex-shrink-0">
           <Calendar class="w-5 h-5 text-primary-container" />
         </div>
 
-        <!-- Info -->
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
-            <span class="font-bold text-primary text-sm">{{ labelTipo(s.tipo) }}</span>
-            <span v-if="authStore.isAdmin && s.empleadoNombre" class="text-xs text-on-surface-variant">
-              — {{ s.empleadoNombre }}
+            <span class="font-bold text-primary text-sm">{{ labelTipo(solicitud.tipo) }}</span>
+            <span v-if="authStore.isAdmin && solicitud.empleadoNombre" class="text-xs text-on-surface-variant">
+              — {{ solicitud.empleadoNombre }}
             </span>
           </div>
           <p class="text-sm text-on-surface-variant">
-            {{ formatFecha(s.fechaInicio) }} → {{ formatFecha(s.fechaFin) }}
+            {{ formatFecha(solicitud.fechaInicio) }} → {{ formatFecha(solicitud.fechaFin) }}
             <span class="ml-2 text-xs font-bold text-primary">
-              ({{ differenceInDays(parseISO(s.fechaFin), parseISO(s.fechaInicio)) + 1 }} días)
+              ({{ differenceInDays(parseISO(solicitud.fechaFin), parseISO(solicitud.fechaInicio)) + 1 }} días)
             </span>
           </p>
-          <p v-if="s.motivo" class="text-xs text-on-surface-variant mt-1">{{ s.motivo }}</p>
-          <p v-if="s.motivoRechazo" class="text-xs text-red-600 mt-1 font-medium">
-            Motivo de rechazo: {{ s.motivoRechazo }}
+          <p v-if="solicitud.motivo" class="text-xs text-on-surface-variant mt-1">{{ solicitud.motivo }}</p>
+          <p v-if="solicitud.motivoRechazo" class="text-xs text-red-600 mt-1 font-medium">
+            Motivo de rechazo: {{ solicitud.motivoRechazo }}
           </p>
           <p class="text-[10px] text-on-surface-variant/60 mt-1">
-            Solicitada el {{ formatFecha(s.solicitadaEn) }}
+            Solicitada el {{ formatFecha(solicitud.solicitadaEn) }}
           </p>
         </div>
 
-        <!-- Estado + acciones admin -->
         <div class="flex items-center gap-3 flex-shrink-0">
-          <span class="text-[10px] font-bold px-2.5 py-1 rounded-full" :class="badgeEstado(s.estado)">
-            {{ s.estado.toLowerCase() }}
+          <span class="text-[10px] font-bold px-2.5 py-1 rounded-full" :class="badgeEstado(solicitud.estado)">
+            {{ solicitud.estado.toLowerCase() }}
           </span>
 
-          <!-- Botones admin solo para pendientes -->
-          <template v-if="authStore.isAdmin && s.estado === 'PENDIENTE'">
+          <template v-if="authStore.isAdmin && solicitud.estado === 'PENDIENTE'">
             <button
               class="w-8 h-8 rounded-full bg-green-100 hover:bg-green-200 text-green-700 flex items-center justify-center transition-colors"
-              :aria-label="`Aprobar solicitud de ${s.empleadoNombre || 'empleado'}`"
+              :aria-label="`Aprobar solicitud de ${solicitud.empleadoNombre || 'empleado'}`"
               :disabled="procesando"
-              @click="aprobar(s.id)"
+              @click="aprobar(solicitud.id)"
             >
               <Check class="w-4 h-4" aria-hidden="true" />
             </button>
             <button
               class="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 text-red-700 flex items-center justify-center transition-colors"
-              :aria-label="`Rechazar solicitud de ${s.empleadoNombre || 'empleado'}`"
-              @click="solicitudId = s.id; modalRechazo = true"
+              :aria-label="`Rechazar solicitud de ${solicitud.empleadoNombre || 'empleado'}`"
+              @click="solicitudIdSeleccionada = solicitud.id; modalRechazo = true"
             >
               <X class="w-4 h-4" aria-hidden="true" />
             </button>
           </template>
+
+          <button
+            v-else-if="!authStore.isAdmin && solicitud.estado === 'PENDIENTE'"
+            class="text-xs text-error hover:underline"
+            :disabled="procesando"
+            @click="cancelarSolicitud(solicitud.id)"
+          >
+            Cancelar
+          </button>
         </div>
       </div>
 
@@ -313,7 +456,6 @@ function formatFecha(f: string): string {
 
           <div class="space-y-4">
 
-            <!-- Tipo -->
             <div>
               <label class="label">Tipo de ausencia</label>
               <select v-model="form.tipo" class="select-field">
@@ -326,7 +468,6 @@ function formatFecha(f: string): string {
               </p>
             </div>
 
-            <!-- Fechas -->
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="label">Fecha inicio</label>
@@ -338,18 +479,27 @@ function formatFecha(f: string): string {
               </div>
             </div>
 
-            <!-- Duración calculada -->
             <p v-if="duracionDias > 0" class="text-xs font-bold text-primary-container bg-primary-fixed px-3 py-1.5 rounded-lg">
               Duración: {{ duracionDias }} día{{ duracionDias !== 1 ? 's' : '' }}
             </p>
 
-            <!-- Motivo -->
+            <!-- Aviso de bloqueo -->
+            <div
+              v-if="bloqueoSolapado"
+              class="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2"
+            >
+              <AlertTriangle class="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>
+                Las fechas seleccionadas <span class="font-bold">no están disponibles</span>.
+                <span v-if="bloqueoSolapado.motivo">Motivo: {{ bloqueoSolapado.motivo }}.</span>
+              </span>
+            </div>
+
             <div>
               <label class="label">Motivo (opcional)</label>
               <textarea v-model="form.motivo" rows="2" class="input resize-none" placeholder="Descripción breve..." />
             </div>
 
-            <!-- Error -->
             <Transition name="modal-overlay">
               <p v-if="errorForm" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {{ errorForm }}
@@ -359,7 +509,11 @@ function formatFecha(f: string): string {
 
           <div class="flex gap-3 mt-5">
             <button class="btn-secondary flex-1" @click="modalAbierto = false">Cancelar</button>
-            <button class="btn-primary flex-1" :disabled="enviando" @click="enviarSolicitud">
+            <button
+              class="btn-primary flex-1"
+              :disabled="enviando || !!bloqueoSolapado"
+              @click="enviarSolicitud"
+            >
               <Loader2 v-if="enviando" class="w-4 h-4 animate-spin" />
               <span>{{ enviando ? 'Enviando...' : 'Enviar solicitud' }}</span>
             </button>
@@ -368,7 +522,7 @@ function formatFecha(f: string): string {
       </div>
     </Transition>
 
-    <!-- Modal motivo de rechazo -->
+    <!-- Modal motivo de rechazo (admin) -->
     <Transition name="modal-overlay">
       <div
         v-if="modalRechazo"

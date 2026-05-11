@@ -58,4 +58,12 @@ public class AusenciaController {
     public ResponseEntity<SolicitudAusencia> cancelar(@PathVariable UUID id) {
         return ResponseEntity.ok(useCase.cancelar(id));
     }
+
+    @Operation(summary = "Marcar notificacion como vista",
+            description = "El empleado confirma que ha leido el card de aprobacion/rechazo")
+    @ApiResponse(responseCode = "200", description = "Marcada como vista")
+    @PatchMapping("/{id}/marcar-vista")
+    public ResponseEntity<SolicitudAusencia> marcarVista(@PathVariable UUID id) {
+        return ResponseEntity.ok(useCase.marcarComoVista(id));
+    }
 }
