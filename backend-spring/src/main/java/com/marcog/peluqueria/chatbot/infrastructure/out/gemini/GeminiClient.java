@@ -15,6 +15,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
 @Component
 @Slf4j
@@ -29,79 +30,103 @@ public class GeminiClient {
     @Value("${gemini.model:gemini-2.0-flash}")
     private String model;
 
+    private static final List<String> FALLBACK_MODELS = List.of(
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+        "gemini-2.0-flash-lite"
+    );
+
     public GeminiClient(@Qualifier("geminiRestTemplate") RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
     public GeminiResult generateContent(String systemInstruction, List<ChatMessageDto> history,
                                          String userMessage, List<Map<String, Object>> tools) {
-        try {
-            ObjectNode body = mapper.createObjectNode();
+        List<String> modelsToTry = new ArrayList<>();
+        modelsToTry.add(model);
+        for (String m : FALLBACK_MODELS) {
+            if (!m.equals(model)) modelsToTry.add(m);
+        }
 
-            // System instruction
-            ObjectNode sysInstr = mapper.createObjectNode();
-            ArrayNode sysParts = mapper.createArrayNode();
-            sysParts.add(mapper.createObjectNode().put("text", systemInstruction));
-            sysInstr.set("parts", sysParts);
-            body.set("system_instruction", sysInstr);
-
-            // Contents (history + new message)
-            ArrayNode contents = mapper.createArrayNode();
-            if (history != null) {
-                for (ChatMessageDto msg : history) {
-                    ObjectNode content = mapper.createObjectNode();
-                    content.put("role", "model".equals(msg.getRole()) ? "model" : "user");
-                    ArrayNode parts = mapper.createArrayNode();
-                    parts.add(mapper.createObjectNode().put("text", msg.getContent()));
-                    content.set("parts", parts);
-                    contents.add(content);
+        for (String currentModel : modelsToTry) {
+            try {
+                GeminiResult result = callGemini(currentModel, systemInstruction, history, userMessage, tools);
+                if (!currentModel.equals(model)) {
+                    log.info("Usando modelo fallback: {}", currentModel);
+                }
+                return result;
+            } catch (Exception e) {
+                if (e.getMessage() != null && e.getMessage().contains("429")) {
+                    log.warn("Quota agotada para {}, probando siguiente modelo", currentModel);
+                } else {
+                    log.error("Error llamando a Gemini API con {}: {}", currentModel, e.getMessage());
+                    break;
                 }
             }
-            ObjectNode userContent = mapper.createObjectNode();
-            userContent.put("role", "user");
-            ArrayNode userParts = mapper.createArrayNode();
-            userParts.add(mapper.createObjectNode().put("text", userMessage));
-            userContent.set("parts", userParts);
-            contents.add(userContent);
-            body.set("contents", contents);
-
-            // Tools (function declarations)
-            if (tools != null && !tools.isEmpty()) {
-                ArrayNode toolsNode = mapper.createArrayNode();
-                ObjectNode toolObj = mapper.createObjectNode();
-                ArrayNode funcDecls = mapper.valueToTree(tools);
-                toolObj.set("function_declarations", funcDecls);
-                toolsNode.add(toolObj);
-                body.set("tools", toolsNode);
-            }
-
-            String url = String.format(
-                    "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
-                    model, apiKey);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> entity = new HttpEntity<>(mapper.writeValueAsString(body), headers);
-
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-            JsonNode root = mapper.readTree(response.getBody());
-
-            JsonNode candidate = root.path("candidates").path(0).path("content").path("parts").path(0);
-
-            if (candidate.has("functionCall")) {
-                JsonNode fc = candidate.get("functionCall");
-                String funcName = fc.get("name").asText();
-                JsonNode args = fc.get("args");
-                return new GeminiResult(null, funcName, args);
-            }
-
-            String text = candidate.path("text").asText("");
-            return new GeminiResult(text, null, null);
-
-        } catch (Exception e) {
-            log.error("Error llamando a Gemini API: {}", e.getMessage());
-            return new GeminiResult("Lo siento, no puedo responder ahora. Inténtalo de nuevo.", null, null);
         }
+        return new GeminiResult("Lo siento, no puedo responder ahora. Inténtalo de nuevo.", null, null);
+    }
+
+    private GeminiResult callGemini(String currentModel, String systemInstruction, List<ChatMessageDto> history,
+                                     String userMessage, List<Map<String, Object>> tools) throws Exception {
+        ObjectNode body = mapper.createObjectNode();
+
+        ObjectNode sysInstr = mapper.createObjectNode();
+        ArrayNode sysParts = mapper.createArrayNode();
+        sysParts.add(mapper.createObjectNode().put("text", systemInstruction));
+        sysInstr.set("parts", sysParts);
+        body.set("system_instruction", sysInstr);
+
+        ArrayNode contents = mapper.createArrayNode();
+        if (history != null) {
+            for (ChatMessageDto msg : history) {
+                ObjectNode content = mapper.createObjectNode();
+                content.put("role", "model".equals(msg.getRole()) ? "model" : "user");
+                ArrayNode parts = mapper.createArrayNode();
+                parts.add(mapper.createObjectNode().put("text", msg.getContent()));
+                content.set("parts", parts);
+                contents.add(content);
+            }
+        }
+        ObjectNode userContent = mapper.createObjectNode();
+        userContent.put("role", "user");
+        ArrayNode userParts = mapper.createArrayNode();
+        userParts.add(mapper.createObjectNode().put("text", userMessage));
+        userContent.set("parts", userParts);
+        contents.add(userContent);
+        body.set("contents", contents);
+
+        if (tools != null && !tools.isEmpty()) {
+            ArrayNode toolsNode = mapper.createArrayNode();
+            ObjectNode toolObj = mapper.createObjectNode();
+            ArrayNode funcDecls = mapper.valueToTree(tools);
+            toolObj.set("function_declarations", funcDecls);
+            toolsNode.add(toolObj);
+            body.set("tools", toolsNode);
+        }
+
+        String url = String.format(
+                "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
+                currentModel, apiKey);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> entity = new HttpEntity<>(mapper.writeValueAsString(body), headers);
+
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+        JsonNode root = mapper.readTree(response.getBody());
+
+        JsonNode candidate = root.path("candidates").path(0).path("content").path("parts").path(0);
+
+        if (candidate.has("functionCall")) {
+            JsonNode fc = candidate.get("functionCall");
+            String funcName = fc.get("name").asText();
+            JsonNode args = fc.get("args");
+            return new GeminiResult(null, funcName, args);
+        }
+
+        String text = candidate.path("text").asText("");
+        return new GeminiResult(text, null, null);
     }
 
     public GeminiResult sendFunctionResponse(String systemInstruction, List<ChatMessageDto> history,
