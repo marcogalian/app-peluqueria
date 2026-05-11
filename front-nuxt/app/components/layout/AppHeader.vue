@@ -41,8 +41,9 @@ function irAMensajes() {
 
 
 const iniciales = computed(() => {
-  const u = authStore.usuario?.username ?? ''
-  return u.slice(0, 2).toUpperCase()
+  const username = authStore.usuario?.username?.trim()
+  if (username) return username.slice(0, 2).toUpperCase()
+  return authStore.isAdmin ? 'AD' : 'EM'
 })
 
 function irAConfiguracion() {

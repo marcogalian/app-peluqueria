@@ -9,11 +9,6 @@
 import { Eye, EyeOff, AtSign, Lock, Scissors, ArrowRight, Loader2 } from 'lucide-vue-next'
 import { useToast } from '~/modules/shared/composables/useToast'
 
-definePageMeta({
-  layout: 'auth',
-  auth: false,   // esta ruta es pública — el middleware auth la ignora
-})
-
 // ── Estado del formulario ─────────────────────────────────
 const form = reactive({
   username:   '',
