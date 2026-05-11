@@ -1,6 +1,6 @@
-# Frontend Peluquería
+# Frontend Nuxt
 
-Frontend del sistema de gestión de peluquería construido con Nuxt 4, Vue 3, TypeScript, Pinia y Tailwind CSS.
+Frontend de Peluqueria Isabella construido con Nuxt 4, Vue 3, TypeScript, Pinia y Tailwind CSS.
 
 ## Stack
 
@@ -10,25 +10,98 @@ Frontend del sistema de gestión de peluquería construido con Nuxt 4, Vue 3, Ty
 - Pinia
 - Tailwind CSS
 - Axios
-- Vitest + Vue Test Utils
+- FullCalendar
+- Chart.js
+- Lucide
+
+## Arquitectura
+
+La aplicacion usa vertical slicing por modulo.
+
+Las rutas Nuxt viven en `app/pages`, pero son wrappers finos. La implementacion real de cada pantalla vive en `app/modules`.
+
+Ejemplo:
+
+```text
+app/pages/admin/clientes.vue
+└── importa app/modules/clientes/pages/ClientesAdminPage.vue
+```
 
 ## Estructura
 
-- `app/pages`: rutas y pantallas
-- `app/components`: layout y componentes reutilizables
-- `app/modules`: código organizado por dominio
-- `app/middleware`: protección por autenticación y rol
-- `app/infrastructure/http`: cliente API centralizado
+```text
+app/
+├── pages                  # Rutas Nuxt
+├── modules                # Slices de negocio
+├── components             # Layout y componentes globales
+├── middleware             # Auth y roles
+├── infrastructure/http    # Cliente API
+└── assets/css             # Estilos globales
+```
+
+## Modulos
+
+- `agenda`
+- `ausencias`
+- `auth`
+- `calendario`
+- `chat`
+- `chatbot`
+- `clientes`
+- `configuracion`
+- `dashboard`
+- `empleados`
+- `inventario`
+- `mensajes`
+- `resultados`
+- `servicios`
+- `ventas`
 
 ## Comandos
 
+Instalar:
+
 ```bash
 npm install
+```
+
+Desarrollo:
+
+```bash
 npm run dev
+```
+
+Build:
+
+```bash
 npm run build
+```
+
+Tests:
+
+```bash
 npm test
 ```
 
-## Integración con backend
+## API
 
-La URL base de la API se resuelve desde runtime config de Nuxt y, en local, usa `http://localhost:8080/api`.
+El cliente HTTP vive en:
+
+```text
+app/infrastructure/http/api.ts
+```
+
+En local, la API se consume desde:
+
+```text
+http://localhost:8080/api
+```
+
+## Criterios UI actuales
+
+- Cards no clicables sin hover.
+- Inputs y filtros con estilo coherente.
+- Edicion inline en clientes y empleados.
+- Modales para crear o editar citas.
+- Sidebar plegable.
+- Look sobrio: blanco suave, navy y sombras ligeras.

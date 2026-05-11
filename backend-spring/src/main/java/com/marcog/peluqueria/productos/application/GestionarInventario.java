@@ -38,6 +38,13 @@ import java.util.stream.Collectors;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
+/**
+ * Caso de uso de inventario y venta de productos.
+ *
+ * Gestiona productos activos, ajustes de stock, ventas agrupadas y resumenes
+ * comerciales. Tambien dispara notificaciones cuando un ajuste deja un producto
+ * por debajo de su stock minimo.
+ */
 @Service
 @RequiredArgsConstructor
 public class GestionarInventario implements GestionarProducto {

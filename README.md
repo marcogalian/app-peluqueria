@@ -1,213 +1,217 @@
-# Sistema de Gestión de Peluquería
+# Peluqueria Isabella - Sistema de Gestion
 
-Aplicación web full-stack para la gestión integral de un salón de peluquería.
-Desarrollada como Trabajo de Fin de Grado (DAM/DAW).
+Aplicacion full-stack para gestionar una peluqueria desde un panel web: agenda, clientes, empleados, servicios, inventario, ventas, ausencias, resultados, mensajeria interna y asistente de gestion con IA.
 
----
+El proyecto esta desarrollado como aplicacion profesional de gestion para un salon realista, con backend Spring Boot, frontend Nuxt y despliegue local con Docker Compose.
 
-## Tecnologías
+## Indice rapido
 
-### Backend (`backend-spring/`)
-| Tecnología | Versión | Uso |
-|---|---|---|
-| Spring Boot | 3.5.9 | Framework principal |
-| Java | 21 | Lenguaje |
-| Spring Security + JWT | — | Autenticación stateless |
-| Spring Data JPA + Hibernate | — | Persistencia |
-| PostgreSQL | 15 | Base de datos |
-| MapStruct | — | Mapeo entidad↔dominio |
-| Lombok | — | Reducción de boilerplate |
-| WebSocket STOMP | — | Chat en tiempo real |
-| Twilio | — | Notificaciones WhatsApp |
-| Spring Mail + Mailtrap | — | Notificaciones por email |
+- [Que hace la aplicacion](#que-hace-la-aplicacion)
+- [Stack tecnico](#stack-tecnico)
+- [Arquitectura](#arquitectura)
+- [Estructura del repositorio](#estructura-del-repositorio)
+- [Arranque rapido](#arranque-rapido)
+- [Usuarios demo](#usuarios-demo)
+- [Documentacion](#documentacion)
+- [Comandos utiles](#comandos-utiles)
 
-### Frontend (`front-nuxt/`)
-| Tecnología | Versión | Uso |
-|---|---|---|
-| Nuxt | 4 | Framework Vue SSR/SPA |
-| Vue 3 | — | Composition API |
-| TypeScript | strict | Tipado estático |
-| Tailwind CSS | 4 | Estilos |
-| Pinia | — | Estado global |
-| FullCalendar | — | Calendario de citas |
-| Chart.js + vue-chartjs | — | Gráficas de finanzas |
-| STOMP.js | — | Cliente WebSocket |
-| Axios | — | Cliente HTTP |
+## Que hace la aplicacion
 
-### Infraestructura (`docker/`)
-| Tecnología | Uso |
+### Panel administrador
+
+- Panel de control con KPIs, evolucion de ventas, citas, inventario y alertas.
+- Agenda visual para crear, editar, cancelar y completar citas.
+- Gestion de clientes con datos personales, VIP, historial, consentimiento y fotos.
+- Gestion de empleados, especialidades, disponibilidad, bajas y vacaciones.
+- Catalogo de servicios con precio, duracion, categoria y genero.
+- Inventario de productos con stock, stock minimo, filtros y ventas.
+- Mensajeria interna y envio de emails a empleados.
+- Resultados financieros: ingresos, gastos, beneficios, productos y rendimiento.
+- Configuracion del negocio, dias especiales y dias bloqueados para vacaciones.
+- Asistente de gestion para consultar datos del negocio.
+
+### Portal empleado
+
+- Agenda propia.
+- Mensajes internos.
+- Ventas de productos.
+- Solicitud de vacaciones y bajas.
+- Notificaciones de aprobacion o rechazo de ausencias.
+- Asistente de gestion limitado por rol.
+
+## Stack tecnico
+
+### Backend
+
+| Tecnologia | Uso |
 |---|---|
-| Docker + Docker Compose | Contenedores |
-| PostgreSQL 15 (imagen oficial) | Base de datos |
+| Java 21 | Lenguaje principal |
+| Spring Boot 3.5 | API REST y aplicacion backend |
+| Spring Security | Autenticacion y autorizacion |
+| JWT + Refresh Token | Sesiones stateless |
+| Spring Data JPA + Hibernate | Persistencia |
+| PostgreSQL 15 | Base de datos principal |
+| H2 | Base de datos para tests |
+| MapStruct | Mapeo entre dominio y entidades |
+| Lombok | Reduccion de boilerplate |
+| WebSocket STOMP | Chat interno en tiempo real |
+| Spring Mail + Mailtrap | Emails en entorno de pruebas |
+| Twilio | Notificaciones WhatsApp |
+| Gemini API | Asistente IA |
+| Springdoc OpenAPI | Swagger UI y contrato REST |
 
----
+### Frontend
+
+| Tecnologia | Uso |
+|---|---|
+| Nuxt 4 | Framework frontend |
+| Vue 3 | UI con Composition API |
+| TypeScript | Tipado |
+| Pinia | Estado global |
+| Tailwind CSS | Estilos |
+| Axios | Cliente HTTP |
+| FullCalendar | Agenda visual |
+| Chart.js | Graficas |
+| Lucide | Iconografia |
+
+### Infraestructura
+
+| Tecnologia | Uso |
+|---|---|
+| Docker Compose | Orquestacion local |
+| PostgreSQL Docker | Base de datos persistente |
+| Volumen `uploads_data` | Fotos y ficheros subidos |
+| Volumen `postgres_data` | Datos de PostgreSQL |
 
 ## Arquitectura
 
-### Backend — Arquitectura Hexagonal (Ports & Adapters)
+El backend sigue una combinacion de Vertical Slicing, Screaming Architecture y arquitectura hexagonal implicita.
 
-```
-backend-spring/src/main/java/com/marcog/peluqueria/
-│
-├── [módulo]/
-│   ├── domain/
-│   │   ├── model/          ← Entidades de negocio puras
-│   │   └── port/
-│   │       ├── in/         ← Casos de uso (interfaces)
-│   │       └── out/        ← Puertos de salida (interfaces)
-│   ├── application/
-│   │   └── service/        ← Implementación de casos de uso
-│   └── infrastructure/
-│       ├── in/web/         ← Controladores REST
-│       └── out/persistence/ ← JPA: entidades, mappers, repositorios
+Cada modulo de negocio tiene su propio corte vertical:
+
+```text
+backend-spring/src/main/java/com/marcog/peluqueria/<modulo>/
+├── application      # Casos de uso: GestionarAgenda, RegistrarCliente...
+├── domain           # Modelo de negocio y contratos: Cliente, ClienteRepository...
+└── infrastructure   # Web, persistencia, email, Gemini, configuracion...
 ```
 
-**Módulos implementados:**
-- `security` — Autenticación JWT + refresh token
-- `clientes` — Gestión de clientes con historial clínico, VIP, consentimiento fotos
-- `citas` — Agenda de citas con estados, notificaciones y recordatorios
-- `peluqueros` — Gestión de empleados, disponibilidad, especialidades
-- `servicios` — Catálogo de servicios por género y precio
-- `productos` — Inventario de productos con control de stock
-- `ausencias` — Solicitudes de vacaciones/bajas con flujo de aprobación
-- `fotos` — Galería fotográfica de clientes (almacenamiento local)
-- `ofertas` — Promociones temporales y días especiales
-- `finanzas` — Dashboard de ingresos, gastos y KPIs
-- `chat` — Mensajería interna en tiempo real (WebSocket + AES-256)
-- `shared/notification` — Servicio de notificaciones transversal (email + WhatsApp)
+La arquitectura evita nombres tecnicos ruidosos como `Port`, `Adapter`, `In` u `Out`. Los contratos viven en `domain` con nombres de negocio y las implementaciones viven en `infrastructure` indicando la tecnologia cuando aporta claridad, por ejemplo `PostgresClienteRepository`.
 
-### Frontend — Screaming Architecture
+El frontend usa vertical slicing por modulo. Las rutas de Nuxt en `app/pages` son wrappers finos y las pantallas reales viven en `app/modules`.
 
-```
+```text
 front-nuxt/app/
-│
-├── modules/                ← Organizado por dominio de negocio
-│   ├── auth/
-│   ├── agenda/
-│   ├── calendario/
-│   ├── clientes/
-│   ├── empleados/
-│   ├── vacaciones/
-│   ├── productos/
-│   ├── servicios/
-│   ├── finanzas/
-│   └── mensajes/
-│
-├── shared/                 ← Componentes y utilidades transversales
-│   ├── components/ui/
-│   ├── components/layout/
-│   └── composables/
-│
-└── infrastructure/
-    └── http/api.ts         ← Cliente Axios centralizado con interceptors JWT
+├── pages                 # Rutas Nuxt muy finas
+├── modules               # Agenda, clientes, inventario, mensajes...
+├── components            # Layout y componentes globales
+└── infrastructure/http   # Cliente API
 ```
-
----
 
 ## Estructura del repositorio
 
+```text
+peluqueria/
+├── backend-spring/       # API Spring Boot
+├── front-nuxt/           # Aplicacion Nuxt
+├── docker/               # Docker Compose y variables de entorno
+├── docs/                 # Documentacion funcional y tecnica
+├── specs/                # Especificaciones y decisiones de arquitectura
+└── plan-*.md             # Planes de mejora y release
 ```
-app-peluqueria/
-├── backend-spring/     ← API REST Spring Boot
-├── front-nuxt/         ← SPA Nuxt 4
-└── docker/             ← Docker Compose para desarrollo y producción
-```
 
----
+## Arranque rapido
 
-## Instalación y ejecución
+### Requisitos
 
-### Requisitos previos
 - Docker Desktop
-- Java 21 (para desarrollo local del backend)
-- Node.js 22 (para desarrollo local del frontend)
+- Java 21, si se ejecuta backend fuera de Docker
+- Node.js 22, si se ejecuta frontend fuera de Docker
 
-### Con Docker (recomendado)
+### Con Docker
 
 ```bash
 cd docker
-docker compose up --build
+docker compose up --build -d
 ```
+
+Servicios:
 
 | Servicio | URL |
 |---|---|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/swagger-ui.html |
 | PostgreSQL | localhost:5432 |
 
-### Desarrollo local
+### Sin Docker
 
-**Backend:**
+Backend:
+
 ```bash
 cd backend-spring
 ./mvnw spring-boot:run
 ```
 
-**Frontend:**
+Frontend:
+
 ```bash
 cd front-nuxt
 npm install
 npm run dev
 ```
 
----
+## Usuarios demo
 
-## Sistema de notificaciones
-
-El sistema envía notificaciones automáticas por **email** (Mailtrap) y **WhatsApp** (Twilio):
-
-| Evento | Destinatario | Canal |
-|--------|-------------|-------|
-| Ausencia aprobada | Peluquero | Email |
-| Ausencia rechazada | Peluquero | Email |
-| Stock bajo al ajustar | Administrador | Email + WhatsApp |
-| Resumen diario de stock bajo | Administrador | Email + WhatsApp (08:00) |
-| Recordatorio de cita (24h antes) | Cliente | Email + WhatsApp |
-
-Sin credenciales configuradas, las notificaciones se simulan en los logs sin errores.
-
----
-
-## Variables de entorno
-
-Crea un archivo `.env` en `docker/` con las siguientes variables:
-
-```env
-# Email (Mailtrap sandbox)
-MAILTRAP_HOST=sandbox.smtp.mailtrap.io
-MAILTRAP_PORT=2525
-MAILTRAP_USERNAME=tu_usuario
-MAILTRAP_PASSWORD=tu_password
-
-# WhatsApp (Twilio)
-TWILIO_ACCOUNT_SID=tu_sid
-TWILIO_AUTH_TOKEN=tu_token
-TWILIO_WHATSAPP_FROM=whatsapp:+1XXXXXXXXXX
-
-# Contacto del administrador para alertas
-APP_ADMIN_EMAIL=admin@peluqueria.com
-APP_ADMIN_PHONE=+34600000000
-```
-
----
-
-## Datos demo
-
-En el primer arranque se crean datos de ejemplo para facilitar pruebas y defensa:
-
-| Usuario | Contraseña | Rol |
+| Usuario | Contrasena | Rol |
 |---|---|---|
 | `admin` | `1234` | Administrador |
 | `sofia` | `1234` | Empleada |
 | `carmen` | `1234` | Empleada |
 | `lucia` | `1234` | Empleada |
 
-También se generan servicios, productos y clientes de muestra. Si `randomuser.me` no está disponible, el backend usa un conjunto local de clientes de respaldo para no depender de internet.
+## Documentacion
 
----
+- [Guia funcional](docs/guia-funcional.md)
+- [Guia tecnica](docs/guia-tecnica.md)
+- [Arranque y configuracion](docs/arranque-y-configuracion.md)
+- [Pruebas y validacion](docs/pruebas-y-validacion.md)
+- [Javadoc y documentacion de codigo](docs/javadoc.md)
+- [Arquitectura backend](specs/arquitectura-backend-hexagonal.md)
+- [Arquitectura frontend](specs/arquitectura-frontend-vertical-slicing.md)
+- [Memoria de progreso](specs/memoria_progreso_2026-05-09.md)
 
-## Metodología de desarrollo
+## Comandos utiles
 
-- **GitFlow**: ramas `main`, `develop` y `feature/*` por funcionalidad
-- **Arquitectura**: Hexagonal (backend) + Screaming Architecture (frontend)
-- **Principios**: SOLID aplicados en ambas capas
+Backend:
+
+```bash
+cd backend-spring
+./mvnw test
+./mvnw clean test
+./mvnw javadoc:javadoc
+```
+
+Frontend:
+
+```bash
+cd front-nuxt
+npm install
+npm run dev
+npm run build
+npm test
+```
+
+Docker:
+
+```bash
+cd docker
+docker compose ps
+docker compose logs api --tail 120
+docker compose logs front --tail 120
+docker compose up --build -d
+```
+
+## Estado actual
+
+El proyecto esta en fase de cierre funcional. Queda recomendado realizar una ronda completa de pruebas manuales, revisar textos finales de documentacion y preparar capturas o demo guiada para presentacion.

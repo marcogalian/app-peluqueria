@@ -26,13 +26,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Servicio de aplicacion del chatbot.
+ * Caso de uso principal del asistente de gestion.
  *
- * Implementa los casos de uso (entrada) y depende solo de puertos de salida:
- *  - ModeloLenguaje                  → para hablar con el modelo
- *  - ContextoNegocio            → para inyectar el contexto estatico
- *  - ConsultasGestionPeluqueria       → para resolver las funciones que pide el modelo
- *  - PeluqueroRepository        → para resolver el peluquero del usuario autenticado
+ * Orquesta respuestas directas desde base de datos y llamadas al modelo de
+ * lenguaje. Las consultas criticas de negocio, como clientes VIP o total de
+ * clientes, se resuelven localmente para no depender de la cuota de Gemini.
  */
 @Service
 @RequiredArgsConstructor

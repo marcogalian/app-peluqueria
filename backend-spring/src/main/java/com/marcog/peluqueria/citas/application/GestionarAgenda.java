@@ -13,6 +13,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Caso de uso principal para gestionar la agenda del salon.
+ *
+ * Centraliza altas, modificaciones, cancelaciones y finalizacion de citas.
+ * Tambien protege la regla de negocio que impide solapar citas activas del
+ * mismo empleado en el mismo tramo horario.
+ */
 @Service
 @RequiredArgsConstructor
 public class GestionarAgenda {

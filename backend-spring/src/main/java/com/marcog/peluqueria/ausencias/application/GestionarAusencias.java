@@ -19,6 +19,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Caso de uso para solicitudes de ausencias, vacaciones y bajas.
+ *
+ * Aplica reglas de antelacion, validacion de dias bloqueados, aprobacion,
+ * rechazo y marcado de notificaciones vistas por el empleado. Las bajas no se
+ * bloquean por calendario porque representan situaciones inevitables.
+ */
 @Service
 @RequiredArgsConstructor
 public class GestionarAusencias implements GestionarAusencia {

@@ -10,7 +10,9 @@ import java.util.UUID;
 public interface JpaDiaBloqueadoRepository extends JpaRepository<DiaBloqueadoEntity, UUID> {
 
     /**
-     * Solapamiento de rangos: dia.fechaInicio <= fin AND dia.fechaFin >= inicio.
+     * Solapamiento de rangos: fecha de inicio del bloqueo anterior o igual al
+     * fin solicitado, y fecha de fin del bloqueo posterior o igual al inicio
+     * solicitado.
      */
     @Query("""
             SELECT d FROM DiaBloqueadoEntity d
