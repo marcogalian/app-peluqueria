@@ -32,8 +32,8 @@ public class GeminiClient {
 
     private static final List<String> FALLBACK_MODELS = List.of(
         "gemini-2.0-flash",
-        "gemini-1.5-flash",
-        "gemini-2.0-flash-lite"
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash-latest"
     );
 
     public GeminiClient(@Qualifier("geminiRestTemplate") RestTemplate restTemplate) {
@@ -59,8 +59,7 @@ public class GeminiClient {
                 if (e.getMessage() != null && e.getMessage().contains("429")) {
                     log.warn("Quota agotada para {}, probando siguiente modelo", currentModel);
                 } else {
-                    log.error("Error llamando a Gemini API con {}: {}", currentModel, e.getMessage());
-                    break;
+                    log.warn("Error con {} ({}), probando siguiente modelo", currentModel, e.getMessage() != null ? e.getMessage().substring(0, Math.min(80, e.getMessage().length())) : "unknown");
                 }
             }
         }
