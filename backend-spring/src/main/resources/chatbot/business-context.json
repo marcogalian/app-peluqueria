@@ -1,0 +1,77 @@
+{
+  "negocio": {
+    "nombre": "Peluquería Isabella",
+    "direccion": "Calle Principal 15, Madrid",
+    "telefono": "+34 600 123 456",
+    "email": "admin@peluqueria.com",
+    "horario": {
+      "lunesViernes": "09:00 - 21:00",
+      "sabado": "09:00 - 14:00",
+      "domingo": "Cerrado"
+    }
+  },
+  "politicas": {
+    "cancelacion": "Se puede cancelar hasta 24 horas antes sin coste. Cancelaciones tardías pueden suponer un cargo del 50%.",
+    "reservas": "Las citas se pueden reservar por teléfono o a través de la aplicación.",
+    "vacacionesEmpleados": "22 días laborables al año, solicitar con 15 días de antelación mínimo.",
+    "descuentoVip": "Los clientes VIP tienen descuento personalizado según su historial.",
+    "formasPago": "Efectivo, tarjeta de crédito/débito y transferencia bancaria."
+  },
+  "equipo": [
+    {
+      "nombre": "Sofía Martínez",
+      "especialidad": "Colorimetría y mechas",
+      "horario": "Lunes a Viernes 09:00-17:00"
+    },
+    {
+      "nombre": "Carmen López",
+      "especialidad": "Corte femenino y alisados",
+      "horario": "Lunes a Viernes 10:00-18:00"
+    },
+    {
+      "nombre": "Lucía Fernández",
+      "especialidad": "Tratamientos capilares",
+      "horario": "Martes a Sábado 09:00-17:00"
+    }
+  ],
+  "servicios": [
+    { "nombre": "Corte de cabello mujer",  "precio": 25.00, "duracionMinutos": 45,  "genero": "FEMENINO",  "categoria": "SENORA",    "descripcion": "Corte personalizado con acabado profesional" },
+    { "nombre": "Corte de cabello hombre", "precio": 15.00, "duracionMinutos": 30,  "genero": "MASCULINO", "categoria": "CABALLERO", "descripcion": "Corte clásico o moderno con lavado incluido" },
+    { "nombre": "Mechas californianas",    "precio": 75.00, "duracionMinutos": 120, "genero": "FEMENINO",  "categoria": "SENORA",    "descripcion": "Técnica de iluminación degradada sin raíz marcada" },
+    { "nombre": "Coloración completa",     "precio": 55.00, "duracionMinutos": 90,  "genero": "FEMENINO",  "categoria": "SENORA",    "descripcion": "Tinte de raíz a puntas con fórmula personalizada" },
+    { "nombre": "Balayage",                "precio": 85.00, "duracionMinutos": 150, "genero": "FEMENINO",  "categoria": "SENORA",    "descripcion": "Coloración a mano alzada para efecto natural" },
+    { "nombre": "Alisado brasileño",       "precio": 90.00, "duracionMinutos": 180, "genero": "FEMENINO",  "categoria": "SENORA",    "descripcion": "Tratamiento de alisado duradero con keratina" },
+    { "nombre": "Tratamiento hidratación", "precio": 35.00, "duracionMinutos": 60,  "genero": "MASCULINO", "categoria": "CABALLERO", "descripcion": "Mascarilla nutritiva profesional con vapor" },
+    { "nombre": "Peinado de novia",        "precio": 80.00, "duracionMinutos": 90,  "genero": "FEMENINO",  "categoria": "SENORA",    "descripcion": "Recogido o semirecogido para eventos especiales" },
+    { "nombre": "Lavado y secado",         "precio": 18.00, "duracionMinutos": 30,  "genero": "FEMENINO",  "categoria": "SENORA",    "descripcion": "Lavado con champú profesional y secado con moldeado" },
+    { "nombre": "Permanente",              "precio": 60.00, "duracionMinutos": 120, "genero": "FEMENINO",  "categoria": "SENORA",    "descripcion": "Ondulación duradera con fijación en frío o calor" },
+    { "nombre": "Depilación facial",       "precio": 12.00, "duracionMinutos": 20,  "genero": "MASCULINO", "categoria": "CABALLERO", "descripcion": "Perfilado de cejas, orejas o pómulos con acabado limpio" },
+    { "nombre": "Tinte de barba",          "precio": 20.00, "duracionMinutos": 30,  "genero": "MASCULINO", "categoria": "CABALLERO", "descripcion": "Coloración y perfilado profesional de barba" },
+    { "nombre": "Corte degradado premium", "precio": 19.00, "duracionMinutos": 35,  "genero": "MASCULINO", "categoria": "CABALLERO", "descripcion": "Fade con contornos definidos y acabado de precisión" },
+    { "nombre": "Arreglo de barba",        "precio": 14.00, "duracionMinutos": 25,  "genero": "MASCULINO", "categoria": "CABALLERO", "descripcion": "Diseño, perfilado y acabado con toalla caliente" },
+    { "nombre": "Lavado detox hombre",     "precio": 16.00, "duracionMinutos": 20,  "genero": "MASCULINO", "categoria": "CABALLERO", "descripcion": "Lavado profundo con masaje capilar y producto detox" },
+    { "nombre": "Cobertura de canas",      "precio": 24.00, "duracionMinutos": 35,  "genero": "MASCULINO", "categoria": "CABALLERO", "descripcion": "Aplicación express de color para cubrir canas" }
+  ],
+  "productos": [
+    { "nombre": "Champú hidratante Wella",        "precio": 12.50, "categoria": "CHAMPU",        "genero": "FEMENINO",  "descripcion": "Champú profesional para cabello seco y dañado" },
+    { "nombre": "Champú anticaída Kerastase",     "precio": 18.00, "categoria": "CHAMPU",        "genero": "MASCULINO", "descripcion": "Fórmula reforzante con aminoácidos y cafeína" },
+    { "nombre": "Champú equilibrante Unisex",     "precio": 10.00, "categoria": "CHAMPU",        "genero": "UNISEX",    "descripcion": "Para uso diario con pH neutro y extractos naturales" },
+    { "nombre": "Acondicionador nutritivo L'Oréal","precio": 14.00, "categoria": "ACONDICIONADOR","genero": "FEMENINO",  "descripcion": "Mascarilla acondicionadora con aceite de argán" },
+    { "nombre": "Mascarilla reparadora Redken",   "precio": 22.00, "categoria": "ACONDICIONADOR","genero": "UNISEX",    "descripcion": "Tratamiento intensivo para puntas abiertas" },
+    { "nombre": "Tinte rubio miel Schwarzkopf",   "precio": 9.50,  "categoria": "COLORACION",    "genero": "FEMENINO",  "descripcion": "Coloración permanente tono 7.3 rubio miel" },
+    { "nombre": "Tinte castaño oscuro L'Oréal",  "precio": 9.00,  "categoria": "COLORACION",    "genero": "UNISEX",    "descripcion": "Coloración permanente tono 3.0 castaño oscuro" },
+    { "nombre": "Decolorante en polvo Wella",     "precio": 11.00, "categoria": "COLORACION",    "genero": "UNISEX",    "descripcion": "Polvo decolorante de alta potencia hasta 7 tonos" },
+    { "nombre": "Cera modeladora Gatsby",         "precio": 8.00,  "categoria": "CERA",          "genero": "MASCULINO", "descripcion": "Cera de fijación fuerte con acabado mate" },
+    { "nombre": "Pomada American Crew",           "precio": 11.50, "categoria": "CERA",          "genero": "MASCULINO", "descripcion": "Fijación media con brillo intenso para hombre" },
+    { "nombre": "Laca fijadora Elnett",           "precio": 7.50,  "categoria": "OTRO",          "genero": "FEMENINO",  "descripcion": "Laca de fijación fuerte y larga duración" },
+    { "nombre": "Plancha cerámica Babyliss",      "precio": 89.00, "categoria": "HERRAMIENTA",   "genero": "UNISEX",    "descripcion": "Plancha profesional 230°C con placas flotantes" },
+    { "nombre": "Rizador automático Remington",   "precio": 65.00, "categoria": "HERRAMIENTA",   "genero": "FEMENINO",  "descripcion": "Rizador de barril intercambiable, 180-210°C" },
+    { "nombre": "Sérum antifrizz Moroccanoil",    "precio": 28.00, "categoria": "OTRO",          "genero": "UNISEX",    "descripcion": "Aceite de argán puro para control del encrespamiento" },
+    { "nombre": "Spray termoprotector Tresemmé",  "precio": 9.00,  "categoria": "OTRO",          "genero": "UNISEX",    "descripcion": "Protección hasta 230°C antes de aplicar calor" }
+  ],
+  "ofertas": [
+    { "nombre": "Martes de Color",   "descripcion": "20% de descuento en coloraciones cada martes",           "descuento": 20 },
+    { "nombre": "Pack Primavera",    "descripcion": "15% en cortes y tratamientos durante toda la primavera", "descuento": 15 },
+    { "nombre": "Descuento Fidelidad","descripcion": "10% en productos para clientes habituales",             "descuento": 10 }
+  ]
+}
