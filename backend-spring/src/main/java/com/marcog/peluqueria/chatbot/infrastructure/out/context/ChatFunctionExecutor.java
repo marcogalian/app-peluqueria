@@ -8,6 +8,8 @@ import com.marcog.peluqueria.ausencias.domain.model.SolicitudAusencia;
 import com.marcog.peluqueria.ausencias.domain.port.out.AusenciaRepositoryPort;
 import com.marcog.peluqueria.finanzas.application.service.FinanzasDashboardService;
 import com.marcog.peluqueria.finanzas.domain.model.DashboardStats;
+import com.marcog.peluqueria.productos.domain.model.Producto;
+import com.marcog.peluqueria.productos.domain.port.out.ProductoRepositoryPort;
 import com.marcog.peluqueria.productos.infrastructure.out.persistence.JpaVentaProductoRepository;
 import com.marcog.peluqueria.productos.infrastructure.out.persistence.VentaProductoEntity;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class ChatFunctionExecutor {
     private final AusenciaRepositoryPort ausenciaRepository;
     private final FinanzasDashboardService dashboardService;
     private final JpaVentaProductoRepository ventaProductoRepository;
+    private final ProductoRepositoryPort productoRepository;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public String execute(String functionName, JsonNode args, UUID peluqueroId, boolean isAdmin) {
@@ -55,6 +58,10 @@ public class ChatFunctionExecutor {
                 case "getProductosMasVendidos" -> {
                     if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar ventas\"}";
                     yield getProductosMasVendidos(args);
+                }
+                case "getInventario" -> {
+                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar inventario\"}";
+                    yield getInventario();
                 }
                 default -> "{\"error\": \"Funcion no reconocida: " + functionName + "\"}";
             };
@@ -174,6 +181,35 @@ public class ChatFunctionExecutor {
             return mapper.writeValueAsString(Map.of("productosStockBajo", stockBajo, "total", stockBajo.size()));
         } catch (Exception e) {
             return "{\"error\": \"Error serializando productos\"}";
+        }
+    }
+
+    private String getInventario() {
+        List<Producto> productos = productoRepository.findAll().stream()
+                .filter(Producto::isActivo)
+                .collect(Collectors.toList());
+
+        int totalProductos = productos.size();
+        int totalUnidades = productos.stream()
+                .mapToInt(p -> p.getStock() != null ? p.getStock() : 0)
+                .sum();
+
+        List<Map<String, Object>> detalle = productos.stream()
+                .map(p -> Map.<String, Object>of(
+                        "nombre", p.getNombre(),
+                        "stock", p.getStock() != null ? p.getStock() : 0,
+                        "stockMinimo", p.getStockMinimo() != null ? p.getStockMinimo() : 0
+                ))
+                .collect(Collectors.toList());
+
+        try {
+            return mapper.writeValueAsString(Map.of(
+                    "totalProductosDistintos", totalProductos,
+                    "totalUnidadesEnStock", totalUnidades,
+                    "detalle", detalle
+            ));
+        } catch (Exception e) {
+            return "{\"error\": \"Error serializando inventario\"}";
         }
     }
 

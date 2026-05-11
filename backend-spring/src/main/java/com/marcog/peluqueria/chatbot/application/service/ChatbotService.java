@@ -144,6 +144,12 @@ public class ChatbotService {
                             "required", List.of("periodo")
                     )
             ));
+
+            tools.add(Map.of(
+                    "name", "getInventario",
+                    "description", "Obtiene el inventario completo: numero total de productos distintos, unidades totales en stock y detalle por producto",
+                    "parameters", Map.of("type", "object", "properties", Map.of())
+            ));
         }
 
         return tools;
