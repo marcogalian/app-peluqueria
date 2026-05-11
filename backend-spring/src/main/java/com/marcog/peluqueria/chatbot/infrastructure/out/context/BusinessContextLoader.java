@@ -3,6 +3,8 @@ package com.marcog.peluqueria.chatbot.infrastructure.out.context;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.marcog.peluqueria.ofertas.domain.model.Oferta;
+import com.marcog.peluqueria.ofertas.domain.port.out.OfertaRepositoryPort;
 import com.marcog.peluqueria.peluqueros.domain.model.Peluquero;
 import com.marcog.peluqueria.peluqueros.domain.port.out.PeluqueroRepositoryPort;
 import com.marcog.peluqueria.productos.domain.model.Producto;
@@ -25,6 +27,7 @@ public class BusinessContextLoader {
     private final ServicioRepository servicioRepository;
     private final ProductoRepositoryPort productoRepository;
     private final PeluqueroRepositoryPort peluqueroRepository;
+    private final OfertaRepositoryPort ofertaRepository;
     private final ObjectMapper mapper = new ObjectMapper();
 
     private volatile String cachedContext = "";
@@ -99,9 +102,24 @@ public class BusinessContextLoader {
             }
             root.set("productos", productosNode);
 
+            // Ofertas activas
+            List<Oferta> ofertas = ofertaRepository.findActivas();
+            ArrayNode ofertasNode = mapper.createArrayNode();
+            for (Oferta o : ofertas) {
+                ObjectNode on = mapper.createObjectNode();
+                on.put("nombre", o.getNombre());
+                if (o.getDescripcion() != null) on.put("descripcion", o.getDescripcion());
+                if (o.getDescuentoPorcentaje() != null) on.put("descuentoPorcentaje", o.getDescuentoPorcentaje());
+                if (o.getFechaInicio() != null) on.put("fechaInicio", o.getFechaInicio().toString());
+                if (o.getFechaFin() != null) on.put("fechaFin", o.getFechaFin().toString());
+                if (o.getTipo() != null) on.put("tipo", o.getTipo().name());
+                ofertasNode.add(on);
+            }
+            root.set("ofertas", ofertasNode);
+
             cachedContext = mapper.writeValueAsString(root);
-            log.info("Contexto regenerado desde BD: {} servicios, {} productos activos",
-                    servicios.size(), productosNode.size());
+            log.info("Contexto regenerado desde BD: {} peluqueros, {} servicios, {} productos, {} ofertas",
+                    peluqueros.size(), servicios.size(), productosNode.size(), ofertas.size());
         } catch (Exception e) {
             log.error("Error regenerando contexto: {}", e.getMessage());
         }
