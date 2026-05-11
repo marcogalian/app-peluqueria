@@ -13,10 +13,6 @@ public class RegistrarClienteService implements RegistrarClienteUseCase {
 
     @Override
     public Cliente ejecutar(Cliente cliente){
-        // TODO logica de negocio
-        // teléfono existe?, normalizar el nombre, etc.
-        System.out.println("Registrando cliente: " + cliente.getNombre());
-
         return clienteRepository.save(cliente);
     }
 }

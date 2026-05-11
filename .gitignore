@@ -17,6 +17,9 @@ docker/postgres_data/
 .env.*.local
 *.env
 
+# ── Planes internos (no subir) ─────────────────────────────
+plan-*.md
+
 # ── Archivos de desarrollo/scripts locales ─────────────────
 scripts/
 create_modules.py
