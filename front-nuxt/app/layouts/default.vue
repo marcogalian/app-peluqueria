@@ -12,4 +12,5 @@
       </main>
     </div>
   </div>
+  <ChatbotWidget />
 </template>
