@@ -38,7 +38,9 @@ public class ChatbotService {
             FUNCIONES (datos en tiempo real desde BD):
             - getCitasEmpleado(fecha?): citas del empleado autenticado, default hoy
             - getVacacionesEmpleado(): vacaciones del empleado autenticado
-            - Solo admin: getGanancias, getCitasAtendidas, getProductosStockBajo, getProductosMasVendidos, getInventario
+            - Solo admin: getGanancias, getCitasAtendidas, getProductosStockBajo, getProductosMasVendidos, getInventario, getClientesVip, getTotalClientes
+
+            IMPORTANTE: Si el admin pregunta por clientes (cuantos hay, VIP, nombres), DEBES llamar a getTotalClientes o getClientesVip. NUNCA digas que no tienes acceso a clientes — siempre llama la funcion.
 
             REGLAS IMPORTANTES:
             - Responde SIEMPRE en espanol, amable y conciso (2-3 frases para respuestas simples)
