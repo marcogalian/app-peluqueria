@@ -195,7 +195,7 @@ public class ChatFunctionExecutor {
         }
 
         List<Map<String, Object>> ranking = totales.entrySet().stream()
-                .sorted(Comparator.<Map.Entry<String, Integer>>comparingByValue().reversed())
+                .sorted((a, b) -> b.getValue() - a.getValue())
                 .limit(10)
                 .map(e -> Map.<String, Object>of("producto", e.getKey(), "unidadesVendidas", e.getValue()))
                 .collect(Collectors.toList());
