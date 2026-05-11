@@ -5,24 +5,8 @@ import { Trash2, Send, Loader2, Sparkles, Bot } from 'lucide-vue-next'
 definePageMeta({ middleware: 'auth' })
 
 const { messages, loading, suggestedQuestions, sendMessage, clearHistory } = useChatbot()
-const authStore = useAuthStore()
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
-
-const initialSuggestions = computed(() => {
-  const base = [
-    '¿Qué citas tengo hoy?',
-    '¿Cuál es el horario del salón?',
-    '¿Qué servicios ofrecemos?',
-    '¿Qué productos tenemos?',
-  ]
-  if (authStore.isAdmin) {
-    base.push('¿Cómo van las ganancias este mes?')
-  }
-  return base
-})
-
-const showInitialSuggestions = computed(() => messages.value.length === 0 && !loading.value)
 
 async function handleSend() {
   const text = inputText.value.trim()
@@ -81,26 +65,13 @@ watch(messages, () => {
       <!-- Mensajes -->
       <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
 
-        <!-- Sugerencias iniciales -->
-        <div v-if="showInitialSuggestions" class="flex flex-col items-center gap-4 pt-8">
+        <!-- Estado vacío -->
+        <div v-if="messages.length === 0 && !loading" class="flex flex-col items-center gap-3 pt-12 text-center">
           <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
             <Bot class="w-8 h-8 text-primary" />
           </div>
-          <div class="text-center">
-            <p class="font-semibold text-on-surface">¡Hola! Soy el asistente de Peluquería Isabella</p>
-            <p class="text-sm text-on-surface-variant mt-1">¿En qué puedo ayudarte hoy?</p>
-          </div>
-          <div class="flex flex-wrap gap-2 justify-center max-w-md">
-            <button
-              v-for="sug in initialSuggestions"
-              :key="sug"
-              class="text-sm px-4 py-2 rounded-full bg-surface-container text-on-surface-variant
-                     hover:bg-primary/10 hover:text-primary transition-colors border border-outline-variant/30"
-              @click="handleSuggestion(sug)"
-            >
-              {{ sug }}
-            </button>
-          </div>
+          <p class="font-semibold text-on-surface">Asistente IA</p>
+          <p class="text-sm text-on-surface-variant">Escribe tu pregunta para empezar</p>
         </div>
 
         <!-- Burbujas de mensajes -->
