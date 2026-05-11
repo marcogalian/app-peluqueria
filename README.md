@@ -56,7 +56,6 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 | Lombok | Reduccion de boilerplate |
 | WebSocket STOMP | Chat interno en tiempo real |
 | Spring Mail + Mailtrap | Emails en entorno de pruebas |
-| Twilio | Notificaciones WhatsApp |
 | Gemini API | Asistente IA |
 | Springdoc OpenAPI | Swagger UI y contrato REST |
 

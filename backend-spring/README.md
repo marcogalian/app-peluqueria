@@ -15,7 +15,7 @@ API REST de Peluqueria Isabella.
 - Lombok
 - Springdoc OpenAPI
 - WebSocket STOMP
-- Mailtrap, Twilio y Gemini
+- Mailtrap y Gemini
 
 ## Arquitectura
 
