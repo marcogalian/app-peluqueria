@@ -34,11 +34,9 @@ services:
       # Ajusta estos valores con tus credenciales reales
       MAILTRAP_HOST: sandbox.smtp.mailtrap.io
       MAILTRAP_PORT: 2525
-      MAILTRAP_USERNAME: ${MAILTRAP_USERNAME:-}
-      MAILTRAP_PASSWORD: ${MAILTRAP_PASSWORD:-}
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
-      TWILIO_WHATSAPP_FROM: ${TWILIO_WHATSAPP_FROM:-}
+      MAILTRAP_USERNAME: 51e106a28faced
+      MAILTRAP_PASSWORD: f9e4285727d31a
+      GEMINI_API_KEY: AIzaSyChUdFxLTKRY4yiXh0qOrCx6roNf3p5Wzw
     volumes:
       - uploads_data:/app/uploads
     depends_on:
