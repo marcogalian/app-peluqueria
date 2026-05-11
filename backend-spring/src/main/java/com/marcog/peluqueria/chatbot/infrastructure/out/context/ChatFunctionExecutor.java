@@ -50,7 +50,8 @@ public class ChatFunctionExecutor implements ChatFunctionExecutorPort {
     private final JpaVentaProductoRepository ventaProductoRepository;
     private final ProductoRepositoryPort productoRepository;
     private final ClienteRepository clienteRepository;
-    private final ObjectMapper mapper = new ObjectMapper();
+    // ObjectMapper inyectado de Spring para mantener config consistente con el resto.
+    private final ObjectMapper mapper;
 
     private static final String ERROR_NO_ADMIN_GANANCIAS =
             "{\"error\": \"Solo el administrador puede consultar ganancias\"}";

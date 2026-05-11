@@ -39,7 +39,9 @@ public class BusinessContextLoader implements BusinessContextPort {
     private final ProductoRepositoryPort productoRepository;
     private final PeluqueroRepositoryPort peluqueroRepository;
     private final OfertaRepositoryPort ofertaRepository;
-    private final ObjectMapper mapper = new ObjectMapper();
+    // ObjectMapper inyectado de Spring (autoconfigurado, con modulo JavaTime)
+    // en lugar de new ObjectMapper() para mantener configuracion consistente.
+    private final ObjectMapper mapper;
 
     private volatile String cachedContext = "";
 

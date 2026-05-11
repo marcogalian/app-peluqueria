@@ -36,7 +36,8 @@ public class GeminiClient implements LlmClientPort {
 
     // ── Configuracion ───────────────────────────────────────────────
     private final RestTemplate restTemplate;
-    private final ObjectMapper mapper = new ObjectMapper();
+    // ObjectMapper inyectado de Spring (no new) para reusar el bean autoconfigurado.
+    private final ObjectMapper mapper;
 
     @Value("${gemini.api.key:}")
     private String apiKey;
@@ -57,8 +58,9 @@ public class GeminiClient implements LlmClientPort {
     private static final String ERROR_RESPONSE =
             "Lo siento, no puedo responder ahora. Inténtalo de nuevo.";
 
-    public GeminiClient(@Qualifier("geminiRestTemplate") RestTemplate restTemplate) {
+    public GeminiClient(@Qualifier("geminiRestTemplate") RestTemplate restTemplate, ObjectMapper mapper) {
         this.restTemplate = restTemplate;
+        this.mapper = mapper;
     }
 
     // ── API publica ─────────────────────────────────────────────────

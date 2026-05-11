@@ -120,8 +120,8 @@ public class ProductoService implements GestionarProductoUseCase {
         p.setStock(stockActual - cantidad);
         Producto guardado = repository.guardar(p);
 
-        var productoEntity = jpaProductoRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producto no encontrado: " + id));
+        // getReferenceById devuelve un proxy sin hacer SELECT extra (B5: evitar double lookup)
+        var productoEntity = jpaProductoRepository.getReferenceById(id);
 
         VentaProductoEntity venta = ventaProductoRepository.save(VentaProductoEntity.builder()
                 .producto(productoEntity)
@@ -195,8 +195,8 @@ public class ProductoService implements GestionarProductoUseCase {
             Producto guardado = repository.guardar(producto);
             productosActualizados.add(guardado);
 
-            var productoEntity = jpaProductoRepository.findById(productoId)
-                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producto no encontrado: " + productoId));
+            // Proxy lazy sin SELECT extra (B5: evitar double lookup en venta agrupada)
+            var productoEntity = jpaProductoRepository.getReferenceById(productoId);
 
             lineasPendientes.add(VentaProductoEntity.builder()
                     .producto(productoEntity)
@@ -273,9 +273,13 @@ public class ProductoService implements GestionarProductoUseCase {
     }
 
     private String generarNumeroVenta() {
-        String prefijo = "V-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd", Locale.ROOT)) + "-";
-        long siguiente = ventaRepository.countByNumeroStartingWith(prefijo) + 1;
-        return prefijo + String.format("%04d", siguiente);
+        // Antes: count + 1 -> race condition bajo concurrencia (dos peticiones leen el mismo count
+        // y generan el mismo numero). Ahora: timestamp con milisegundos + sufijo random.
+        // Probabilidad de colision practicamente nula sin necesidad de bloqueos en BD.
+        String marcaTemporal = LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS", Locale.ROOT));
+        int sufijoAleatorio = java.util.concurrent.ThreadLocalRandom.current().nextInt(1000);
+        return "V-" + marcaTemporal + "-" + String.format("%03d", sufijoAleatorio);
     }
 
     private BigDecimal sumarTotales(List<VentaProductoEntity> ventas) {

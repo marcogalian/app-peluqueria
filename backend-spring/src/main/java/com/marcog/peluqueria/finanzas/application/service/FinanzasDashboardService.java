@@ -289,17 +289,10 @@ public class FinanzasDashboardService {
                 .filter(c -> EstadoCita.COMPLETADO.equals(c.getEstado())).collect(Collectors.toList());
         List<VentaProductoEntity> ventasAnio = ventaProductoRepository.findByFechaVentaBetween(anioInicio, ahora);
 
-        double ingresosDia    = sumarIngresos(completadasAnio.stream()
-                .filter(c -> !c.getFechaHora().isBefore(hoyInicio)).collect(Collectors.toList()))
-                + sumarIngresosVentasDouble(filtrarVentasDesde(ventasAnio, hoyInicio));
-        double ingresosSemana = sumarIngresos(completadasAnio.stream()
-                .filter(c -> !c.getFechaHora().isBefore(semanaInicio)).collect(Collectors.toList()))
-                + sumarIngresosVentasDouble(filtrarVentasDesde(ventasAnio, semanaInicio));
-        double ingresosMes    = sumarIngresos(completadasAnio.stream()
-                .filter(c -> !c.getFechaHora().isBefore(mesInicio)).collect(Collectors.toList()))
-                + sumarIngresosVentasDouble(filtrarVentasDesde(ventasAnio, mesInicio));
-        double ingresosAnio   = sumarIngresos(completadasAnio)
-                + sumarIngresosVentasDouble(ventasAnio);
+        double ingresosDia    = sumarIngresosDesde(completadasAnio, ventasAnio, hoyInicio);
+        double ingresosSemana = sumarIngresosDesde(completadasAnio, ventasAnio, semanaInicio);
+        double ingresosMes    = sumarIngresosDesde(completadasAnio, ventasAnio, mesInicio);
+        double ingresosAnio   = sumarIngresos(completadasAnio) + sumarIngresosVentasDouble(ventasAnio);
 
         // Variación vs mes anterior
         LocalDateTime mesAnteriorInicio = mesInicio.minusMonths(1);
@@ -407,6 +400,19 @@ public class FinanzasDashboardService {
         return ventas.stream()
                 .filter(venta -> !venta.getFechaVenta().isBefore(inicio))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Suma ingresos (servicios + productos) desde una fecha hasta ahora.
+     * Extraido para evitar repetir el patron 4 veces (dia/semana/mes/anio).
+     */
+    private double sumarIngresosDesde(List<Cita> completadas,
+                                       List<VentaProductoEntity> ventas,
+                                       LocalDateTime inicio) {
+        List<Cita> citasDesde = completadas.stream()
+                .filter(cita -> !cita.getFechaHora().isBefore(inicio))
+                .collect(Collectors.toList());
+        return sumarIngresos(citasDesde) + sumarIngresosVentasDouble(filtrarVentasDesde(ventas, inicio));
     }
 
     private ResultadosDTO.Evolucion construirEvolucion(List<Cita> completadas, List<VentaProductoEntity> ventas,
