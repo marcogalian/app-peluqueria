@@ -1,9 +1,9 @@
 package com.marcog.peluqueria.chatbot.infrastructure.in.web;
 
-import com.marcog.peluqueria.chatbot.application.service.ChatbotService;
 import com.marcog.peluqueria.chatbot.domain.model.ChatRequest;
 import com.marcog.peluqueria.chatbot.domain.model.ChatResponse;
-import com.marcog.peluqueria.chatbot.infrastructure.out.context.BusinessContextLoader;
+import com.marcog.peluqueria.chatbot.domain.port.in.ChatbotUseCase;
+import com.marcog.peluqueria.chatbot.domain.port.in.RegenerarContextoUseCase;
 import com.marcog.peluqueria.security.infrastructure.config.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -13,7 +13,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Chatbot", description = "Asistente virtual IA con Gemini")
 @RestController
@@ -21,25 +24,28 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class ChatbotController {
 
-    private final ChatbotService chatbotService;
-    private final BusinessContextLoader contextLoader;
+    // Solo dependencias de puertos de entrada (use cases). Sin acoplamiento a infra.
+    private final ChatbotUseCase chatbotUseCase;
+    private final RegenerarContextoUseCase regenerarContextoUseCase;
 
-    @Operation(summary = "Enviar mensaje al chatbot", description = "Envia un mensaje y recibe respuesta del asistente IA")
+    @Operation(summary = "Enviar mensaje al chatbot",
+            description = "Envia un mensaje y recibe respuesta del asistente IA")
     @ApiResponse(responseCode = "200", description = "Respuesta generada")
     @PostMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_HAIRDRESSER')")
     public ResponseEntity<ChatResponse> chat(
             @Valid @RequestBody ChatRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(chatbotService.chat(request, userDetails));
+        return ResponseEntity.ok(chatbotUseCase.chat(request, userDetails));
     }
 
-    @Operation(summary = "Regenerar contexto", description = "Regenera el contexto de negocio del chatbot (solo admin)")
+    @Operation(summary = "Regenerar contexto",
+            description = "Regenera el contexto de negocio del chatbot (solo admin)")
     @ApiResponse(responseCode = "200", description = "Contexto regenerado")
     @PostMapping("/regenerar-contexto")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<String> regenerarContexto() {
-        contextLoader.regenerar();
+        regenerarContextoUseCase.regenerar();
         return ResponseEntity.ok("Contexto regenerado correctamente");
     }
 }

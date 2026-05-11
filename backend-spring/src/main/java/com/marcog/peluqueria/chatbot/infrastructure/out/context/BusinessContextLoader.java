@@ -3,6 +3,7 @@ package com.marcog.peluqueria.chatbot.infrastructure.out.context;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.marcog.peluqueria.chatbot.domain.port.out.BusinessContextPort;
 import com.marcog.peluqueria.ofertas.domain.model.Oferta;
 import com.marcog.peluqueria.ofertas.domain.port.out.OfertaRepositoryPort;
 import com.marcog.peluqueria.peluqueros.domain.model.Peluquero;
@@ -31,7 +32,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class BusinessContextLoader {
+public class BusinessContextLoader implements BusinessContextPort {
 
     // ── Dependencias ────────────────────────────────────────────────
     private final ServicioRepository servicioRepository;
@@ -44,6 +45,7 @@ public class BusinessContextLoader {
 
     // ── Ciclo de vida ───────────────────────────────────────────────
 
+    @Override
     @PostConstruct
     @Scheduled(cron = "0 0 3 * * *")
     public void regenerar() {
@@ -65,6 +67,7 @@ public class BusinessContextLoader {
         }
     }
 
+    @Override
     public String getContext() {
         return cachedContext;
     }

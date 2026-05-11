@@ -30,6 +30,11 @@ public class PeluqueroPersistenceAdapter implements PeluqueroRepositoryPort {
     }
 
     @Override
+    public Optional<Peluquero> findByUserId(UUID userId) {
+        return repository.findByUserId(userId).map(mapper::toDomain);
+    }
+
+    @Override
     public Peluquero save(Peluquero peluquero) {
         PeluqueroEntity entity = mapper.toEntity(peluquero);
         PeluqueroEntity savedEntity = repository.save(entity);

@@ -10,6 +10,8 @@ public interface PeluqueroRepositoryPort {
 
     Optional<Peluquero> findById(UUID id);
 
+    Optional<Peluquero> findByUserId(UUID userId);
+
     Peluquero save(Peluquero peluquero);
 
     void deleteById(UUID id);

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.marcog.peluqueria.ausencias.domain.model.EstadoAusencia;
 import com.marcog.peluqueria.ausencias.domain.model.SolicitudAusencia;
 import com.marcog.peluqueria.ausencias.domain.port.out.AusenciaRepositoryPort;
+import com.marcog.peluqueria.chatbot.domain.port.out.ChatFunctionExecutorPort;
 import com.marcog.peluqueria.citas.domain.model.Cita;
 import com.marcog.peluqueria.citas.domain.model.EstadoCita;
 import com.marcog.peluqueria.citas.domain.port.out.CitaRepositoryPort;
@@ -40,7 +41,7 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class ChatFunctionExecutor {
+public class ChatFunctionExecutor implements ChatFunctionExecutorPort {
 
     // ── Dependencias ────────────────────────────────────────────────
     private final CitaRepositoryPort citaRepository;
@@ -66,6 +67,7 @@ public class ChatFunctionExecutor {
 
     // ── Dispatcher publico ──────────────────────────────────────────
 
+    @Override
     public String execute(String functionName, JsonNode args, UUID peluqueroId, boolean isAdmin) {
         try {
             return switch (functionName) {

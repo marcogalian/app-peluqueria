@@ -1,29 +1,48 @@
 package com.marcog.peluqueria.chatbot.application.service;
 
-import com.marcog.peluqueria.chatbot.domain.model.ChatMessageDto;
 import com.marcog.peluqueria.chatbot.domain.model.ChatRequest;
 import com.marcog.peluqueria.chatbot.domain.model.ChatResponse;
-import com.marcog.peluqueria.chatbot.infrastructure.out.context.BusinessContextLoader;
-import com.marcog.peluqueria.chatbot.infrastructure.out.context.ChatFunctionExecutor;
-import com.marcog.peluqueria.chatbot.infrastructure.out.gemini.GeminiClient;
-import com.marcog.peluqueria.chatbot.infrastructure.out.gemini.GeminiClient.GeminiResult;
-import com.marcog.peluqueria.peluqueros.infrastructure.out.persistence.JpaPeluqueroRepository;
+import com.marcog.peluqueria.chatbot.domain.model.LlmResult;
+import com.marcog.peluqueria.chatbot.domain.port.in.ChatbotUseCase;
+import com.marcog.peluqueria.chatbot.domain.port.in.RegenerarContextoUseCase;
+import com.marcog.peluqueria.chatbot.domain.port.out.BusinessContextPort;
+import com.marcog.peluqueria.chatbot.domain.port.out.ChatFunctionExecutorPort;
+import com.marcog.peluqueria.chatbot.domain.port.out.LlmClientPort;
+import com.marcog.peluqueria.peluqueros.domain.port.out.PeluqueroRepositoryPort;
 import com.marcog.peluqueria.security.infrastructure.config.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.time.LocalDate;
+import java.time.format.TextStyle;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
+/**
+ * Servicio de aplicacion del chatbot.
+ *
+ * Implementa los casos de uso (entrada) y depende solo de puertos de salida:
+ *  - LlmClientPort                  → para hablar con el modelo
+ *  - BusinessContextPort            → para inyectar el contexto estatico
+ *  - ChatFunctionExecutorPort       → para resolver las funciones que pide el modelo
+ *  - PeluqueroRepositoryPort        → para resolver el peluquero del usuario autenticado
+ */
 @Service
 @RequiredArgsConstructor
-public class ChatbotService {
+public class ChatbotService implements ChatbotUseCase, RegenerarContextoUseCase {
 
-    private final GeminiClient geminiClient;
-    private final BusinessContextLoader contextLoader;
-    private final ChatFunctionExecutor functionExecutor;
-    private final JpaPeluqueroRepository peluqueroRepository;
+    // ── Dependencias (solo puertos) ─────────────────────────────────
+    private final LlmClientPort llmClient;
+    private final BusinessContextPort contextLoader;
+    private final ChatFunctionExecutorPort functionExecutor;
+    private final PeluqueroRepositoryPort peluqueroRepository;
 
     private static final int MAX_ITERACIONES_FUNCTION_CALLING = 3;
+    private static final Locale LOCALE_ES = new Locale("es", "ES");
 
     private static final String SYSTEM_PROMPT = """
             Eres el asistente virtual de Peluqueria Isabella. Respondes en espanol, de forma amable y concisa.
@@ -54,25 +73,17 @@ public class ChatbotService {
             Contexto del negocio:
             """;
 
+    // ── Casos de uso ────────────────────────────────────────────────
+
+    @Override
     public ChatResponse chat(ChatRequest request, CustomUserDetails userDetails) {
-        boolean isAdmin = userDetails.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = esAdmin(userDetails);
+        UUID peluqueroId = resolverPeluqueroDelUsuario(userDetails);
 
-        UUID userId = userDetails.getUserEntity().getId();
-        UUID peluqueroId = peluqueroRepository.findByUserId(userId)
-                .map(p -> p.getId())
-                .orElse(null);
-
-        String fechaHoy = java.time.LocalDate.now().toString();
-        String diaSemana = java.time.LocalDate.now().getDayOfWeek()
-                .getDisplayName(java.time.format.TextStyle.FULL, new java.util.Locale("es", "ES"));
-        String systemInstruction = SYSTEM_PROMPT
-                + "\nFecha actual: " + fechaHoy + " (" + diaSemana + ")\n"
-                + "Cuando el usuario diga 'hoy', usa esta fecha. Para 'mañana' suma un dia.\n\n"
-                + contextLoader.getContext();
+        String systemInstruction = construirSystemInstruction();
         List<Map<String, Object>> tools = buildToolDeclarations(isAdmin);
 
-        GeminiResult resultadoModelo = geminiClient.generateContent(
+        LlmResult resultadoModelo = llmClient.generateContent(
                 systemInstruction, request.getHistory(), request.getMessage(), tools);
 
         // Bucle de function calling. Limite duro para evitar loops infinitos.
@@ -85,7 +96,7 @@ public class ChatbotService {
                     isAdmin);
 
             // Mantener coherencia: usar el mismo modelo y los args originales
-            resultadoModelo = geminiClient.sendFunctionResponse(
+            resultadoModelo = llmClient.sendFunctionResponse(
                     resultadoModelo.modelUsed(),
                     systemInstruction,
                     request.getHistory(),
@@ -108,10 +119,41 @@ public class ChatbotService {
                 .build();
     }
 
+    @Override
+    public void regenerar() {
+        contextLoader.regenerar();
+    }
+
+    // ── Helpers privados ────────────────────────────────────────────
+
+    private boolean esAdmin(CustomUserDetails userDetails) {
+        return userDetails.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+    }
+
+    private UUID resolverPeluqueroDelUsuario(CustomUserDetails userDetails) {
+        UUID userId = userDetails.getUserEntity().getId();
+        // Puede devolver null para admins que no son peluqueros: aceptado.
+        return peluqueroRepository.findByUserId(userId)
+                .map(peluquero -> peluquero.getId())
+                .orElse(null);
+    }
+
+    private String construirSystemInstruction() {
+        LocalDate hoy = LocalDate.now();
+        String fechaHoy = hoy.toString();
+        String diaSemana = hoy.getDayOfWeek().getDisplayName(TextStyle.FULL, LOCALE_ES);
+
+        return SYSTEM_PROMPT
+                + "\nFecha actual: " + fechaHoy + " (" + diaSemana + ")\n"
+                + "Cuando el usuario diga 'hoy', usa esta fecha. Para 'mañana' suma un dia.\n\n"
+                + contextLoader.getContext();
+    }
+
     private List<Map<String, Object>> buildToolDeclarations(boolean isAdmin) {
         List<Map<String, Object>> tools = new ArrayList<>();
 
-        // Functions for all roles
+        // ── Funciones para todos los roles ──────────────────────────
         tools.add(Map.of(
                 "name", "getCitasEmpleado",
                 "description", "Obtiene las citas del empleado autenticado. Si no se indica fecha, usa la de hoy.",
@@ -122,99 +164,89 @@ public class ChatbotService {
                         )
                 )
         ));
-
         tools.add(Map.of(
                 "name", "getVacacionesEmpleado",
                 "description", "Obtiene las vacaciones y ausencias del empleado autenticado",
                 "parameters", Map.of("type", "object", "properties", Map.of())
         ));
 
-        // Admin-only functions
-        if (isAdmin) {
-            tools.add(Map.of(
-                    "name", "getGanancias",
-                    "description", "Obtiene ingresos, gastos y beneficio del negocio",
-                    "parameters", Map.of(
-                            "type", "object",
-                            "properties", Map.of(
-                                    "periodo", Map.of("type", "string", "description", "Periodo: hoy, semana o mes")
-                            ),
-                            "required", List.of("periodo")
-                    )
-            ));
+        if (!isAdmin) return tools;
 
-            tools.add(Map.of(
-                    "name", "getCitasAtendidas",
-                    "description", "Obtiene cuantas citas ha atendido un empleado en un periodo",
-                    "parameters", Map.of(
-                            "type", "object",
-                            "properties", Map.of(
-                                    "empleadoId", Map.of("type", "string", "description", "UUID del empleado"),
-                                    "periodo", Map.of("type", "string", "description", "Periodo: hoy, semana o mes")
-                            ),
-                            "required", List.of("empleadoId", "periodo")
-                    )
-            ));
-
-            tools.add(Map.of(
-                    "name", "getProductosStockBajo",
-                    "description", "Obtiene los productos con stock por debajo del minimo",
-                    "parameters", Map.of("type", "object", "properties", Map.of())
-            ));
-
-            tools.add(Map.of(
-                    "name", "getProductosMasVendidos",
-                    "description", "Obtiene el ranking de productos mas vendidos por unidades en un periodo",
-                    "parameters", Map.of(
-                            "type", "object",
-                            "properties", Map.of(
-                                    "periodo", Map.of("type", "string", "description", "Periodo: hoy, semana o mes")
-                            ),
-                            "required", List.of("periodo")
-                    )
-            ));
-
-            tools.add(Map.of(
-                    "name", "getInventario",
-                    "description", "Obtiene el inventario completo: numero total de productos distintos, unidades totales en stock y detalle por producto",
-                    "parameters", Map.of("type", "object", "properties", Map.of())
-            ));
-
-            tools.add(Map.of(
-                    "name", "getClientesVip",
-                    "description", "Obtiene el listado de clientes VIP con nombre, telefono y descuento personalizado",
-                    "parameters", Map.of("type", "object", "properties", Map.of())
-            ));
-
-            tools.add(Map.of(
-                    "name", "getTotalClientes",
-                    "description", "Obtiene el numero total de clientes (activos, archivados y cuantos son VIP)",
-                    "parameters", Map.of("type", "object", "properties", Map.of())
-            ));
-        }
+        // ── Funciones solo para admin ───────────────────────────────
+        tools.add(Map.of(
+                "name", "getGanancias",
+                "description", "Obtiene ingresos, gastos y beneficio del negocio",
+                "parameters", Map.of(
+                        "type", "object",
+                        "properties", Map.of(
+                                "periodo", Map.of("type", "string", "description", "Periodo: hoy, semana o mes")
+                        ),
+                        "required", List.of("periodo")
+                )
+        ));
+        tools.add(Map.of(
+                "name", "getCitasAtendidas",
+                "description", "Obtiene cuantas citas ha atendido un empleado en un periodo",
+                "parameters", Map.of(
+                        "type", "object",
+                        "properties", Map.of(
+                                "empleadoId", Map.of("type", "string", "description", "UUID del empleado"),
+                                "periodo", Map.of("type", "string", "description", "Periodo: hoy, semana o mes")
+                        ),
+                        "required", List.of("empleadoId", "periodo")
+                )
+        ));
+        tools.add(Map.of(
+                "name", "getProductosStockBajo",
+                "description", "Obtiene los productos con stock por debajo del minimo",
+                "parameters", Map.of("type", "object", "properties", Map.of())
+        ));
+        tools.add(Map.of(
+                "name", "getProductosMasVendidos",
+                "description", "Obtiene el ranking de productos mas vendidos por unidades en un periodo",
+                "parameters", Map.of(
+                        "type", "object",
+                        "properties", Map.of(
+                                "periodo", Map.of("type", "string", "description", "Periodo: hoy, semana o mes")
+                        ),
+                        "required", List.of("periodo")
+                )
+        ));
+        tools.add(Map.of(
+                "name", "getInventario",
+                "description", "Obtiene el inventario completo: numero total de productos distintos, unidades totales en stock y detalle por producto",
+                "parameters", Map.of("type", "object", "properties", Map.of())
+        ));
+        tools.add(Map.of(
+                "name", "getClientesVip",
+                "description", "Obtiene el listado de clientes VIP con nombre, telefono y descuento personalizado",
+                "parameters", Map.of("type", "object", "properties", Map.of())
+        ));
+        tools.add(Map.of(
+                "name", "getTotalClientes",
+                "description", "Obtiene el numero total de clientes (activos, archivados y cuantos son VIP)",
+                "parameters", Map.of("type", "object", "properties", Map.of())
+        ));
 
         return tools;
     }
 
     private List<String> extractSuggestions(String reply) {
         List<String> suggestions = new ArrayList<>();
-        int idx = reply.indexOf("[SUGERENCIAS]:");
-        if (idx >= 0) {
-            String sugPart = reply.substring(idx + "[SUGERENCIAS]:".length()).trim();
-            sugPart = sugPart.replaceAll("[\\[\\]\"]", "");
-            for (String s : sugPart.split(",")) {
-                String trimmed = s.trim();
-                if (!trimmed.isEmpty()) suggestions.add(trimmed);
-            }
+        int indiceMarcador = reply.indexOf("[SUGERENCIAS]:");
+        if (indiceMarcador < 0) return suggestions;
+
+        String sugerenciasRaw = reply.substring(indiceMarcador + "[SUGERENCIAS]:".length()).trim();
+        sugerenciasRaw = sugerenciasRaw.replaceAll("[\\[\\]\"]", "");
+        for (String sugerencia : sugerenciasRaw.split(",")) {
+            String limpia = sugerencia.trim();
+            if (!limpia.isEmpty()) suggestions.add(limpia);
         }
         return suggestions;
     }
 
     private String cleanSuggestions(String reply) {
-        int idx = reply.indexOf("[SUGERENCIAS]:");
-        if (idx >= 0) {
-            return reply.substring(0, idx).trim();
-        }
-        return reply;
+        int indiceMarcador = reply.indexOf("[SUGERENCIAS]:");
+        return indiceMarcador >= 0 ? reply.substring(0, indiceMarcador).trim() : reply;
     }
 }

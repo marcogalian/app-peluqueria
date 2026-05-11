@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.marcog.peluqueria.chatbot.domain.model.ChatMessageDto;
+import com.marcog.peluqueria.chatbot.domain.model.LlmResult;
+import com.marcog.peluqueria.chatbot.domain.port.out.LlmClientPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,7 +32,7 @@ import java.util.Map;
  */
 @Component
 @Slf4j
-public class GeminiClient {
+public class GeminiClient implements LlmClientPort {
 
     // ── Configuracion ───────────────────────────────────────────────
     private final RestTemplate restTemplate;
@@ -65,7 +67,8 @@ public class GeminiClient {
      * Primera llamada al modelo. Devuelve el texto generado o un functionCall.
      * Itera por la lista de modelos fallback hasta que uno responda OK.
      */
-    public GeminiResult generateContent(String systemInstruction,
+    @Override
+    public LlmResult generateContent(String systemInstruction,
                                         List<ChatMessageDto> history,
                                         String userMessage,
                                         List<Map<String, Object>> tools) {
@@ -74,7 +77,7 @@ public class GeminiClient {
         for (String modeloActual : modelosOrdenados) {
             try {
                 ObjectNode body = construirCuerpoBase(systemInstruction, history, userMessage, tools);
-                GeminiResult resultado = enviarPeticion(modeloActual, body);
+                LlmResult resultado = enviarPeticion(modeloActual, body);
                 if (!modeloActual.equals(model)) {
                     log.info("Usando modelo fallback: {}", modeloActual);
                 }
@@ -85,7 +88,7 @@ public class GeminiClient {
             }
         }
 
-        return new GeminiResult(ERROR_RESPONSE, null, null, null);
+        return new LlmResult(ERROR_RESPONSE, null, null, null);
     }
 
     /**
@@ -93,7 +96,8 @@ public class GeminiClient {
      * Reproduce la conversacion completa: usuario → functionCall del modelo → functionResponse.
      * Usa el mismo modelo que respondio la primera vez para mantener coherencia.
      */
-    public GeminiResult sendFunctionResponse(String modeloUtilizado,
+    @Override
+    public LlmResult sendFunctionResponse(String modeloUtilizado,
                                               String systemInstruction,
                                               List<ChatMessageDto> history,
                                               String userMessage,
@@ -115,7 +119,7 @@ public class GeminiClient {
 
         } catch (Exception ex) {
             log.error("Error en function response con {}: {}", modeloUtilizado, ex.getMessage());
-            return new GeminiResult("No pude procesar la información. Inténtalo de nuevo.",
+            return new LlmResult("No pude procesar la información. Inténtalo de nuevo.",
                     null, null, null);
         }
     }
@@ -205,7 +209,7 @@ public class GeminiClient {
 
     // ── Envio HTTP y parseo ─────────────────────────────────────────
 
-    private GeminiResult enviarPeticion(String modelo, ObjectNode body) throws Exception {
+    private LlmResult enviarPeticion(String modelo, ObjectNode body) throws Exception {
         String url = String.format(GEMINI_URL_TEMPLATE, modelo, apiKey);
 
         HttpHeaders headers = new HttpHeaders();
@@ -218,7 +222,7 @@ public class GeminiClient {
 
         if (candidate.has("functionCall")) {
             JsonNode functionCall = candidate.get("functionCall");
-            return new GeminiResult(
+            return new LlmResult(
                     null,
                     functionCall.get("name").asText(),
                     functionCall.get("args"),
@@ -226,7 +230,7 @@ public class GeminiClient {
             );
         }
 
-        return new GeminiResult(candidate.path("text").asText(""), null, null, modelo);
+        return new LlmResult(candidate.path("text").asText(""), null, null, modelo);
     }
 
     // ── Utilidades ──────────────────────────────────────────────────
@@ -244,21 +248,5 @@ public class GeminiClient {
         String mensaje = ex.getMessage();
         if (mensaje == null) return "unknown";
         return mensaje.substring(0, Math.min(80, mensaje.length()));
-    }
-
-    /**
-     * Resultado de una llamada al modelo.
-     * @param text          texto generado (null si el modelo decidio llamar a una funcion)
-     * @param functionName  nombre de la funcion solicitada por el modelo
-     * @param functionArgs  argumentos JSON de la funcion solicitada
-     * @param modelUsed     modelo que respondio (para mantener coherencia en la siguiente vuelta)
-     */
-    public record GeminiResult(String text,
-                                String functionName,
-                                JsonNode functionArgs,
-                                String modelUsed) {
-        public boolean isFunctionCall() {
-            return functionName != null;
-        }
     }
 }
