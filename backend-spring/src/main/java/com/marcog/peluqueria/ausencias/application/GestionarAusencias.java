@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 
 /**
  * Caso de uso para solicitudes de ausencias, vacaciones y bajas.
@@ -36,9 +37,33 @@ public class GestionarAusencias implements GestionarAusencia {
     private final GestionarDiasBloqueados GestionarDiasBloqueados;
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private final Semaphore solicitudesCalendario = new Semaphore(1, true);
 
     @Override
     public SolicitudAusencia solicitar(SolicitudAusencia solicitud) {
+        if (requiereBloqueoCalendario(solicitud)) {
+            return solicitarConBloqueoCalendario(solicitud);
+        }
+        return registrarSolicitud(solicitud);
+    }
+
+    private SolicitudAusencia solicitarConBloqueoCalendario(SolicitudAusencia solicitud) {
+        boolean adquirido = false;
+        try {
+            solicitudesCalendario.acquire();
+            adquirido = true;
+            return registrarSolicitud(solicitud);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("No se pudo procesar la solicitud de ausencia.", ex);
+        } finally {
+            if (adquirido) {
+                solicitudesCalendario.release();
+            }
+        }
+    }
+
+    private SolicitudAusencia registrarSolicitud(SolicitudAusencia solicitud) {
         validarAntelacion(solicitud);
         validarDiasBloqueados(solicitud);
         solicitud.setEstado(EstadoAusencia.PENDIENTE);
@@ -46,6 +71,10 @@ public class GestionarAusencias implements GestionarAusencia {
         // El propio empleado crea la solicitud, no necesita notificacion al verla.
         solicitud.setVistaPorEmpleado(true);
         return repository.guardar(solicitud);
+    }
+
+    private boolean requiereBloqueoCalendario(SolicitudAusencia solicitud) {
+        return solicitud.getTipo() != TipoAusencia.BAJA;
     }
 
     private void validarDiasBloqueados(SolicitudAusencia s) {

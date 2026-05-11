@@ -38,6 +38,7 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 - Solicitud de vacaciones y bajas.
 - Notificaciones de aprobacion o rechazo de ausencias.
 - Asistente de gestion limitado por rol.
+- Control de concurrencia en solicitudes de calendario para evitar carreras cuando varios empleados piden vacaciones a la vez.
 
 ## Stack tecnico
 
