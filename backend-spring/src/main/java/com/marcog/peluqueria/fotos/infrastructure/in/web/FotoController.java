@@ -4,6 +4,7 @@ import com.marcog.peluqueria.fotos.domain.model.FotoCliente;
 import com.marcog.peluqueria.fotos.domain.port.in.GestionarFotoUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.List; import java.util.UUID;
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "Fotos", description = "Galeria de fotos de clientes")
 @RestController @RequiredArgsConstructor
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
+@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_HAIRDRESSER')")
 public class FotoController {
     private final GestionarFotoUseCase useCase;
 

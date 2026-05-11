@@ -5,109 +5,208 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.marcog.peluqueria.chatbot.domain.model.ChatMessageDto;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 
+/**
+ * Cliente HTTP contra Gemini API (Google AI Studio).
+ *
+ * Responsabilidades:
+ *  - Construir payload JSON segun protocolo de generateContent
+ *  - Manejar function calling de ida y vuelta (modelo -> funcion -> modelo)
+ *  - Aplicar fallback automatico entre modelos cuando uno falla (429, 404, etc.)
+ */
 @Component
 @Slf4j
 public class GeminiClient {
 
+    // ── Configuracion ───────────────────────────────────────────────
     private final RestTemplate restTemplate;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Value("${gemini.api.key:}")
     private String apiKey;
 
-    @Value("${gemini.model:gemini-2.0-flash}")
+    @Value("${gemini.model:gemini-2.5-flash}")
     private String model;
 
+    private static final String GEMINI_URL_TEMPLATE =
+            "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s";
+
     private static final List<String> FALLBACK_MODELS = List.of(
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite"
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite"
     );
+
+    private static final String ERROR_RESPONSE =
+            "Lo siento, no puedo responder ahora. Inténtalo de nuevo.";
 
     public GeminiClient(@Qualifier("geminiRestTemplate") RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
-    public GeminiResult generateContent(String systemInstruction, List<ChatMessageDto> history,
-                                         String userMessage, List<Map<String, Object>> tools) {
-        List<String> modelsToTry = new ArrayList<>();
-        modelsToTry.add(model);
-        for (String m : FALLBACK_MODELS) {
-            if (!m.equals(model)) modelsToTry.add(m);
-        }
+    // ── API publica ─────────────────────────────────────────────────
 
-        for (String currentModel : modelsToTry) {
+    /**
+     * Primera llamada al modelo. Devuelve el texto generado o un functionCall.
+     * Itera por la lista de modelos fallback hasta que uno responda OK.
+     */
+    public GeminiResult generateContent(String systemInstruction,
+                                        List<ChatMessageDto> history,
+                                        String userMessage,
+                                        List<Map<String, Object>> tools) {
+        List<String> modelosOrdenados = construirOrdenDeModelos();
+
+        for (String modeloActual : modelosOrdenados) {
             try {
-                GeminiResult result = callGemini(currentModel, systemInstruction, history, userMessage, tools);
-                if (!currentModel.equals(model)) {
-                    log.info("Usando modelo fallback: {}", currentModel);
+                ObjectNode body = construirCuerpoBase(systemInstruction, history, userMessage, tools);
+                GeminiResult resultado = enviarPeticion(modeloActual, body);
+                if (!modeloActual.equals(model)) {
+                    log.info("Usando modelo fallback: {}", modeloActual);
                 }
-                return result;
-            } catch (Exception e) {
-                if (e.getMessage() != null && e.getMessage().contains("429")) {
-                    log.warn("Quota agotada para {}, probando siguiente modelo", currentModel);
-                } else {
-                    log.warn("Error con {} ({}), probando siguiente modelo", currentModel, e.getMessage() != null ? e.getMessage().substring(0, Math.min(80, e.getMessage().length())) : "unknown");
-                }
+                return resultado;
+            } catch (Exception ex) {
+                log.warn("Error con {} ({}), probando siguiente modelo",
+                        modeloActual, abreviarMensajeError(ex));
             }
         }
-        return new GeminiResult("Lo siento, no puedo responder ahora. Inténtalo de nuevo.", null, null);
+
+        return new GeminiResult(ERROR_RESPONSE, null, null, null);
     }
 
-    private GeminiResult callGemini(String currentModel, String systemInstruction, List<ChatMessageDto> history,
-                                     String userMessage, List<Map<String, Object>> tools) throws Exception {
+    /**
+     * Segunda llamada al modelo tras ejecutar la funcion solicitada.
+     * Reproduce la conversacion completa: usuario → functionCall del modelo → functionResponse.
+     * Usa el mismo modelo que respondio la primera vez para mantener coherencia.
+     */
+    public GeminiResult sendFunctionResponse(String modeloUtilizado,
+                                              String systemInstruction,
+                                              List<ChatMessageDto> history,
+                                              String userMessage,
+                                              String functionName,
+                                              JsonNode functionArgsOriginales,
+                                              String functionResult,
+                                              List<Map<String, Object>> tools) {
+        try {
+            ObjectNode body = construirCuerpoBase(systemInstruction, history, userMessage, tools);
+            ArrayNode contents = (ArrayNode) body.get("contents");
+
+            // Turno modelo: replica el functionCall original (con args reales, no vacios)
+            contents.add(construirTurnoFunctionCall(functionName, functionArgsOriginales));
+
+            // Turno funcion: respuesta de la funcion ejecutada localmente
+            contents.add(construirTurnoFunctionResponse(functionName, functionResult));
+
+            return enviarPeticion(modeloUtilizado, body);
+
+        } catch (Exception ex) {
+            log.error("Error en function response con {}: {}", modeloUtilizado, ex.getMessage());
+            return new GeminiResult("No pude procesar la información. Inténtalo de nuevo.",
+                    null, null, null);
+        }
+    }
+
+    // ── Construccion del payload ────────────────────────────────────
+
+    /**
+     * Construye el cuerpo JSON comun: system_instruction + contents (historial + mensaje usuario) + tools.
+     * El contents queda mutable para que el llamador pueda anadir turnos adicionales.
+     */
+    private ObjectNode construirCuerpoBase(String systemInstruction,
+                                            List<ChatMessageDto> history,
+                                            String userMessage,
+                                            List<Map<String, Object>> tools) {
         ObjectNode body = mapper.createObjectNode();
 
-        ObjectNode sysInstr = mapper.createObjectNode();
-        ArrayNode sysParts = mapper.createArrayNode();
-        sysParts.add(mapper.createObjectNode().put("text", systemInstruction));
-        sysInstr.set("parts", sysParts);
-        body.set("system_instruction", sysInstr);
+        // System instruction
+        ObjectNode systemNode = mapper.createObjectNode();
+        ArrayNode systemParts = mapper.createArrayNode();
+        systemParts.add(mapper.createObjectNode().put("text", systemInstruction));
+        systemNode.set("parts", systemParts);
+        body.set("system_instruction", systemNode);
 
+        // Contents: historial + mensaje del usuario actual
         ArrayNode contents = mapper.createArrayNode();
         if (history != null) {
-            for (ChatMessageDto msg : history) {
-                ObjectNode content = mapper.createObjectNode();
-                content.put("role", "model".equals(msg.getRole()) ? "model" : "user");
-                ArrayNode parts = mapper.createArrayNode();
-                parts.add(mapper.createObjectNode().put("text", msg.getContent()));
-                content.set("parts", parts);
-                contents.add(content);
+            for (ChatMessageDto mensaje : history) {
+                contents.add(construirTurnoTexto(
+                        "model".equals(mensaje.getRole()) ? "model" : "user",
+                        mensaje.getContent()));
             }
         }
-        ObjectNode userContent = mapper.createObjectNode();
-        userContent.put("role", "user");
-        ArrayNode userParts = mapper.createArrayNode();
-        userParts.add(mapper.createObjectNode().put("text", userMessage));
-        userContent.set("parts", userParts);
-        contents.add(userContent);
+        contents.add(construirTurnoTexto("user", userMessage));
         body.set("contents", contents);
 
+        // Tools (function declarations)
         if (tools != null && !tools.isEmpty()) {
             ArrayNode toolsNode = mapper.createArrayNode();
-            ObjectNode toolObj = mapper.createObjectNode();
-            ArrayNode funcDecls = mapper.valueToTree(tools);
-            toolObj.set("function_declarations", funcDecls);
-            toolsNode.add(toolObj);
+            ObjectNode toolWrapper = mapper.createObjectNode();
+            toolWrapper.set("function_declarations", mapper.valueToTree(tools));
+            toolsNode.add(toolWrapper);
             body.set("tools", toolsNode);
         }
 
-        String url = String.format(
-                "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
-                currentModel, apiKey);
+        return body;
+    }
+
+    private ObjectNode construirTurnoTexto(String role, String texto) {
+        ObjectNode contenido = mapper.createObjectNode();
+        contenido.put("role", role);
+        ArrayNode partes = mapper.createArrayNode();
+        partes.add(mapper.createObjectNode().put("text", texto));
+        contenido.set("parts", partes);
+        return contenido;
+    }
+
+    private ObjectNode construirTurnoFunctionCall(String functionName, JsonNode argsOriginales) {
+        ObjectNode contenido = mapper.createObjectNode();
+        contenido.put("role", "model");
+        ArrayNode partes = mapper.createArrayNode();
+        ObjectNode parteCall = mapper.createObjectNode();
+        ObjectNode functionCall = mapper.createObjectNode();
+        functionCall.put("name", functionName);
+        // Importante: re-enviar los args originales que devolvio el modelo, no un objeto vacio
+        functionCall.set("args", argsOriginales != null ? argsOriginales : mapper.createObjectNode());
+        parteCall.set("functionCall", functionCall);
+        partes.add(parteCall);
+        contenido.set("parts", partes);
+        return contenido;
+    }
+
+    private ObjectNode construirTurnoFunctionResponse(String functionName, String functionResult) {
+        ObjectNode contenido = mapper.createObjectNode();
+        contenido.put("role", "function");
+        ArrayNode partes = mapper.createArrayNode();
+        ObjectNode parteResponse = mapper.createObjectNode();
+        ObjectNode functionResponse = mapper.createObjectNode();
+        functionResponse.put("name", functionName);
+        ObjectNode responseObj = mapper.createObjectNode();
+        responseObj.put("result", functionResult);
+        functionResponse.set("response", responseObj);
+        parteResponse.set("functionResponse", functionResponse);
+        partes.add(parteResponse);
+        contenido.set("parts", partes);
+        return contenido;
+    }
+
+    // ── Envio HTTP y parseo ─────────────────────────────────────────
+
+    private GeminiResult enviarPeticion(String modelo, ObjectNode body) throws Exception {
+        String url = String.format(GEMINI_URL_TEMPLATE, modelo, apiKey);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -115,111 +214,51 @@ public class GeminiClient {
 
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
         JsonNode root = mapper.readTree(response.getBody());
-
         JsonNode candidate = root.path("candidates").path(0).path("content").path("parts").path(0);
 
         if (candidate.has("functionCall")) {
-            JsonNode fc = candidate.get("functionCall");
-            String funcName = fc.get("name").asText();
-            JsonNode args = fc.get("args");
-            return new GeminiResult(null, funcName, args);
+            JsonNode functionCall = candidate.get("functionCall");
+            return new GeminiResult(
+                    null,
+                    functionCall.get("name").asText(),
+                    functionCall.get("args"),
+                    modelo
+            );
         }
 
-        String text = candidate.path("text").asText("");
-        return new GeminiResult(text, null, null);
+        return new GeminiResult(candidate.path("text").asText(""), null, null, modelo);
     }
 
-    public GeminiResult sendFunctionResponse(String systemInstruction, List<ChatMessageDto> history,
-                                              String userMessage, String functionName, String functionResult,
-                                              List<Map<String, Object>> tools) {
-        try {
-            ObjectNode body = mapper.createObjectNode();
+    // ── Utilidades ──────────────────────────────────────────────────
 
-            ObjectNode sysInstr = mapper.createObjectNode();
-            ArrayNode sysParts = mapper.createArrayNode();
-            sysParts.add(mapper.createObjectNode().put("text", systemInstruction));
-            sysInstr.set("parts", sysParts);
-            body.set("system_instruction", sysInstr);
-
-            ArrayNode contents = mapper.createArrayNode();
-            if (history != null) {
-                for (ChatMessageDto msg : history) {
-                    ObjectNode content = mapper.createObjectNode();
-                    content.put("role", "model".equals(msg.getRole()) ? "model" : "user");
-                    ArrayNode parts = mapper.createArrayNode();
-                    parts.add(mapper.createObjectNode().put("text", msg.getContent()));
-                    content.set("parts", parts);
-                    contents.add(content);
-                }
-            }
-
-            // User message
-            ObjectNode userContent = mapper.createObjectNode();
-            userContent.put("role", "user");
-            ArrayNode userParts = mapper.createArrayNode();
-            userParts.add(mapper.createObjectNode().put("text", userMessage));
-            userContent.set("parts", userParts);
-            contents.add(userContent);
-
-            // Model function call
-            ObjectNode modelContent = mapper.createObjectNode();
-            modelContent.put("role", "model");
-            ArrayNode modelParts = mapper.createArrayNode();
-            ObjectNode fcPart = mapper.createObjectNode();
-            ObjectNode fc = mapper.createObjectNode();
-            fc.put("name", functionName);
-            fc.set("args", mapper.createObjectNode());
-            fcPart.set("functionCall", fc);
-            modelParts.add(fcPart);
-            modelContent.set("parts", modelParts);
-            contents.add(modelContent);
-
-            // Function response
-            ObjectNode funcRespContent = mapper.createObjectNode();
-            funcRespContent.put("role", "function");
-            ArrayNode funcParts = mapper.createArrayNode();
-            ObjectNode frPart = mapper.createObjectNode();
-            ObjectNode fr = mapper.createObjectNode();
-            fr.put("name", functionName);
-            ObjectNode responseObj = mapper.createObjectNode();
-            responseObj.put("result", functionResult);
-            fr.set("response", responseObj);
-            frPart.set("functionResponse", fr);
-            funcParts.add(frPart);
-            funcRespContent.set("parts", funcParts);
-            contents.add(funcRespContent);
-
-            body.set("contents", contents);
-
-            if (tools != null && !tools.isEmpty()) {
-                ArrayNode toolsNode = mapper.createArrayNode();
-                ObjectNode toolObj = mapper.createObjectNode();
-                ArrayNode funcDecls = mapper.valueToTree(tools);
-                toolObj.set("function_declarations", funcDecls);
-                toolsNode.add(toolObj);
-                body.set("tools", toolsNode);
-            }
-
-            String url = String.format(
-                    "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
-                    model, apiKey);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> entity = new HttpEntity<>(mapper.writeValueAsString(body), headers);
-
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-            JsonNode root = mapper.readTree(response.getBody());
-            String text = root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText("");
-            return new GeminiResult(text, null, null);
-
-        } catch (Exception e) {
-            log.error("Error en function response a Gemini: {}", e.getMessage());
-            return new GeminiResult("No pude procesar la información. Inténtalo de nuevo.", null, null);
+    private List<String> construirOrdenDeModelos() {
+        List<String> orden = new ArrayList<>();
+        orden.add(model);
+        for (String modeloFallback : FALLBACK_MODELS) {
+            if (!modeloFallback.equals(model)) orden.add(modeloFallback);
         }
+        return orden;
     }
 
-    public record GeminiResult(String text, String functionName, JsonNode functionArgs) {
-        public boolean isFunctionCall() { return functionName != null; }
+    private String abreviarMensajeError(Exception ex) {
+        String mensaje = ex.getMessage();
+        if (mensaje == null) return "unknown";
+        return mensaje.substring(0, Math.min(80, mensaje.length()));
+    }
+
+    /**
+     * Resultado de una llamada al modelo.
+     * @param text          texto generado (null si el modelo decidio llamar a una funcion)
+     * @param functionName  nombre de la funcion solicitada por el modelo
+     * @param functionArgs  argumentos JSON de la funcion solicitada
+     * @param modelUsed     modelo que respondio (para mantener coherencia en la siguiente vuelta)
+     */
+    public record GeminiResult(String text,
+                                String functionName,
+                                JsonNode functionArgs,
+                                String modelUsed) {
+        public boolean isFunctionCall() {
+            return functionName != null;
+        }
     }
 }

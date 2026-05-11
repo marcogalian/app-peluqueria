@@ -37,6 +37,7 @@ services:
       MAILTRAP_USERNAME: 51e106a28faced
       MAILTRAP_PASSWORD: f9e4285727d31a
       GEMINI_API_KEY: AIzaSyChUdFxLTKRY4yiXh0qOrCx6roNf3p5Wzw
+      JWT_SECRET_KEY: 4f8b9c2e7a1d6f3b8e5c2a9d4b7e1f6c3a8d5b2e9f4c1a6d3b8e5f2c9a4d1b6e
     volumes:
       - uploads_data:/app/uploads
     depends_on:

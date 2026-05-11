@@ -21,6 +21,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RestController
 @RequestMapping("/api/v1/clientes")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_HAIRDRESSER')")
 public class ClienteController {
     private final RegistrarClienteUseCase registrarClienteUseCase;
     private final ConsultarClienteService consultarClienteService;

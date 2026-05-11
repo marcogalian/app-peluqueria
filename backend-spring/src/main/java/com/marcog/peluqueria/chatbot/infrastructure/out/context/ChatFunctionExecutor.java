@@ -2,10 +2,12 @@ package com.marcog.peluqueria.chatbot.infrastructure.out.context;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.marcog.peluqueria.citas.domain.model.Cita;
-import com.marcog.peluqueria.citas.domain.port.out.CitaRepositoryPort;
+import com.marcog.peluqueria.ausencias.domain.model.EstadoAusencia;
 import com.marcog.peluqueria.ausencias.domain.model.SolicitudAusencia;
 import com.marcog.peluqueria.ausencias.domain.port.out.AusenciaRepositoryPort;
+import com.marcog.peluqueria.citas.domain.model.Cita;
+import com.marcog.peluqueria.citas.domain.model.EstadoCita;
+import com.marcog.peluqueria.citas.domain.port.out.CitaRepositoryPort;
 import com.marcog.peluqueria.clientes.domain.model.Cliente;
 import com.marcog.peluqueria.clientes.domain.port.out.ClienteRepository;
 import com.marcog.peluqueria.finanzas.application.service.FinanzasDashboardService;
@@ -22,17 +24,25 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Ejecutor de funciones que el modelo Gemini puede invocar.
+ * Cada metodo consulta la BD y devuelve JSON serializado para el modelo.
+ *
+ * Comprobacion de rol: las funciones solo-admin se filtran aqui como segunda
+ * linea de defensa (la primera es ChatbotService.buildToolDeclarations).
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class ChatFunctionExecutor {
 
+    // ── Dependencias ────────────────────────────────────────────────
     private final CitaRepositoryPort citaRepository;
     private final AusenciaRepositoryPort ausenciaRepository;
     private final FinanzasDashboardService dashboardService;
@@ -41,189 +51,194 @@ public class ChatFunctionExecutor {
     private final ClienteRepository clienteRepository;
     private final ObjectMapper mapper = new ObjectMapper();
 
+    private static final String ERROR_NO_ADMIN_GANANCIAS =
+            "{\"error\": \"Solo el administrador puede consultar ganancias\"}";
+    private static final String ERROR_NO_ADMIN_CITAS =
+            "{\"error\": \"Solo el administrador puede consultar citas de otros empleados\"}";
+    private static final String ERROR_NO_ADMIN_STOCK =
+            "{\"error\": \"Solo el administrador puede consultar stock\"}";
+    private static final String ERROR_NO_ADMIN_VENTAS =
+            "{\"error\": \"Solo el administrador puede consultar ventas\"}";
+    private static final String ERROR_NO_ADMIN_INVENTARIO =
+            "{\"error\": \"Solo el administrador puede consultar inventario\"}";
+    private static final String ERROR_NO_ADMIN_CLIENTES =
+            "{\"error\": \"Solo el administrador puede consultar clientes\"}";
+
+    // ── Dispatcher publico ──────────────────────────────────────────
+
     public String execute(String functionName, JsonNode args, UUID peluqueroId, boolean isAdmin) {
         try {
             return switch (functionName) {
                 case "getCitasEmpleado" -> getCitasEmpleado(args, peluqueroId);
                 case "getVacacionesEmpleado" -> getVacacionesEmpleado(peluqueroId);
-                case "getGanancias" -> {
-                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar ganancias\"}";
-                    yield getGanancias(args);
-                }
-                case "getCitasAtendidas" -> {
-                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar citas de otros empleados\"}";
-                    yield getCitasAtendidas(args);
-                }
-                case "getProductosStockBajo" -> {
-                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar stock\"}";
-                    yield getProductosStockBajo();
-                }
-                case "getProductosMasVendidos" -> {
-                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar ventas\"}";
-                    yield getProductosMasVendidos(args);
-                }
-                case "getInventario" -> {
-                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar inventario\"}";
-                    yield getInventario();
-                }
-                case "getClientesVip" -> {
-                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar clientes\"}";
-                    yield getClientesVip();
-                }
-                case "getTotalClientes" -> {
-                    if (!isAdmin) yield "{\"error\": \"Solo el administrador puede consultar clientes\"}";
-                    yield getTotalClientes();
-                }
+                case "getGanancias" -> isAdmin ? getGanancias(args) : ERROR_NO_ADMIN_GANANCIAS;
+                case "getCitasAtendidas" -> isAdmin ? getCitasAtendidas(args) : ERROR_NO_ADMIN_CITAS;
+                case "getProductosStockBajo" -> isAdmin ? getProductosStockBajo() : ERROR_NO_ADMIN_STOCK;
+                case "getProductosMasVendidos" -> isAdmin ? getProductosMasVendidos(args) : ERROR_NO_ADMIN_VENTAS;
+                case "getInventario" -> isAdmin ? getInventario() : ERROR_NO_ADMIN_INVENTARIO;
+                case "getClientesVip" -> isAdmin ? getClientesVip() : ERROR_NO_ADMIN_CLIENTES;
+                case "getTotalClientes" -> isAdmin ? getTotalClientes() : ERROR_NO_ADMIN_CLIENTES;
                 default -> "{\"error\": \"Funcion no reconocida: " + functionName + "\"}";
             };
-        } catch (Exception e) {
-            log.error("Error ejecutando funcion {}: {}", functionName, e.getMessage());
+        } catch (Exception ex) {
+            log.error("Error ejecutando funcion {}: {}", functionName, ex.getMessage());
             return "{\"error\": \"Error al ejecutar la funcion\"}";
         }
     }
 
+    // ── Funciones para todos los roles ──────────────────────────────
+
     private String getCitasEmpleado(JsonNode args, UUID peluqueroId) {
-        String fechaStr = args != null && args.has("fecha") ? args.get("fecha").asText() : LocalDate.now().toString();
+        String fechaStr = args != null && args.has("fecha")
+                ? args.get("fecha").asText()
+                : LocalDate.now().toString();
         LocalDate fecha = LocalDate.parse(fechaStr);
         LocalDateTime inicio = fecha.atStartOfDay();
         LocalDateTime fin = fecha.atTime(23, 59, 59);
 
         List<Cita> citas = citaRepository.findByCriteria(inicio, fin, peluqueroId);
-        List<Map<String, String>> resultado = citas.stream().map(c -> Map.of(
-                "hora", c.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm")),
-                "cliente", c.getCliente().getNombre() + " " + c.getCliente().getApellidos(),
-                "servicio", c.getServicios() != null && !c.getServicios().isEmpty()
-                        ? c.getServicios().get(0).getNombre() : "Sin servicio",
-                "estado", c.getEstado().name()
-        )).collect(Collectors.toList());
+        List<Map<String, String>> citasResumidas = citas.stream()
+                .map(this::resumirCita)
+                .collect(Collectors.toList());
 
-        try {
-            return mapper.writeValueAsString(Map.of("fecha", fechaStr, "totalCitas", resultado.size(), "citas", resultado));
-        } catch (Exception e) {
-            return "{\"error\": \"Error serializando citas\"}";
-        }
+        return toJson(Map.of(
+                "fecha", fechaStr,
+                "totalCitas", citasResumidas.size(),
+                "citas", citasResumidas
+        ), "Error serializando citas");
+    }
+
+    private Map<String, String> resumirCita(Cita cita) {
+        return Map.of(
+                "hora", cita.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm")),
+                "cliente", cita.getCliente().getNombre() + " " + cita.getCliente().getApellidos(),
+                "servicio", primerServicioOSinServicio(cita),
+                "estado", cita.getEstado().name()
+        );
+    }
+
+    private String primerServicioOSinServicio(Cita cita) {
+        return cita.getServicios() != null && !cita.getServicios().isEmpty()
+                ? cita.getServicios().get(0).getNombre()
+                : "Sin servicio";
     }
 
     private String getVacacionesEmpleado(UUID peluqueroId) {
         List<SolicitudAusencia> ausencias = ausenciaRepository.findByPeluqueroId(peluqueroId);
-        long aprobadas = ausencias.stream().filter(a -> "APROBADA".equals(a.getEstado())).count();
-        long pendientes = ausencias.stream().filter(a -> "PENDIENTE".equals(a.getEstado())).count();
+        // Comparacion contra el enum directo. Antes comparaba String con enum -> siempre 0.
+        long aprobadas = contarPorEstado(ausencias, EstadoAusencia.APROBADA);
+        long pendientes = contarPorEstado(ausencias, EstadoAusencia.PENDIENTE);
 
-        try {
-            return mapper.writeValueAsString(Map.of(
-                    "totalSolicitudes", ausencias.size(),
-                    "aprobadas", aprobadas,
-                    "pendientes", pendientes
-            ));
-        } catch (Exception e) {
-            return "{\"error\": \"Error serializando ausencias\"}";
-        }
+        return toJson(Map.of(
+                "totalSolicitudes", ausencias.size(),
+                "aprobadas", aprobadas,
+                "pendientes", pendientes
+        ), "Error serializando ausencias");
     }
 
+    private long contarPorEstado(List<SolicitudAusencia> ausencias, EstadoAusencia estado) {
+        return ausencias.stream()
+                .filter(ausencia -> estado.equals(ausencia.getEstado()))
+                .count();
+    }
+
+    // ── Funciones admin ─────────────────────────────────────────────
+
     private String getGanancias(JsonNode args) {
-        String periodo = args != null && args.has("periodo") ? args.get("periodo").asText() : "mes";
+        String periodoSolicitado = args != null && args.has("periodo")
+                ? args.get("periodo").asText()
+                : "mes";
         LocalDate hoy = LocalDate.now();
-        int mes = hoy.getMonthValue();
-        int anio = hoy.getYear();
 
-        if ("semana".equals(periodo)) {
-            LocalDate inicioSemana = hoy.with(DayOfWeek.MONDAY);
-            mes = inicioSemana.getMonthValue();
-            anio = inicioSemana.getYear();
-        }
+        // El dashboard se calcula a nivel mensual. Devolvemos las cifras del mes
+        // y dejamos que el modelo matice si el usuario pidio "hoy" o "semana".
+        DashboardStats stats = dashboardService.getStatsByMesAndAnio(hoy.getMonthValue(), hoy.getYear());
 
-        DashboardStats stats = dashboardService.getStatsByMesAndAnio(mes, anio);
-        try {
-            return mapper.writeValueAsString(Map.of(
-                    "periodo", periodo,
-                    "ingresos", stats.getIngresosTotales(),
-                    "gastos", stats.getGastosTotales(),
-                    "beneficio", stats.getBalance(),
-                    "totalCitas", stats.getCitasCompletadasMes()
-            ));
-        } catch (Exception e) {
-            return "{\"error\": \"Error serializando ganancias\"}";
-        }
+        return toJson(Map.of(
+                "periodoSolicitado", periodoSolicitado,
+                "ingresosMes", stats.getIngresosTotales(),
+                "gastosMes", stats.getGastosTotales(),
+                "beneficioMes", stats.getBalance(),
+                "citasCompletadasMes", stats.getCitasCompletadasMes(),
+                "nota", "Cifras del mes en curso. Si piden hoy/semana matizalo en la respuesta."
+        ), "Error serializando ganancias");
     }
 
     private String getCitasAtendidas(JsonNode args) {
-        String empleadoId = args != null && args.has("empleadoId") ? args.get("empleadoId").asText() : null;
+        String empleadoIdStr = args != null && args.has("empleadoId") ? args.get("empleadoId").asText() : null;
         String periodo = args != null && args.has("periodo") ? args.get("periodo").asText() : "mes";
 
-        if (empleadoId == null) return "{\"error\": \"empleadoId requerido\"}";
+        if (empleadoIdStr == null) {
+            return "{\"error\": \"empleadoId requerido\"}";
+        }
 
-        UUID peluqueroId = UUID.fromString(empleadoId);
+        UUID peluqueroId = UUID.fromString(empleadoIdStr);
+        LocalDateTime inicio = calcularInicioPeriodo(periodo);
+        LocalDateTime fin = LocalDate.now().atTime(23, 59, 59);
+
+        List<Cita> citas = citaRepository.findByCriteria(inicio, fin, peluqueroId);
+        // Antes comparaba con "COMPLETADA" pero el enum es COMPLETADO -> siempre 0.
+        long completadas = citas.stream()
+                .filter(cita -> EstadoCita.COMPLETADO.equals(cita.getEstado()))
+                .count();
+
+        return toJson(Map.of(
+                "empleadoId", empleadoIdStr,
+                "periodo", periodo,
+                "citasCompletadas", completadas,
+                "citasTotales", citas.size()
+        ), "Error serializando citas atendidas");
+    }
+
+    private LocalDateTime calcularInicioPeriodo(String periodo) {
         LocalDate hoy = LocalDate.now();
-        LocalDateTime inicio;
-        LocalDateTime fin = hoy.atTime(23, 59, 59);
-
-        inicio = switch (periodo) {
+        return switch (periodo) {
             case "hoy" -> hoy.atStartOfDay();
             case "semana" -> hoy.with(DayOfWeek.MONDAY).atStartOfDay();
             default -> hoy.withDayOfMonth(1).atStartOfDay();
         };
-
-        List<Cita> citas = citaRepository.findByCriteria(inicio, fin, peluqueroId);
-        long completadas = citas.stream().filter(c -> "COMPLETADA".equals(c.getEstado().name())).count();
-
-        try {
-            return mapper.writeValueAsString(Map.of(
-                    "empleadoId", empleadoId,
-                    "periodo", periodo,
-                    "citasCompletadas", completadas,
-                    "citasTotales", citas.size()
-            ));
-        } catch (Exception e) {
-            return "{\"error\": \"Error serializando citas atendidas\"}";
-        }
     }
 
     private String getProductosStockBajo() {
-        DashboardStats stats = dashboardService.getStatsByMesAndAnio(
-                LocalDate.now().getMonthValue(), LocalDate.now().getYear());
+        LocalDate hoy = LocalDate.now();
+        DashboardStats stats = dashboardService.getStatsByMesAndAnio(hoy.getMonthValue(), hoy.getYear());
+
         List<Map<String, Object>> stockBajo = stats.getProductosStats().getPocoStock().stream()
-                .map(p -> Map.<String, Object>of(
-                        "nombre", p.getNombre(),
-                        "stock", p.getStock(),
-                        "stockMinimo", p.getStockMinimo()
+                .map(producto -> Map.<String, Object>of(
+                        "nombre", producto.getNombre(),
+                        "stock", producto.getStock(),
+                        "stockMinimo", producto.getStockMinimo()
                 ))
                 .collect(Collectors.toList());
-        try {
-            return mapper.writeValueAsString(Map.of("productosStockBajo", stockBajo, "total", stockBajo.size()));
-        } catch (Exception e) {
-            return "{\"error\": \"Error serializando productos\"}";
-        }
+
+        return toJson(Map.of(
+                "productosStockBajo", stockBajo,
+                "total", stockBajo.size()
+        ), "Error serializando productos");
     }
 
-    private String getClientesVip() {
-        List<Cliente> vips = clienteRepository.findByFiltros(null, true, false);
-        List<Map<String, Object>> detalle = vips.stream()
-                .map(c -> Map.<String, Object>of(
-                        "nombre", c.getNombre() + " " + (c.getApellidos() != null ? c.getApellidos() : ""),
-                        "telefono", c.getTelefono() != null ? c.getTelefono() : "",
-                        "descuento", c.getDescuentoPorcentaje() != null ? c.getDescuentoPorcentaje() : 0
-                ))
+    private String getProductosMasVendidos(JsonNode args) {
+        String periodo = args != null && args.has("periodo") ? args.get("periodo").asText() : "mes";
+        LocalDateTime inicio = calcularInicioPeriodo(periodo);
+        LocalDateTime fin = LocalDate.now().atTime(23, 59, 59);
+
+        List<VentaProductoEntity> ventas = ventaProductoRepository.findByFechaVentaBetween(inicio, fin);
+
+        Map<String, Integer> unidadesPorProducto = new HashMap<>();
+        for (VentaProductoEntity venta : ventas) {
+            int cantidad = venta.getCantidad() != null ? venta.getCantidad() : 0;
+            unidadesPorProducto.merge(venta.getProductoNombre(), cantidad, Integer::sum);
+        }
+
+        List<Map<String, Object>> ranking = unidadesPorProducto.entrySet().stream()
+                .sorted((primero, segundo) -> segundo.getValue() - primero.getValue())
+                .limit(10)
+                .map(entrada -> Map.<String, Object>of(
+                        "producto", entrada.getKey(),
+                        "unidadesVendidas", entrada.getValue()))
                 .collect(Collectors.toList());
-        try {
-            return mapper.writeValueAsString(Map.of("totalVip", vips.size(), "clientes", detalle));
-        } catch (Exception e) {
-            return "{\"error\": \"Error serializando VIPs\"}";
-        }
-    }
 
-    private String getTotalClientes() {
-        List<Cliente> activos = clienteRepository.findAllByArchivado(false);
-        List<Cliente> archivados = clienteRepository.findAllByArchivado(true);
-        long vips = activos.stream().filter(Cliente::isEsVip).count();
-        try {
-            return mapper.writeValueAsString(Map.of(
-                    "activos", activos.size(),
-                    "archivados", archivados.size(),
-                    "vip", vips
-            ));
-        } catch (Exception e) {
-            return "{\"error\": \"Error serializando clientes\"}";
-        }
+        return toJson(Map.of("periodo", periodo, "ranking", ranking), "Error serializando ranking");
     }
 
     private String getInventario() {
@@ -231,57 +246,63 @@ public class ChatFunctionExecutor {
                 .filter(Producto::isActivo)
                 .collect(Collectors.toList());
 
-        int totalProductos = productos.size();
+        int totalDistintos = productos.size();
         int totalUnidades = productos.stream()
-                .mapToInt(p -> p.getStock() != null ? p.getStock() : 0)
+                .mapToInt(producto -> producto.getStock() != null ? producto.getStock() : 0)
                 .sum();
 
         List<Map<String, Object>> detalle = productos.stream()
-                .map(p -> Map.<String, Object>of(
-                        "nombre", p.getNombre(),
-                        "stock", p.getStock() != null ? p.getStock() : 0,
-                        "stockMinimo", p.getStockMinimo() != null ? p.getStockMinimo() : 0
+                .map(producto -> Map.<String, Object>of(
+                        "nombre", producto.getNombre(),
+                        "stock", producto.getStock() != null ? producto.getStock() : 0,
+                        "stockMinimo", producto.getStockMinimo() != null ? producto.getStockMinimo() : 0
                 ))
                 .collect(Collectors.toList());
 
-        try {
-            return mapper.writeValueAsString(Map.of(
-                    "totalProductosDistintos", totalProductos,
-                    "totalUnidadesEnStock", totalUnidades,
-                    "detalle", detalle
-            ));
-        } catch (Exception e) {
-            return "{\"error\": \"Error serializando inventario\"}";
-        }
+        return toJson(Map.of(
+                "totalProductosDistintos", totalDistintos,
+                "totalUnidadesEnStock", totalUnidades,
+                "detalle", detalle
+        ), "Error serializando inventario");
     }
 
-    private String getProductosMasVendidos(JsonNode args) {
-        String periodo = args != null && args.has("periodo") ? args.get("periodo").asText() : "mes";
-        LocalDate hoy = LocalDate.now();
-        LocalDateTime inicio = switch (periodo) {
-            case "hoy"    -> hoy.atStartOfDay();
-            case "semana" -> hoy.with(DayOfWeek.MONDAY).atStartOfDay();
-            default       -> hoy.withDayOfMonth(1).atStartOfDay();
-        };
-        LocalDateTime fin = hoy.atTime(23, 59, 59);
+    private String getClientesVip() {
+        List<Cliente> clientesVip = clienteRepository.findByFiltros(null, true, false);
 
-        List<VentaProductoEntity> ventas = ventaProductoRepository.findByFechaVentaBetween(inicio, fin);
-
-        Map<String, Integer> totales = new java.util.HashMap<>();
-        for (VentaProductoEntity v : ventas) {
-            totales.merge(v.getProductoNombre(), v.getCantidad() != null ? v.getCantidad() : 0, Integer::sum);
-        }
-
-        List<Map<String, Object>> ranking = totales.entrySet().stream()
-                .sorted((a, b) -> b.getValue() - a.getValue())
-                .limit(10)
-                .map(e -> Map.<String, Object>of("producto", e.getKey(), "unidadesVendidas", e.getValue()))
+        List<Map<String, Object>> detalle = clientesVip.stream()
+                .map(cliente -> Map.<String, Object>of(
+                        "nombre", cliente.getNombre() + " " + (cliente.getApellidos() != null ? cliente.getApellidos() : ""),
+                        "telefono", cliente.getTelefono() != null ? cliente.getTelefono() : "",
+                        "descuento", cliente.getDescuentoPorcentaje() != null ? cliente.getDescuentoPorcentaje() : 0
+                ))
                 .collect(Collectors.toList());
 
+        return toJson(Map.of(
+                "totalVip", clientesVip.size(),
+                "clientes", detalle
+        ), "Error serializando VIPs");
+    }
+
+    private String getTotalClientes() {
+        List<Cliente> activos = clienteRepository.findAllByArchivado(false);
+        List<Cliente> archivados = clienteRepository.findAllByArchivado(true);
+        long totalVip = activos.stream().filter(Cliente::isEsVip).count();
+
+        return toJson(Map.of(
+                "activos", activos.size(),
+                "archivados", archivados.size(),
+                "vip", totalVip
+        ), "Error serializando clientes");
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────
+
+    private String toJson(Object payload, String mensajeError) {
         try {
-            return mapper.writeValueAsString(Map.of("periodo", periodo, "ranking", ranking));
-        } catch (Exception e) {
-            return "{\"error\": \"Error serializando ranking\"}";
+            return mapper.writeValueAsString(payload);
+        } catch (Exception ex) {
+            log.error("Fallo serializando payload del chatbot: {}", ex.getMessage());
+            return "{\"error\": \"" + mensajeError + "\"}";
         }
     }
 }

@@ -23,6 +23,8 @@ public class ChatbotService {
     private final ChatFunctionExecutor functionExecutor;
     private final JpaPeluqueroRepository peluqueroRepository;
 
+    private static final int MAX_ITERACIONES_FUNCTION_CALLING = 3;
+
     private static final String SYSTEM_PROMPT = """
             Eres el asistente virtual de Peluqueria Isabella. Respondes en espanol, de forma amable y concisa.
 
@@ -70,21 +72,33 @@ public class ChatbotService {
                 + contextLoader.getContext();
         List<Map<String, Object>> tools = buildToolDeclarations(isAdmin);
 
-        GeminiResult result = geminiClient.generateContent(
+        GeminiResult resultadoModelo = geminiClient.generateContent(
                 systemInstruction, request.getHistory(), request.getMessage(), tools);
 
-        // Handle function calling loop (max 3 iterations)
-        int maxIterations = 3;
-        while (result.isFunctionCall() && maxIterations-- > 0) {
-            String funcResult = functionExecutor.execute(
-                    result.functionName(), result.functionArgs(), peluqueroId, isAdmin);
+        // Bucle de function calling. Limite duro para evitar loops infinitos.
+        int iteracionesRestantes = MAX_ITERACIONES_FUNCTION_CALLING;
+        while (resultadoModelo.isFunctionCall() && iteracionesRestantes-- > 0) {
+            String resultadoFuncion = functionExecutor.execute(
+                    resultadoModelo.functionName(),
+                    resultadoModelo.functionArgs(),
+                    peluqueroId,
+                    isAdmin);
 
-            result = geminiClient.sendFunctionResponse(
-                    systemInstruction, request.getHistory(), request.getMessage(),
-                    result.functionName(), funcResult, tools);
+            // Mantener coherencia: usar el mismo modelo y los args originales
+            resultadoModelo = geminiClient.sendFunctionResponse(
+                    resultadoModelo.modelUsed(),
+                    systemInstruction,
+                    request.getHistory(),
+                    request.getMessage(),
+                    resultadoModelo.functionName(),
+                    resultadoModelo.functionArgs(),
+                    resultadoFuncion,
+                    tools);
         }
 
-        String reply = result.text() != null ? result.text() : "No pude generar una respuesta.";
+        String reply = resultadoModelo.text() != null
+                ? resultadoModelo.text()
+                : "No pude generar una respuesta.";
         List<String> suggestions = extractSuggestions(reply);
         reply = cleanSuggestions(reply);
 

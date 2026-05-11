@@ -203,12 +203,16 @@ public class FinanzasDashboardService {
                 .map(DashboardStats.ProductoRanking::getGananciaEstimada)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        // Guardas null antes de comparar: stock o stockMinimo podrian no estar seteados
+        // y dispararian un NullPointerException en la comparacion sin auto-unboxing seguro.
         List<DashboardStats.ProductoStock> pocoStock = todosLosProductos.stream()
-                .filter(p -> p.getStock() <= p.getStockMinimo())
-                .map(p -> DashboardStats.ProductoStock.builder()
-                        .nombre(p.getNombre())
-                        .stock(p.getStock())
-                        .stockMinimo(p.getStockMinimo())
+                .filter(producto -> producto.getStock() != null
+                        && producto.getStockMinimo() != null
+                        && producto.getStock() <= producto.getStockMinimo())
+                .map(producto -> DashboardStats.ProductoStock.builder()
+                        .nombre(producto.getNombre())
+                        .stock(producto.getStock())
+                        .stockMinimo(producto.getStockMinimo())
                         .build())
                 .collect(Collectors.toList());
 

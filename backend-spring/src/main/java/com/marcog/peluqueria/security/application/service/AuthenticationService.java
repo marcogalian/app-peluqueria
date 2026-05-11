@@ -28,11 +28,13 @@ public class AuthenticationService {
         private final PasswordEncoder passwordEncoder;
 
         public AuthResponse register(RegisterRequest request) {
+                // SEGURIDAD: el rol se fija siempre a ROLE_HAIRDRESSER. No leer del request,
+                // permitir esto seria una via de escalada de privilegios desde un endpoint publico.
                 var user = UserEntity.builder()
                                 .username(request.getUsername())
                                 .email(request.getEmail())
                                 .password(passwordEncoder.encode(request.getPassword()))
-                                .role(request.getRole() != null ? request.getRole() : Role.ROLE_HAIRDRESSER)
+                                .role(Role.ROLE_HAIRDRESSER)
                                 .active(true)
                                 .build();
 

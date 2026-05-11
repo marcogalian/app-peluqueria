@@ -19,11 +19,21 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * Cachea en memoria el contexto estatico del negocio en formato JSON.
+ *
+ * Lo que entra aqui debe cambiar como mucho una vez al dia (servicios, productos,
+ * politicas, equipo, ofertas). Los datos en tiempo real (citas, dinero, stock)
+ * NO se cachean: van por function calling en ChatFunctionExecutor.
+ *
+ * Se regenera al arrancar la aplicacion y cada noche a las 03:00.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class BusinessContextLoader {
 
+    // ── Dependencias ────────────────────────────────────────────────
     private final ServicioRepository servicioRepository;
     private final ProductoRepositoryPort productoRepository;
     private final PeluqueroRepositoryPort peluqueroRepository;
@@ -32,100 +42,144 @@ public class BusinessContextLoader {
 
     private volatile String cachedContext = "";
 
+    // ── Ciclo de vida ───────────────────────────────────────────────
+
     @PostConstruct
     @Scheduled(cron = "0 0 3 * * *")
     public void regenerar() {
         try {
-            ObjectNode root = mapper.createObjectNode();
+            ObjectNode raiz = mapper.createObjectNode();
 
-            // Datos estáticos del negocio
-            ObjectNode negocio = mapper.createObjectNode();
-            negocio.put("nombre", "Peluquería Isabella");
-            negocio.put("direccion", "Calle Principal 15, Madrid");
-            negocio.put("telefono", "+34 600 123 456");
-            negocio.put("email", "admin@peluqueria.com");
-            ObjectNode horario = mapper.createObjectNode();
-            horario.put("lunesViernes", "09:00 - 21:00");
-            horario.put("sabado", "09:00 - 14:00");
-            horario.put("domingo", "Cerrado");
-            negocio.set("horario", horario);
-            root.set("negocio", negocio);
+            raiz.set("negocio", construirNegocio());
+            raiz.set("politicas", construirPoliticas());
+            raiz.set("equipo", construirEquipo());
+            raiz.put("totalEmpleados", peluqueroRepository.findAll().size());
+            raiz.set("servicios", construirCatalogoServicios());
+            raiz.set("productos", construirCatalogoProductos());
+            raiz.set("ofertas", construirOfertasActivas());
 
-            ObjectNode politicas = mapper.createObjectNode();
-            politicas.put("cancelacion", "Se puede cancelar hasta 24 horas antes sin coste. Cancelaciones tardías pueden suponer un cargo del 50%.");
-            politicas.put("reservas", "Las citas se pueden reservar por teléfono o a través de la aplicación.");
-            politicas.put("vacacionesEmpleados", "22 días laborables al año, solicitar con 15 días de antelación mínimo.");
-            politicas.put("descuentoVip", "Los clientes VIP tienen descuento personalizado según su historial.");
-            politicas.put("formasPago", "Efectivo, tarjeta de crédito/débito y transferencia bancaria.");
-            root.set("politicas", politicas);
-
-            // Equipo (peluqueros activos)
-            List<Peluquero> peluqueros = peluqueroRepository.findAll();
-            ArrayNode equipoNode = mapper.createArrayNode();
-            for (Peluquero p : peluqueros) {
-                ObjectNode pn = mapper.createObjectNode();
-                pn.put("nombre", p.getNombre());
-                if (p.getEspecialidad() != null) pn.put("especialidad", p.getEspecialidad());
-                if (p.getHorarioBase() != null) pn.put("horario", p.getHorarioBase());
-                pn.put("disponible", p.isDisponible() && !p.isEnBaja() && !p.isEnVacaciones());
-                equipoNode.add(pn);
-            }
-            root.set("equipo", equipoNode);
-            root.put("totalEmpleados", peluqueros.size());
-
-            // Servicios desde BD
-            List<Servicio> servicios = servicioRepository.findAll();
-            ArrayNode serviciosNode = mapper.createArrayNode();
-            for (Servicio s : servicios) {
-                ObjectNode sn = mapper.createObjectNode();
-                sn.put("nombre", s.getNombre());
-                sn.put("precio", s.getPrecio() != null ? s.getPrecio().doubleValue() : 0);
-                sn.put("duracionMinutos", s.getDuracionMinutos() != null ? s.getDuracionMinutos() : 0);
-                if (s.getGenero() != null) sn.put("genero", s.getGenero().name());
-                if (s.getCategoria() != null) sn.put("categoria", s.getCategoria().name());
-                if (s.getDescripcion() != null) sn.put("descripcion", s.getDescripcion());
-                serviciosNode.add(sn);
-            }
-            root.set("servicios", serviciosNode);
-
-            // Productos activos desde BD
-            List<Producto> productos = productoRepository.findAll();
-            ArrayNode productosNode = mapper.createArrayNode();
-            for (Producto p : productos) {
-                if (!p.isActivo()) continue;
-                ObjectNode pn = mapper.createObjectNode();
-                pn.put("nombre", p.getNombre());
-                pn.put("precio", p.getPrecio() != null ? p.getPrecio().doubleValue() : 0);
-                if (p.getCategoria() != null) pn.put("categoria", p.getCategoria().name());
-                if (p.getGenero() != null) pn.put("genero", p.getGenero().name());
-                productosNode.add(pn);
-            }
-            root.set("productos", productosNode);
-
-            // Ofertas activas
-            List<Oferta> ofertas = ofertaRepository.findActivas();
-            ArrayNode ofertasNode = mapper.createArrayNode();
-            for (Oferta o : ofertas) {
-                ObjectNode on = mapper.createObjectNode();
-                on.put("nombre", o.getNombre());
-                if (o.getDescripcion() != null) on.put("descripcion", o.getDescripcion());
-                if (o.getDescuentoPorcentaje() != null) on.put("descuentoPorcentaje", o.getDescuentoPorcentaje());
-                if (o.getFechaInicio() != null) on.put("fechaInicio", o.getFechaInicio().toString());
-                if (o.getFechaFin() != null) on.put("fechaFin", o.getFechaFin().toString());
-                if (o.getTipo() != null) on.put("tipo", o.getTipo().name());
-                ofertasNode.add(on);
-            }
-            root.set("ofertas", ofertasNode);
-
-            cachedContext = mapper.writeValueAsString(root);
-            log.info("Contexto regenerado desde BD: {} peluqueros, {} servicios, {} productos, {} ofertas",
-                    peluqueros.size(), servicios.size(), productosNode.size(), ofertas.size());
-        } catch (Exception e) {
-            log.error("Error regenerando contexto: {}", e.getMessage());
+            cachedContext = mapper.writeValueAsString(raiz);
+            log.info("Contexto del chatbot regenerado correctamente");
+        } catch (Exception ex) {
+            log.error("Error regenerando contexto del chatbot: {}", ex.getMessage());
         }
     }
 
     public String getContext() {
         return cachedContext;
+    }
+
+    // ── Construccion del JSON ───────────────────────────────────────
+
+    private ObjectNode construirNegocio() {
+        ObjectNode negocio = mapper.createObjectNode();
+        negocio.put("nombre", "Peluquería Isabella");
+        negocio.put("direccion", "Calle Principal 15, Madrid");
+        negocio.put("telefono", "+34 600 123 456");
+        negocio.put("email", "admin@peluqueria.com");
+
+        ObjectNode horario = mapper.createObjectNode();
+        horario.put("lunesViernes", "09:00 - 21:00");
+        horario.put("sabado", "09:00 - 14:00");
+        horario.put("domingo", "Cerrado");
+        negocio.set("horario", horario);
+
+        return negocio;
+    }
+
+    private ObjectNode construirPoliticas() {
+        ObjectNode politicas = mapper.createObjectNode();
+        politicas.put("cancelacion", "Se puede cancelar hasta 24 horas antes sin coste. Cancelaciones tardías pueden suponer un cargo del 50%.");
+        politicas.put("reservas", "Las citas se pueden reservar por teléfono o a través de la aplicación.");
+        politicas.put("vacacionesEmpleados", "22 días laborables al año, solicitar con 15 días de antelación mínimo.");
+        politicas.put("descuentoVip", "Los clientes VIP tienen descuento personalizado según su historial.");
+        politicas.put("formasPago", "Efectivo, tarjeta de crédito/débito y transferencia bancaria.");
+        return politicas;
+    }
+
+    private ArrayNode construirEquipo() {
+        ArrayNode equipo = mapper.createArrayNode();
+        for (Peluquero peluquero : peluqueroRepository.findAll()) {
+            ObjectNode nodoPeluquero = mapper.createObjectNode();
+            nodoPeluquero.put("nombre", peluquero.getNombre());
+            if (peluquero.getEspecialidad() != null) {
+                nodoPeluquero.put("especialidad", peluquero.getEspecialidad());
+            }
+            if (peluquero.getHorarioBase() != null) {
+                nodoPeluquero.put("horario", peluquero.getHorarioBase());
+            }
+            nodoPeluquero.put("disponible",
+                    peluquero.isDisponible() && !peluquero.isEnBaja() && !peluquero.isEnVacaciones());
+            equipo.add(nodoPeluquero);
+        }
+        return equipo;
+    }
+
+    private ArrayNode construirCatalogoServicios() {
+        ArrayNode catalogo = mapper.createArrayNode();
+        for (Servicio servicio : servicioRepository.findAll()) {
+            ObjectNode nodoServicio = mapper.createObjectNode();
+            nodoServicio.put("nombre", servicio.getNombre());
+            nodoServicio.put("precio",
+                    servicio.getPrecio() != null ? servicio.getPrecio().doubleValue() : 0);
+            nodoServicio.put("duracionMinutos",
+                    servicio.getDuracionMinutos() != null ? servicio.getDuracionMinutos() : 0);
+            if (servicio.getGenero() != null) {
+                nodoServicio.put("genero", servicio.getGenero().name());
+            }
+            if (servicio.getCategoria() != null) {
+                nodoServicio.put("categoria", servicio.getCategoria().name());
+            }
+            if (servicio.getDescripcion() != null) {
+                nodoServicio.put("descripcion", servicio.getDescripcion());
+            }
+            catalogo.add(nodoServicio);
+        }
+        return catalogo;
+    }
+
+    private ArrayNode construirCatalogoProductos() {
+        ArrayNode catalogo = mapper.createArrayNode();
+        for (Producto producto : productoRepository.findAll()) {
+            if (!producto.isActivo()) continue;
+            ObjectNode nodoProducto = mapper.createObjectNode();
+            nodoProducto.put("nombre", producto.getNombre());
+            nodoProducto.put("precio",
+                    producto.getPrecio() != null ? producto.getPrecio().doubleValue() : 0);
+            if (producto.getCategoria() != null) {
+                nodoProducto.put("categoria", producto.getCategoria().name());
+            }
+            if (producto.getGenero() != null) {
+                nodoProducto.put("genero", producto.getGenero().name());
+            }
+            catalogo.add(nodoProducto);
+        }
+        return catalogo;
+    }
+
+    private ArrayNode construirOfertasActivas() {
+        ArrayNode ofertasActivas = mapper.createArrayNode();
+        List<Oferta> ofertas = ofertaRepository.findActivas();
+        for (Oferta oferta : ofertas) {
+            ObjectNode nodoOferta = mapper.createObjectNode();
+            nodoOferta.put("nombre", oferta.getNombre());
+            if (oferta.getDescripcion() != null) {
+                nodoOferta.put("descripcion", oferta.getDescripcion());
+            }
+            if (oferta.getDescuentoPorcentaje() != null) {
+                nodoOferta.put("descuentoPorcentaje", oferta.getDescuentoPorcentaje());
+            }
+            if (oferta.getFechaInicio() != null) {
+                nodoOferta.put("fechaInicio", oferta.getFechaInicio().toString());
+            }
+            if (oferta.getFechaFin() != null) {
+                nodoOferta.put("fechaFin", oferta.getFechaFin().toString());
+            }
+            if (oferta.getTipo() != null) {
+                nodoOferta.put("tipo", oferta.getTipo().name());
+            }
+            ofertasActivas.add(nodoOferta);
+        }
+        return ofertasActivas;
     }
 }

@@ -54,7 +54,11 @@ public class AuthenticationController {
                 .map(refreshTokenService::verifyExpiration)
                 .map(RefreshTokenEntity::getUser)
                 .map(user -> {
-                    String accessToken = jwtService.generateToken(new CustomUserDetails(user));
+                    // Incluir el rol como claim igual que en login. Sin esto, el access token
+                    // refrescado pierde el rol y los @PreAuthorize fallarian.
+                    java.util.Map<String, Object> claims = new java.util.HashMap<>();
+                    claims.put("role", user.getRole().name());
+                    String accessToken = jwtService.generateToken(claims, new CustomUserDetails(user));
                     return ResponseEntity.ok(AuthResponse.builder()
                             .token(accessToken)
                             .refreshToken(request.getRefreshToken())

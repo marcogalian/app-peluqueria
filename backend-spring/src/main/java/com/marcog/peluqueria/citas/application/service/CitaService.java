@@ -67,7 +67,12 @@ public class CitaService {
         cita.setEstado(EstadoCita.CANCELADO);
         cita.setMotivoCancelacion(motivo);
 
-        boolean cancelacionTardia = LocalDateTime.now().isAfter(cita.getFechaHora().minusHours(24));
+        // Solo penalizar si la cita aun no ha ocurrido. Sin esta guarda, cancelar
+        // una cita pasada anadiria una penalizacion injustificada al cliente.
+        LocalDateTime ahora = LocalDateTime.now();
+        boolean citaEnFuturo = ahora.isBefore(cita.getFechaHora());
+        boolean cancelacionTardia = citaEnFuturo
+                && ahora.isAfter(cita.getFechaHora().minusHours(24));
         if (cancelacionTardia && cita.getCliente() != null) {
             clienteRepository.findById(cita.getCliente().getId()).ifPresent(cliente -> {
                 String penalizacion = String.format("[Penalización %s] Canceló con menos de 24h de antelación.",
@@ -114,7 +119,11 @@ public class CitaService {
                 continue;
 
             LocalDateTime existenteStart = existente.getFechaHora();
-            LocalDateTime existenteEnd = existenteStart.plusMinutes(existente.getDuracionTotal());
+            // Guarda contra duracionTotal null en datos antiguos para evitar NPE.
+            int duracionExistente = existente.getDuracionTotal() != null
+                    ? existente.getDuracionTotal()
+                    : 30;
+            LocalDateTime existenteEnd = existenteStart.plusMinutes(duracionExistente);
 
             // Lógica principal de solapamiento: (StartA < EndB) y (EndA > StartB)
             if (nuevaStart.isBefore(existenteEnd) && nuevaEnd.isAfter(existenteStart)) {
