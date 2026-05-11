@@ -108,6 +108,14 @@ front-nuxt/app/
 └── infrastructure/http   # Cliente API
 ```
 
+### Control de concurrencia
+
+El caso de uso de ausencias incluye un control de concurrencia con `Semaphore(1, true)` para serializar las solicitudes que afectan al calendario, como vacaciones y permisos. Esto evita condiciones de carrera cuando dos empleados intentan pedir vacaciones al mismo tiempo: una solicitud entra, valida dias bloqueados, aplica reglas de antelacion y guarda; la siguiente espera su turno.
+
+Las bajas medicas quedan fuera de este bloqueo porque representan una situacion inevitable y no deberian depender de disponibilidad de calendario.
+
+Esta decision tiene valor tecnico porque demuestra gestion de hilos, seccion critica y proteccion de reglas de negocio en el backend. Para el despliegue actual con una instancia de Spring Boot es suficiente. Si el sistema escalara a varias instancias, el siguiente paso seria mover este bloqueo a base de datos o a un mecanismo distribuido.
+
 ## Asistente de gestion con IA
 
 La aplicacion incluye un asistente interno para administradores y empleados. No es un chat generico pegado a la interfaz: esta conectado al dominio de la peluqueria y responde usando informacion real del sistema.
