@@ -15,5 +15,4 @@ import ToastContainer from '~/modules/shared/components/ToastContainer.vue'
     </div>
   </div>
   <ToastContainer />
-  <ChatbotWidget />
 </template>

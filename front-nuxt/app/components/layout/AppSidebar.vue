@@ -14,7 +14,7 @@
 import {
   LayoutDashboard, Calendar, Users, Scissors,
   Package, UserCog, BarChart3, Settings, LogOut,
-  MessageCircle, Palmtree, ShoppingBag,
+  MessageCircle, Palmtree, ShoppingBag, Bot,
 } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
@@ -32,6 +32,7 @@ const itemsAdmin = [
   { path: '/admin/empleados',  label: 'Empleados',        icon: UserCog },
   { path: '/mensajes',         label: 'Mensajes',         icon: MessageCircle },
   { path: '/admin/resultados', label: 'Resultados',       icon: BarChart3 },
+  { path: '/chat-ia',          label: 'Asistente IA',     icon: Bot },
 ]
 
 const itemsEmpleado = [
@@ -39,6 +40,7 @@ const itemsEmpleado = [
   { path: '/ventas',     label: 'Ventas',     icon: ShoppingBag },
   { path: '/mensajes',   label: 'Mensajes',   icon: MessageCircle },
   { path: '/vacaciones', label: 'Vacaciones', icon: Palmtree },
+  { path: '/chat-ia',   label: 'Asistente IA', icon: Bot },
 ]
 
 const items = computed(() => authStore.isAdmin ? itemsAdmin : itemsEmpleado)
