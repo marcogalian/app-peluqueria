@@ -9,6 +9,7 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 - [Que hace la aplicacion](#que-hace-la-aplicacion)
 - [Stack tecnico](#stack-tecnico)
 - [Arquitectura](#arquitectura)
+- [Asistente de gestion con IA](#asistente-de-gestion-con-ia)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Arranque rapido](#arranque-rapido)
 - [Documentacion](#documentacion)
@@ -105,6 +106,35 @@ front-nuxt/app/
 ├── components            # Layout y componentes globales
 └── infrastructure/http   # Cliente API
 ```
+
+## Asistente de gestion con IA
+
+La aplicacion incluye un asistente interno para administradores y empleados. No es un chat generico pegado a la interfaz: esta conectado al dominio de la peluqueria y responde usando informacion real del sistema.
+
+### Como funciona
+
+El frontend envia la pregunta al backend mediante el modulo de chatbot. El backend autentica al usuario, detecta su rol y decide que informacion puede consultar. A partir de ahi combina dos mecanismos:
+
+- Contexto de negocio cacheado: datos que cambian poco, como nombre del centro, horario, politicas, equipo, servicios, productos y ofertas activas. Este contexto se genera al arrancar y se regenera automaticamente cada noche.
+- Consultas en tiempo real: datos que deben salir de base de datos en el momento, como clientes VIP, total de clientes, inventario, stock bajo, ganancias, productos mas vendidos, citas del empleado o vacaciones.
+
+Para las consultas mas criticas, como clientes VIP o total de clientes, el backend responde directamente desde base de datos. Asi la respuesta no depende de la cuota del proveedor IA y no se inventan datos. Para preguntas mas abiertas, el backend usa Gemini con function calling: el modelo puede pedir una funcion concreta, el backend ejecuta esa funcion contra PostgreSQL y devuelve el resultado para construir la respuesta final.
+
+### Seguridad y roles
+
+El asistente respeta permisos. Un empleado puede consultar informacion propia, como sus citas o vacaciones, mientras que las metricas de negocio y clientes quedan limitadas al administrador. Esta comprobacion se hace en el backend, no solo en la pantalla.
+
+La clave de Gemini se configura por variable de entorno (`GEMINI_API_KEY`) y no se publica en el repositorio.
+
+### Puntos fuertes para la presentacion
+
+- Integracion real con el negocio: el asistente consulta clientes, agenda, inventario, ventas y ausencias, no responde solo con texto estatico.
+- Arquitectura limpia: el caso de uso del asistente vive en `chatbot/application`, el dominio define contratos de negocio y la infraestructura contiene Gemini, contexto y consultas PostgreSQL.
+- Control por roles: admin y empleado tienen capacidades diferentes, lo que demuestra seguridad aplicada a una funcionalidad IA.
+- Function calling: el modelo no accede directamente a la base de datos; pide funciones controladas y el backend decide que ejecutar.
+- Fallback local: algunas respuestas importantes se resuelven sin depender del proveedor externo, mejorando fiabilidad.
+- Contexto regenerable: el asistente se alimenta de datos actualizados del centro y puede regenerar su contexto.
+- Buen enfoque de producto: convierte el panel en una herramienta mas rapida para preguntar "que productos tienen bajo stock", "quienes son clientes VIP" o "cuantas citas tengo hoy".
 
 ## Estructura del repositorio
 
