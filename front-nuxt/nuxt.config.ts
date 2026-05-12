@@ -72,9 +72,9 @@ export default defineNuxtConfig({
         { name: 'viewport',    content: 'width=device-width, initial-scale=1' },
       ],
       link: [
-        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg?v=3' },
-        { rel: 'alternate icon', type: 'image/png', href: '/peluqueria_logo.png?v=3' },
-        { rel: 'apple-touch-icon', href: '/peluqueria_logo.png?v=3' },
+        { rel: 'icon', type: 'image/png', href: '/logotipo.png?v=4' },
+        { rel: 'shortcut icon', type: 'image/png', href: '/logotipo.png?v=4' },
+        { rel: 'apple-touch-icon', href: '/logotipo.png?v=4' },
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         {
