@@ -178,7 +178,7 @@ async function confirmarVenta() {
 
       <!-- Filtros -->
       <div class="flex flex-col xl:flex-row xl:items-center gap-4">
-        <div class="relative min-w-[18rem] flex-1">
+        <div class="relative min-w-0 flex-1 sm:min-w-[18rem]">
           <div class="absolute left-3 inset-y-0 flex items-center pointer-events-none">
             <Search class="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
           </div>

@@ -807,7 +807,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
           <!-- Tabla de ranking -->
           <div v-else class="overflow-y-auto max-h-[380px] pr-1">
             <!-- Cabecera de columnas -->
-            <div class="grid grid-cols-[28px_1fr_80px_90px] gap-3 px-3 mb-2">
+            <div class="hidden grid-cols-[28px_1fr_80px_90px] gap-3 px-3 mb-2 sm:grid">
               <span />
               <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted">Producto</span>
               <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted text-right">Consumidos</span>
@@ -817,7 +817,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
             <div class="space-y-1.5">
               <div
                 v-for="(prod, i) in rankingActivo" :key="prod.nombre"
-                class="grid grid-cols-[28px_1fr_80px_90px] gap-3 items-center p-3 rounded-xl border"
+                class="grid grid-cols-[28px_minmax(0,1fr)] gap-3 p-3 rounded-xl border sm:grid-cols-[28px_1fr_80px_90px] sm:items-center"
                 :class="prod.bajoMinimo
                   ? 'border-red-200/60 bg-red-50/30'
                   : 'border-outline-variant/15 bg-white'"
@@ -835,7 +835,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
                     <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" :class="badgeCategoria(prod.categoria)">
                       {{ prod.categoria }}
                     </span>
-                    <span v-if="prod.bajoMinimo" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700">⚠</span>
+                    <span v-if="prod.bajoMinimo" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700">Stock bajo</span>
                   </div>
                   <div class="flex items-center gap-1.5">
                     <div class="flex-1 h-1 rounded-full bg-surface-container">
@@ -852,13 +852,13 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
                 </div>
 
                 <!-- Consumidos -->
-                <div class="text-right">
+                <div class="col-start-2 text-left sm:col-start-auto sm:text-right">
                   <p class="text-sm font-black text-text-primary">{{ prod.consumidos }}</p>
                   <p class="text-[10px] text-text-muted">uds.</p>
                 </div>
 
                 <!-- Ganancia estimada -->
-                <div class="text-right">
+                <div class="col-start-2 text-left sm:col-start-auto sm:text-right">
                   <p class="text-sm font-bold text-emerald-600">{{ formatEur(prod.gananciaEstimada || 0) }}</p>
                   <p class="text-[10px] text-text-muted">estimado</p>
                 </div>

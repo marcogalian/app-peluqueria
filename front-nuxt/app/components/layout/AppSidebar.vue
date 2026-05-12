@@ -25,8 +25,9 @@ import { useSidebarCollapsed } from '~/modules/shared/composables/useSidebarColl
 const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
-const { collapsed } = useSidebarCollapsed()
+const { collapsed, mobileOpen, closeMobile } = useSidebarCollapsed()
 const mostrarConfirmacionSalida = ref(false)
+const mostrarTextoMenu = computed(() => mobileOpen.value || !collapsed.value)
 
 type Rol = 'admin' | 'empleado'
 type ItemMenu = {
@@ -94,8 +95,11 @@ function esActivo(path: string): boolean {
 function cerrarSesion() {
   authStore.cerrarSesion()
   mostrarConfirmacionSalida.value = false
+  closeMobile()
   router.push('/login')
 }
+
+watch(() => route.path, () => closeMobile())
 
 // Bloquea el scroll del wheel cuando esta sobre la sidebar.
 // Sin esto, el navegador busca el ancestro scrollable y mueve el contenido principal.
@@ -106,18 +110,28 @@ function bloquearScroll(evento: WheelEvent) {
 </script>
 
 <template>
+  <Transition name="modal-overlay">
+    <div
+      v-if="mobileOpen"
+      class="fixed inset-0 z-40 bg-black/35 lg:hidden"
+      aria-hidden="true"
+      @click="closeMobile"
+    />
+  </Transition>
+
   <aside
     :class="[
-      'flex-shrink-0 h-dvh flex flex-col bg-surface-container-low select-none overflow-hidden',
-      'transition-[width] duration-200 ease-out',
-      collapsed ? 'w-16' : 'w-sidebar',
+      'fixed inset-y-0 left-0 z-50 h-dvh w-sidebar flex flex-col bg-surface-container-low select-none overflow-hidden',
+      'transition-transform duration-200 ease-out lg:relative lg:inset-auto lg:z-auto lg:flex-shrink-0 lg:transition-[width]',
+      mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+      collapsed ? 'lg:w-16' : 'lg:w-sidebar',
     ]"
     @wheel.prevent="bloquearScroll"
   >
 
     <!-- ── Cabecera: nombre + version (o avatar si colapsado) ─── -->
     <div :class="['pt-5 pb-4', collapsed ? 'px-3 text-center' : 'px-6']">
-      <template v-if="!collapsed">
+      <template v-if="mostrarTextoMenu">
         <h1 class="text-xl font-extrabold tracking-tighter text-primary leading-none">
           Peluquería Isabella
         </h1>
@@ -142,7 +156,7 @@ function bloquearScroll(evento: WheelEvent) {
       >
         <!-- Titulo de seccion (expandido) o separador fino (colapsado) -->
         <p
-          v-if="!collapsed"
+          v-if="mostrarTextoMenu"
           class="px-3 pt-2.5 pb-1 text-[10px] uppercase tracking-[0.15em] text-on-surface-variant/50 font-bold"
         >
           {{ grupo.titulo }}
@@ -160,14 +174,15 @@ function bloquearScroll(evento: WheelEvent) {
           :to="item.path"
           :class="[
             esActivo(item.path) ? 'nav-item-active' : 'nav-item',
-            collapsed ? 'justify-center px-0' : '',
+            collapsed ? 'lg:justify-center lg:px-0' : '',
           ]"
-          :title="collapsed ? item.label : undefined"
+          :title="collapsed && !mobileOpen ? item.label : undefined"
           :aria-label="item.label"
           :aria-current="esActivo(item.path) ? 'page' : undefined"
+          @click="closeMobile"
         >
           <component :is="item.icon" class="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
-          <span v-if="!collapsed">{{ item.label }}</span>
+          <span v-if="mostrarTextoMenu">{{ item.label }}</span>
         </NuxtLink>
       </div>
     </nav>
@@ -177,14 +192,14 @@ function bloquearScroll(evento: WheelEvent) {
       <button
         :class="[
           'nav-item w-full text-error hover:bg-error-container/30 hover:text-error',
-          collapsed ? 'justify-center px-0' : '',
+          collapsed ? 'lg:justify-center lg:px-0' : '',
         ]"
-        :title="collapsed ? 'Cerrar sesión' : undefined"
+        :title="collapsed && !mobileOpen ? 'Cerrar sesión' : undefined"
         aria-label="Cerrar sesión"
         @click="mostrarConfirmacionSalida = true"
       >
         <LogOut class="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
-        <span v-if="!collapsed">Cerrar sesión</span>
+        <span v-if="mostrarTextoMenu">Cerrar sesión</span>
       </button>
     </div>
 

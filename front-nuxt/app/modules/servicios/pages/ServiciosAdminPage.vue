@@ -259,7 +259,7 @@ function formatEur(n: number): string {
         role="dialog"
         aria-modal="true"
         :aria-label="servicioEditar.id ? `Editar servicio: ${servicioEditar.nombre}` : 'Nuevo servicio'"
-        class="fixed right-0 top-0 h-screen w-96 bg-white shadow-2xl border-l border-outline-variant/20 z-50 flex flex-col"
+        class="fixed right-0 top-0 h-screen w-full max-w-md bg-white shadow-2xl border-l border-outline-variant/20 z-50 flex flex-col"
       >
 
         <div class="p-8 border-b border-outline-variant/10 flex items-center justify-between flex-shrink-0">

@@ -32,7 +32,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Ejecutor de funciones que el modelo Gemini puede invocar.
+ * Ejecutor de funciones que el proveedor IA puede invocar.
  * Cada metodo consulta la BD y devuelve JSON serializado para el modelo.
  *
  * Comprobacion de rol: las funciones solo-admin se filtran aqui como segunda

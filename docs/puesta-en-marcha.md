@@ -109,6 +109,33 @@ npm install
 npm run dev
 ```
 
+## Tests
+
+Backend:
+
+```bash
+cd backend-spring
+./mvnw test
+```
+
+En Windows PowerShell:
+
+```powershell
+cd backend-spring
+.\mvnw.cmd test
+```
+
+El backend usa JUnit 5 y Mockito para probar casos de uso, reglas de negocio y permisos sin levantar dependencias externas innecesarias.
+
+Frontend:
+
+```bash
+cd front-nuxt
+npm test
+```
+
+El frontend usa Vitest para validar stores, servicios y composables, especialmente autenticacion, llamadas HTTP y comportamiento del asistente.
+
 ## Usuarios demo
 
 El backend crea usuarios demo en el primer arranque. Sus nombres de usuario son visibles en el seed, pero la contrasena se lee desde `APP_DEMO_PASSWORD` y no se documenta en el repositorio publico.

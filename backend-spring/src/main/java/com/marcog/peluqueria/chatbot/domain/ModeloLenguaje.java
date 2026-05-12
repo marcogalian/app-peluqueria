@@ -8,10 +8,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Puerto de salida hacia un proveedor de LLM (Gemini, OpenAI, etc.).
+ * Contrato de negocio para conversar con un proveedor LLM.
  *
- * El servicio de aplicacion depende de esta interfaz, no del cliente HTTP concreto.
- * Esto permite cambiar de proveedor sin tocar la logica de negocio.
+ * El caso de uso depende de esta interfaz, no del cliente HTTP concreto.
+ * Esto permite cambiar Gemini por OpenRouter u otro proveedor sin tocar la logica.
  */
 public interface ModeloLenguaje {
 

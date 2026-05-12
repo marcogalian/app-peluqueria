@@ -18,13 +18,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Chatbot", description = "Asistente virtual IA con Gemini")
+@Tag(name = "Chatbot", description = "Asistente virtual IA configurable")
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
 public class ChatbotController {
 
-    // Solo dependencias de puertos de entrada (use cases). Sin acoplamiento a infra.
     private final ConversarConAsistente conversarConAsistente;
     private final RegenerarContextoNegocio regenerarContextoNegocio;
 

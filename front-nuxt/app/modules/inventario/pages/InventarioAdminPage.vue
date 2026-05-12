@@ -350,7 +350,7 @@ function formatEur(n: number): string {
 
       <!-- Filtros + acción -->
       <div class="flex flex-col xl:flex-row xl:items-center gap-4 mb-8">
-        <div class="relative min-w-[18rem] flex-1">
+        <div class="relative min-w-0 flex-1 sm:min-w-[18rem]">
           <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
           <label for="inventario-busqueda" class="sr-only">Buscar producto</label>
           <input
@@ -497,7 +497,7 @@ function formatEur(n: number): string {
     </Transition>
 
     <Transition name="slide-right">
-      <div v-if="modalVentaAbierto" class="fixed inset-0 z-50 flex items-center justify-center p-6">
+      <div v-if="modalVentaAbierto" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
         <div class="w-full max-w-md rounded-[28px] bg-white shadow-2xl border border-outline-variant/10 p-8 space-y-6">
           <div class="flex items-start justify-between gap-4">
             <div>
@@ -560,7 +560,7 @@ function formatEur(n: number): string {
     </Transition>
 
     <Transition name="slide-right">
-      <aside v-if="drawerAbierto" class="fixed right-0 top-0 h-screen w-96 bg-white shadow-2xl border-l border-outline-variant/20 z-50 flex flex-col">
+      <aside v-if="drawerAbierto" class="fixed right-0 top-0 h-screen w-full max-w-md bg-white shadow-2xl border-l border-outline-variant/20 z-50 flex flex-col">
 
         <div class="p-8 border-b border-outline-variant/10 flex items-center justify-between flex-shrink-0">
           <div>

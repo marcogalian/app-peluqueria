@@ -10,6 +10,7 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 - [Stack tecnico](#stack-tecnico)
 - [Arquitectura](#arquitectura)
 - [Asistente de gestion con IA](#asistente-de-gestion-con-ia)
+- [Calidad y pruebas](#calidad-y-pruebas)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Arranque rapido](#arranque-rapido)
 - [Documentacion](#documentacion)
@@ -61,6 +62,7 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 | Spring Mail + Mailtrap | Emails en entorno de pruebas |
 | Gemini API / OpenRouter | Asistente IA configurable |
 | Springdoc OpenAPI | Swagger UI y contrato REST |
+| JUnit 5 + Mockito | Tests unitarios y de casos de uso |
 
 ### Frontend
 
@@ -75,6 +77,7 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 | FullCalendar | Agenda visual |
 | Chart.js | Graficas |
 | Lucide | Iconografia |
+| Vitest | Tests unitarios del frontend |
 
 ### Infraestructura
 
@@ -100,7 +103,7 @@ backend-spring/src/main/java/com/marcog/peluqueria/<modulo>/
 
 La arquitectura evita nombres tecnicos ruidosos como `Port`, `Adapter`, `In` u `Out`. Los contratos viven en `domain` con nombres de negocio y las implementaciones viven en `infrastructure` indicando la tecnologia cuando aporta claridad, por ejemplo `PostgresClienteRepository`.
 
-El frontend usa vertical slicing por modulo. Las rutas de Nuxt en `app/pages` son wrappers finos y las pantallas reales viven en `app/modules`.
+El frontend usa el mismo criterio de vertical slicing por modulo. Las rutas de Nuxt en `app/pages` son wrappers finos y las pantallas reales viven en `app/modules`, separadas por negocio: agenda, clientes, inventario, mensajes, ventas, ausencias, chatbot, etc.
 
 ```text
 front-nuxt/app/
@@ -116,7 +119,7 @@ El caso de uso de ausencias incluye un control de concurrencia con `Semaphore(1,
 
 Las bajas medicas quedan fuera de este bloqueo porque representan una situacion inevitable y no deberian depender de disponibilidad de calendario.
 
-Esta decision tiene valor tecnico porque demuestra gestion de hilos, seccion critica y proteccion de reglas de negocio en el backend. Para el despliegue actual con una instancia de Spring Boot es suficiente. Si el sistema escalara a varias instancias, el siguiente paso seria mover este bloqueo a base de datos o a un mecanismo distribuido.
+Esta decision tiene valor tecnico porque demuestra gestion de hilos, seccion critica, semaforos y proteccion de reglas de negocio en el backend. Para el despliegue actual con una instancia de Spring Boot es suficiente. Si el sistema escalara a varias instancias, el siguiente paso seria mover este bloqueo a base de datos o a un mecanismo distribuido.
 
 ### Roles y auditoria
 
@@ -139,6 +142,8 @@ El frontend envia la pregunta al backend mediante el modulo de chatbot. El backe
 - Consultas en tiempo real: datos que deben salir de base de datos en el momento, como clientes VIP, total de clientes, inventario, stock bajo, ganancias, productos mas vendidos, citas del empleado o vacaciones.
 
 Para las consultas mas criticas, como clientes VIP o total de clientes, el backend responde directamente desde base de datos. Asi la respuesta no depende de la cuota del proveedor IA y no se inventan datos. Para preguntas mas abiertas, el backend usa un proveedor LLM configurable con function calling: el modelo puede pedir una funcion concreta, el backend ejecuta esa funcion contra PostgreSQL y devuelve el resultado para construir la respuesta final.
+
+Tambien se ha mejorado el formato de respuesta del chat para que sea mas util dentro del panel: respuestas sin iconos decorativos, datos estructurados cuando pregunta por agenda, clientes, ventas o inventario, sugerencias limpias y foco mantenido en el input para poder seguir preguntando sin interrupciones.
 
 ### Seguridad y roles
 
@@ -166,6 +171,30 @@ La clave se crea en el panel de OpenRouter, se copia una sola vez y se pega solo
 - Fallback local: algunas respuestas importantes se resuelven sin depender del proveedor externo, mejorando fiabilidad.
 - Contexto regenerable: el asistente se alimenta de datos actualizados del centro y puede regenerar su contexto.
 - Buen enfoque de producto: convierte el panel en una herramienta mas rapida para preguntar "que productos tienen bajo stock", "quienes son clientes VIP" o "cuantas citas tengo hoy".
+
+## Calidad y pruebas
+
+El proyecto incluye pruebas automatizadas en backend y frontend.
+
+En backend se usan JUnit 5 y Mockito para validar casos de uso, reglas de negocio y permisos sin depender de infraestructura real. Esto permite probar escenarios como solicitudes de vacaciones, restricciones por rol y respuestas del asistente con repositorios o servicios simulados.
+
+En frontend se usa Vitest para comprobar stores, servicios y composables clave. La idea es cubrir la logica que no debe romperse al cambiar la interfaz: autenticacion, cliente HTTP, estado global y comportamiento del asistente.
+
+Comandos principales:
+
+```bash
+cd backend-spring
+./mvnw test
+
+cd front-nuxt
+npm test
+```
+
+## Responsive
+
+La aplicacion esta pensada como panel de gestion de escritorio, pero se esta adaptando para que tambien sea util en tablet y movil. El layout general ya contempla menu lateral como drawer en pantallas pequenas, cabecera compacta, paddings responsive, toasts adaptativos y paneles laterales que no se salen del viewport.
+
+Antes de la entrega conviene revisar manualmente las pantallas principales en movil y tablet: login, panel de control, agenda, clientes, inventario, ventas, vacaciones, mensajes, resultados y asistente de gestion.
 
 ## Estructura del repositorio
 

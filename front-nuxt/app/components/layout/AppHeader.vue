@@ -5,7 +5,7 @@
  * Izquierda: búsqueda global (rounded-full, fondo gris)
  * Derecha: notificaciones (campana con contador WS), ajustes, divisor, nombre usuario + avatar
  */
-import { Bell, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
+import { Bell, Settings, PanelLeftClose, PanelLeftOpen, Menu } from 'lucide-vue-next'
 import { useSidebarCollapsed } from '~/modules/shared/composables/useSidebarCollapsed'
 
 const authStore = useAuthStore()
@@ -13,7 +13,7 @@ const route     = useRoute()
 const router    = useRouter()
 
 const { noLeidos, conteo, conectar, limpiarConteo } = useNotificacionesChat()
-const { collapsed, toggle: toggleSidebar } = useSidebarCollapsed()
+const { collapsed, toggle: toggleSidebar, openMobile } = useSidebarCollapsed()
 
 // Conectar al WebSocket al montar el header
 onMounted(() => conectar())
@@ -56,11 +56,21 @@ function formatHora(timestamp: number): string {
 </script>
 
 <template>
-  <header class="h-16 flex-shrink-0 flex items-center justify-between px-8">
+  <header class="h-16 flex-shrink-0 flex items-center justify-between px-4 sm:px-6 lg:px-8">
 
     <!-- Boton para colapsar / expandir el sidebar -->
     <button
-      class="p-2 rounded-lg text-on-surface-variant
+      class="inline-flex p-2 rounded-lg text-on-surface-variant lg:hidden
+             hover:text-primary-container hover:bg-surface-container-low
+             transition-colors"
+      aria-label="Abrir menú lateral"
+      @click="openMobile"
+    >
+      <Menu class="w-5 h-5" aria-hidden="true" />
+    </button>
+
+    <button
+      class="hidden p-2 rounded-lg text-on-surface-variant lg:inline-flex
              hover:text-primary-container hover:bg-surface-container-low
              transition-colors"
       :aria-label="collapsed ? 'Expandir menú lateral' : 'Colapsar menú lateral'"
@@ -112,7 +122,7 @@ function formatHora(timestamp: number): string {
             v-show="dropdownAbierto"
             role="menu"
             aria-label="Notificaciones"
-            class="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-lg
+            class="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-72 bg-white rounded-xl shadow-lg
                    border border-outline-variant/20 z-50 overflow-hidden"
           >
             <!-- Cabecera -->
@@ -186,11 +196,11 @@ function formatHora(timestamp: number): string {
       </button>
 
       <!-- Divisor vertical -->
-      <div class="h-8 w-px bg-outline-variant/30 mx-2" />
+      <div class="hidden h-8 w-px bg-outline-variant/30 mx-2 sm:block" />
 
       <!-- Nombre + rol + avatar -->
       <div class="flex items-center gap-3">
-        <div class="text-right">
+        <div class="hidden text-right sm:block">
           <p class="text-sm font-bold text-on-surface leading-none">
             {{ authStore.usuario?.username ?? 'Usuario' }}
           </p>
