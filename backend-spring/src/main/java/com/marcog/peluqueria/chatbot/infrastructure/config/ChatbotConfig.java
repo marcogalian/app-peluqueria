@@ -17,4 +17,12 @@ public class ChatbotConfig {
                 .setReadTimeout(Duration.ofSeconds(30))
                 .build();
     }
+
+    @Bean("openRouterRestTemplate")
+    public RestTemplate openRouterRestTemplate() {
+        return new RestTemplateBuilder()
+                .setConnectTimeout(Duration.ofSeconds(10))
+                .setReadTimeout(Duration.ofSeconds(45))
+                .build();
+    }
 }

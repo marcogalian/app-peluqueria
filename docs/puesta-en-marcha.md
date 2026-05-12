@@ -38,7 +38,10 @@ Variables principales. El repositorio solo incluye nombres de variables y placeh
 | `CHAT_AES_KEY` | Clave AES para chat interno |
 | `MAILTRAP_USERNAME` | Usuario Mailtrap |
 | `MAILTRAP_PASSWORD` | Contrasena Mailtrap |
-| `GEMINI_API_KEY` | Clave del asistente IA |
+| `AI_PROVIDER` | Proveedor IA: `gemini` u `openrouter` |
+| `GEMINI_API_KEY` | Clave del asistente IA con Gemini |
+| `OPENROUTER_API_KEY` | Clave del asistente IA con OpenRouter |
+| `OPENROUTER_MODEL` | Modelo OpenRouter, por defecto `openrouter/free` |
 | `APP_DEMO_PASSWORD` | Contrasena local para usuarios demo |
 
 ## Arranque con Docker
@@ -134,7 +137,7 @@ cd docker
 docker compose logs api --tail 160
 ```
 
-Si aparecen errores `403` o `429` de Gemini, la clave o la cuota de Gemini no estan disponibles. Las consultas directas de clientes deben seguir funcionando.
+Si aparecen errores `403` o `429` de Gemini, la clave o la cuota de Gemini no estan disponibles. Si se usa OpenRouter, revisar que `AI_PROVIDER=openrouter` y `OPENROUTER_API_KEY` esten configuradas en `docker/.env`. Las consultas directas de clientes deben seguir funcionando.
 
 ### Cambios de codigo no aparecen
 

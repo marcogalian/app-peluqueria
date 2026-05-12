@@ -10,6 +10,7 @@ import com.marcog.peluqueria.chatbot.domain.ModeloLenguaje;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -31,6 +32,7 @@ import java.util.Map;
  *  - Aplicar fallback automatico entre modelos cuando uno falla (429, 404, etc.)
  */
 @Component
+@ConditionalOnProperty(name = "ai.provider", havingValue = "gemini", matchIfMissing = true)
 @Slf4j
 public class GeminiModeloLenguaje implements ModeloLenguaje {
 

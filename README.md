@@ -57,7 +57,7 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 | Lombok | Reduccion de boilerplate |
 | WebSocket STOMP | Chat interno en tiempo real |
 | Spring Mail + Mailtrap | Emails en entorno de pruebas |
-| Gemini API | Asistente IA |
+| Gemini API / OpenRouter | Asistente IA configurable |
 | Springdoc OpenAPI | Swagger UI y contrato REST |
 
 ### Frontend
@@ -127,13 +127,23 @@ El frontend envia la pregunta al backend mediante el modulo de chatbot. El backe
 - Contexto de negocio cacheado: datos que cambian poco, como nombre del centro, horario, politicas, equipo, servicios, productos y ofertas activas. Este contexto se genera al arrancar y se regenera automaticamente cada noche.
 - Consultas en tiempo real: datos que deben salir de base de datos en el momento, como clientes VIP, total de clientes, inventario, stock bajo, ganancias, productos mas vendidos, citas del empleado o vacaciones.
 
-Para las consultas mas criticas, como clientes VIP o total de clientes, el backend responde directamente desde base de datos. Asi la respuesta no depende de la cuota del proveedor IA y no se inventan datos. Para preguntas mas abiertas, el backend usa Gemini con function calling: el modelo puede pedir una funcion concreta, el backend ejecuta esa funcion contra PostgreSQL y devuelve el resultado para construir la respuesta final.
+Para las consultas mas criticas, como clientes VIP o total de clientes, el backend responde directamente desde base de datos. Asi la respuesta no depende de la cuota del proveedor IA y no se inventan datos. Para preguntas mas abiertas, el backend usa un proveedor LLM configurable con function calling: el modelo puede pedir una funcion concreta, el backend ejecuta esa funcion contra PostgreSQL y devuelve el resultado para construir la respuesta final.
 
 ### Seguridad y roles
 
 El asistente respeta permisos. Un empleado puede consultar informacion propia, como sus citas o vacaciones, mientras que las metricas de negocio y clientes quedan limitadas al administrador. Esta comprobacion se hace en el backend, no solo en la pantalla.
 
-La clave de Gemini se configura por variable de entorno (`GEMINI_API_KEY`) y no se publica en el repositorio.
+El proveedor IA se elige por variable de entorno con `AI_PROVIDER`. Por defecto usa Gemini (`AI_PROVIDER=gemini` y `GEMINI_API_KEY`). Para probar OpenRouter se puede usar `AI_PROVIDER=openrouter`, `OPENROUTER_API_KEY` y `OPENROUTER_MODEL=openrouter/free`. Las claves no se publican en el repositorio.
+
+Para activar OpenRouter en local:
+
+```env
+AI_PROVIDER=openrouter
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=openrouter/free
+```
+
+La clave se crea en el panel de OpenRouter, se copia una sola vez y se pega solo en `docker/.env`.
 
 ### Puntos fuertes para la presentacion
 
@@ -141,6 +151,7 @@ La clave de Gemini se configura por variable de entorno (`GEMINI_API_KEY`) y no 
 - Arquitectura limpia: el caso de uso del asistente vive en `chatbot/application`, el dominio define contratos de negocio y la infraestructura contiene Gemini, contexto y consultas PostgreSQL.
 - Control por roles: admin y empleado tienen capacidades diferentes, lo que demuestra seguridad aplicada a una funcionalidad IA.
 - Function calling: el modelo no accede directamente a la base de datos; pide funciones controladas y el backend decide que ejecutar.
+- Proveedor intercambiable: el dominio depende de `ModeloLenguaje`, por lo que Gemini y OpenRouter se pueden cambiar por configuracion sin tocar el frontend.
 - Fallback local: algunas respuestas importantes se resuelven sin depender del proveedor externo, mejorando fiabilidad.
 - Contexto regenerable: el asistente se alimenta de datos actualizados del centro y puede regenerar su contexto.
 - Buen enfoque de producto: convierte el panel en una herramienta mas rapida para preguntar "que productos tienen bajo stock", "quienes son clientes VIP" o "cuantas citas tengo hoy".
