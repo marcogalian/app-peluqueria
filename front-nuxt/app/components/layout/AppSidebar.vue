@@ -16,7 +16,7 @@
  */
 import {
   LayoutDashboard, Calendar, Users, Scissors,
-  Package, UserCog, BarChart3, LogOut,
+  Package, UserCog, BarChart3, LogOut, X,
   MessageCircle, Palmtree, ShoppingBag, Sparkles,
 } from 'lucide-vue-next'
 import { useSidebarCollapsed } from '~/modules/shared/composables/useSidebarCollapsed'
@@ -25,6 +25,7 @@ const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const { collapsed } = useSidebarCollapsed()
+const mostrarConfirmacionSalida = ref(false)
 
 type Rol = 'admin' | 'empleado'
 type ItemMenu = {
@@ -89,6 +90,7 @@ function esActivo(path: string): boolean {
 
 function cerrarSesion() {
   authStore.cerrarSesion()
+  mostrarConfirmacionSalida.value = false
   router.push('/login')
 }
 
@@ -176,7 +178,7 @@ function bloquearScroll(evento: WheelEvent) {
         ]"
         :title="collapsed ? 'Cerrar sesión' : undefined"
         aria-label="Cerrar sesión"
-        @click="cerrarSesion"
+        @click="mostrarConfirmacionSalida = true"
       >
         <LogOut class="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
         <span v-if="!collapsed">Cerrar sesión</span>
@@ -184,4 +186,52 @@ function bloquearScroll(evento: WheelEvent) {
     </div>
 
   </aside>
+
+  <Teleport to="body">
+    <Transition name="modal-overlay">
+      <div
+        v-if="mostrarConfirmacionSalida"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="logout-confirm-title"
+        @click.self="mostrarConfirmacionSalida = false"
+      >
+        <div class="w-full max-w-sm rounded-xl border border-outline-variant/30 bg-white p-6 shadow-card-lg">
+          <div class="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p id="logout-confirm-title" class="text-lg font-extrabold text-primary">
+                Cerrar sesión
+              </p>
+              <p class="mt-2 text-sm leading-relaxed text-on-surface-variant">
+                ¿Seguro que quieres salir del panel?
+              </p>
+            </div>
+            <button
+              class="rounded-md p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low"
+              aria-label="Cancelar cierre de sesión"
+              @click="mostrarConfirmacionSalida = false"
+            >
+              <X class="h-4 w-4" />
+            </button>
+          </div>
+
+          <div class="flex justify-end gap-3">
+            <button
+              class="rounded-md border border-outline-variant/50 bg-white px-4 py-2 text-sm font-bold text-on-surface transition-colors hover:bg-surface-container-low"
+              @click="mostrarConfirmacionSalida = false"
+            >
+              Cancelar
+            </button>
+            <button
+              class="rounded-md bg-error px-4 py-2 text-sm font-bold text-white transition-colors hover:brightness-95"
+              @click="cerrarSesion"
+            >
+              Sí, salir
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
