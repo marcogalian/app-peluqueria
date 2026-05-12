@@ -60,6 +60,7 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
 
             FUNCIONES (datos en tiempo real desde BD):
             - getCitasEmpleado(fecha?): citas del empleado autenticado, default hoy
+            - getCitasProgramadas(periodo?): citas previstas del negocio para admin o propias para empleado. Periodo: hoy, semana, mes
             - getVacacionesEmpleado(): vacaciones del empleado autenticado
             - Solo admin: getGanancias, getCitasAtendidas, getProductosStockBajo, getProductosMasVendidos, getInventario, getClientesVip, getTotalClientes
 
@@ -67,6 +68,8 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
 
             REGLAS IMPORTANTES:
             - Responde SIEMPRE en espanol, amable y conciso (2-3 frases para respuestas simples)
+            - No uses emoticonos ni emojis
+            - No uses Markdown visible como **negritas**. Si necesitas listar, usa lineas simples con guiones
             - Para preguntas sobre empleados, servicios, productos, precios, horarios, ofertas, politicas: USA EL JSON DE CONTEXTO, NO digas que no sabes
             - Para citas, dinero, ventas, stock actual: LLAMA a la funcion correspondiente
             - No inventes datos
@@ -118,7 +121,7 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
                 ? resultadoModelo.text()
                 : "No pude generar una respuesta.";
         List<String> suggestions = extractSuggestions(reply);
-        reply = cleanSuggestions(reply);
+        reply = limpiarEstiloRespuesta(cleanSuggestions(reply));
 
         return ChatResponse.builder()
                 .reply(reply)
@@ -159,6 +162,10 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
 
     private ChatResponse responderConsultaDirecta(ChatRequest request, UUID peluqueroId, boolean isAdmin) {
         String mensaje = normalizar(request.getMessage());
+        if (esConsultaCitasProgramadas(mensaje)) {
+            return responderCitasProgramadas(mensaje, peluqueroId, isAdmin);
+        }
+
         if (!esConsultaClientesVip(mensaje)) {
             if (esConsultaTotalClientes(mensaje)) {
                 return responderTotalClientes(peluqueroId, isAdmin);
@@ -190,6 +197,31 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
                 || mensaje.contains("cuanto")
                 || mensaje.contains("cuantos")
                 || mensaje.contains("cantidad"));
+    }
+
+    private boolean esConsultaCitasProgramadas(String mensaje) {
+        return mensaje.contains("cita")
+                && (mensaje.contains("prevista")
+                || mensaje.contains("previstas")
+                || mensaje.contains("programada")
+                || mensaje.contains("programadas")
+                || mensaje.contains("agendada")
+                || mensaje.contains("agendadas")
+                || mensaje.contains("hay cita"));
+    }
+
+    private ChatResponse responderCitasProgramadas(String mensaje, UUID peluqueroId, boolean isAdmin) {
+        JsonNode args = MAPPER.createObjectNode().put("periodo", detectarPeriodo(mensaje));
+        String resultadoFuncion = functionExecutor.execute("getCitasProgramadas", args, peluqueroId, isAdmin);
+        return formatearCitasProgramadas(resultadoFuncion, isAdmin);
+    }
+
+    private String detectarPeriodo(String mensaje) {
+        if (mensaje.contains("hoy")) return "hoy";
+        if (mensaje.contains("manana")) return "manana";
+        if (mensaje.contains("semana")) return "semana";
+        if (mensaje.contains("mes")) return "mes";
+        return "semana";
     }
 
     private ChatResponse responderTotalClientes(UUID peluqueroId, boolean isAdmin) {
@@ -280,6 +312,65 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
         }
     }
 
+    private ChatResponse formatearCitasProgramadas(String resultadoFuncion, boolean isAdmin) {
+        try {
+            JsonNode raiz = MAPPER.readTree(resultadoFuncion);
+            if (raiz.has("error")) {
+                return ChatResponse.builder()
+                        .reply("No he podido consultar las citas programadas ahora mismo.")
+                        .suggestedQuestions(List.of("¿Qué citas hay hoy?", "¿Qué productos tienen bajo stock?"))
+                        .build();
+            }
+
+            String periodo = raiz.path("periodo").asText("semana");
+            int total = raiz.path("totalCitas").asInt(0);
+            JsonNode citas = raiz.path("citas");
+            String etiquetaPeriodo = switch (periodo) {
+                case "hoy" -> "hoy";
+                case "manana" -> "mañana";
+                case "mes" -> "este mes";
+                default -> "esta semana";
+            };
+
+            if (total == 0 || !citas.isArray() || citas.isEmpty()) {
+                return ChatResponse.builder()
+                        .reply("No hay citas programadas para " + etiquetaPeriodo + ".")
+                        .suggestedQuestions(List.of(
+                                "¿Qué ganancias tenemos este mes?",
+                                "¿Qué productos tienen bajo stock?"
+                        ))
+                        .build();
+            }
+
+            List<String> lineas = new ArrayList<>();
+            citas.forEach(cita -> {
+                String peluquera = cita.path("peluquera").asText("").trim();
+                String sufijoPeluquera = isAdmin && !peluquera.isBlank() ? " · " + peluquera : "";
+                lineas.add("- " + cita.path("fecha").asText("")
+                        + " " + cita.path("hora").asText("")
+                        + " · " + cita.path("cliente").asText("")
+                        + " · " + cita.path("servicio").asText("")
+                        + sufijoPeluquera);
+            });
+
+            String reply = "Hay " + total + " citas programadas para " + etiquetaPeriodo + ":\n\n"
+                    + String.join("\n", lineas);
+            return ChatResponse.builder()
+                    .reply(reply)
+                    .suggestedQuestions(List.of(
+                            "¿Qué ganancias tenemos este mes?",
+                            "¿Qué productos tienen bajo stock?",
+                            "¿Qué clientes son VIP?"
+                    ))
+                    .build();
+        } catch (Exception ex) {
+            return ChatResponse.builder()
+                    .reply("No he podido leer las citas programadas ahora mismo.")
+                    .suggestedQuestions(List.of("¿Qué citas hay hoy?", "¿Qué productos tienen bajo stock?"))
+                    .build();
+        }
+    }
+
     private String normalizar(String texto) {
         if (texto == null) return "";
         String sinAcentos = Normalizer.normalize(texto, Normalizer.Form.NFD)
@@ -305,6 +396,16 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
                 "name", "getVacacionesEmpleado",
                 "description", "Obtiene las vacaciones y ausencias del empleado autenticado",
                 "parameters", Map.of("type", "object", "properties", Map.of())
+        ));
+        tools.add(Map.of(
+                "name", "getCitasProgramadas",
+                "description", "Obtiene las citas programadas. Para admin devuelve todas las citas del negocio; para empleado solo sus propias citas.",
+                "parameters", Map.of(
+                        "type", "object",
+                        "properties", Map.of(
+                                "periodo", Map.of("type", "string", "description", "Periodo: hoy, manana, semana o mes")
+                        )
+                )
         ));
 
         if (!isAdmin) return tools;
@@ -385,5 +486,15 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
     private String cleanSuggestions(String reply) {
         int indiceMarcador = reply.indexOf("[SUGERENCIAS]:");
         return indiceMarcador >= 0 ? reply.substring(0, indiceMarcador).trim() : reply;
+    }
+
+    private String limpiarEstiloRespuesta(String reply) {
+        if (reply == null) return "";
+        return reply
+                .replace("**", "")
+                .replace("__", "")
+                .replaceAll("[\\p{So}\\uFE0F\\u200D]", "")
+                .replaceAll("[ \\t]+\\n", "\n")
+                .trim();
     }
 }

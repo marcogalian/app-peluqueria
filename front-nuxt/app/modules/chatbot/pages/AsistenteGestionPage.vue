@@ -7,6 +7,7 @@ definePageMeta({ middleware: 'auth' })
 const { messages, loading, suggestedQuestions, sendMessage, clearHistory } = useChatbot()
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
+const questionInput = ref<HTMLInputElement | null>(null)
 
 async function handleSend() {
   const text = inputText.value.trim()
@@ -15,18 +16,24 @@ async function handleSend() {
   await sendMessage(text)
   await nextTick()
   scrollToBottom()
+  focusQuestionInput()
 }
 
 async function handleSuggestion(text: string) {
   await sendMessage(text)
   await nextTick()
   scrollToBottom()
+  focusQuestionInput()
 }
 
 function scrollToBottom() {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
   }
+}
+
+function focusQuestionInput() {
+  requestAnimationFrame(() => questionInput.value?.focus())
 }
 
 watch(messages, () => {
@@ -95,7 +102,7 @@ watch(messages, () => {
           :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
         >
           <div
-            class="max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed"
+            class="max-w-[75%] whitespace-pre-line px-4 py-3 rounded-2xl text-sm leading-relaxed"
             :class="msg.role === 'user'
               ? 'bg-primary-container text-white rounded-br-sm'
               : 'bg-surface-container text-on-surface rounded-bl-sm'"
@@ -131,6 +138,7 @@ watch(messages, () => {
       <div class="p-4 border-t border-outline-variant/20">
         <form class="flex gap-3" @submit.prevent="handleSend">
           <input
+            ref="questionInput"
             v-model="inputText"
             type="text"
             placeholder="Escribe una consulta de gestión..."

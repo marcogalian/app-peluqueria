@@ -73,6 +73,7 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
         try {
             return switch (functionName) {
                 case "getCitasEmpleado" -> getCitasEmpleado(args, peluqueroId);
+                case "getCitasProgramadas" -> getCitasProgramadas(args, peluqueroId, isAdmin);
                 case "getVacacionesEmpleado" -> getVacacionesEmpleado(peluqueroId);
                 case "getGanancias" -> isAdmin ? getGanancias(args) : ERROR_NO_ADMIN_GANANCIAS;
                 case "getCitasAtendidas" -> isAdmin ? getCitasAtendidas(args) : ERROR_NO_ADMIN_CITAS;
@@ -117,6 +118,60 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
                 "cliente", cita.getCliente().getNombre() + " " + cita.getCliente().getApellidos(),
                 "servicio", primerServicioOSinServicio(cita),
                 "estado", cita.getEstado().name()
+        );
+    }
+
+    private String getCitasProgramadas(JsonNode args, UUID peluqueroId, boolean isAdmin) {
+        String periodo = args != null && args.has("periodo")
+                ? args.get("periodo").asText("semana")
+                : "semana";
+        LocalDate hoy = LocalDate.now();
+        LocalDateTime inicio = switch (periodo) {
+            case "hoy" -> hoy.atStartOfDay();
+            case "manana" -> hoy.plusDays(1).atStartOfDay();
+            case "mes" -> hoy.withDayOfMonth(1).atStartOfDay();
+            default -> hoy.with(DayOfWeek.MONDAY).atStartOfDay();
+        };
+        LocalDateTime fin = switch (periodo) {
+            case "hoy" -> hoy.atTime(23, 59, 59);
+            case "manana" -> hoy.plusDays(1).atTime(23, 59, 59);
+            case "mes" -> hoy.withDayOfMonth(hoy.lengthOfMonth()).atTime(23, 59, 59);
+            default -> hoy.with(DayOfWeek.SUNDAY).atTime(23, 59, 59);
+        };
+
+        UUID filtroPeluquero = isAdmin ? null : peluqueroId;
+        List<Cita> citas = citaRepository.findByCriteria(inicio, fin, filtroPeluquero).stream()
+                .filter(cita -> !EstadoCita.CANCELADO.equals(cita.getEstado()))
+                .filter(cita -> !EstadoCita.COMPLETADO.equals(cita.getEstado()))
+                .sorted((primera, segunda) -> primera.getFechaHora().compareTo(segunda.getFechaHora()))
+                .collect(Collectors.toList());
+
+        List<Map<String, String>> detalle = citas.stream()
+                .map(this::resumirCitaProgramada)
+                .collect(Collectors.toList());
+
+        return toJson(Map.of(
+                "periodo", periodo,
+                "desde", inicio.toLocalDate().toString(),
+                "hasta", fin.toLocalDate().toString(),
+                "totalCitas", detalle.size(),
+                "citas", detalle
+        ), "Error serializando citas programadas");
+    }
+
+    private Map<String, String> resumirCitaProgramada(Cita cita) {
+        String cliente = cita.getCliente() != null
+                ? cita.getCliente().getNombre() + " " + (cita.getCliente().getApellidos() != null ? cita.getCliente().getApellidos() : "")
+                : "Cliente sin asignar";
+        String peluquera = cita.getPeluquero() != null ? cita.getPeluquero().getNombre() : "";
+
+        return Map.of(
+                "fecha", cita.getFechaHora().format(DateTimeFormatter.ofPattern("dd/MM")),
+                "hora", cita.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm")),
+                "cliente", cliente.trim(),
+                "servicio", primerServicioOSinServicio(cita),
+                "peluquera", peluquera,
+                "estado", cita.getEstado() != null ? cita.getEstado().name() : ""
         );
     }
 

@@ -152,16 +152,16 @@ class ResponderConsultasGestionTest {
     }
 
     @Test
-    @DisplayName("Empleado solo recibe 2 tools (citas + vacaciones)")
-    void chat_empleado_pasaSolo2Tools() {
+    @DisplayName("Empleado solo recibe tools propias (citas, vacaciones y citas programadas)")
+    void chat_empleado_pasaSoloToolsPropias() {
         when(llmClient.generateContent(any(), any(), any(),
-                argThat((List<Map<String, Object>> tools) -> tools != null && tools.size() == 2)))
+                argThat((List<Map<String, Object>> tools) -> tools != null && tools.size() == 3)))
                 .thenReturn(new LlmResult("ok", null, null, "modelo"));
 
         ResponderConsultasGestion.chat(peticionConMensaje("test"), empleadoUser);
 
         verify(llmClient).generateContent(any(), any(), any(),
-                argThat((List<Map<String, Object>> tools) -> tools != null && tools.size() == 2));
+                argThat((List<Map<String, Object>> tools) -> tools != null && tools.size() == 3));
     }
 
     @Test

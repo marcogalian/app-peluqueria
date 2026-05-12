@@ -5,12 +5,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.marcog.peluqueria.ausencias.domain.EstadoAusencia;
 import com.marcog.peluqueria.ausencias.domain.SolicitudAusencia;
 import com.marcog.peluqueria.ausencias.domain.AusenciaRepository;
+import com.marcog.peluqueria.citas.domain.Cita;
+import com.marcog.peluqueria.citas.domain.EstadoCita;
 import com.marcog.peluqueria.citas.domain.CitaRepository;
 import com.marcog.peluqueria.clientes.domain.Cliente;
 import com.marcog.peluqueria.clientes.domain.ClienteRepository;
 import com.marcog.peluqueria.finanzas.application.ConsultarPanelFinanciero;
+import com.marcog.peluqueria.peluqueros.domain.Peluquero;
 import com.marcog.peluqueria.productos.domain.ProductoRepository;
 import com.marcog.peluqueria.productos.infrastructure.persistence.JpaVentaProductoRepository;
+import com.marcog.peluqueria.servicios.domain.Servicio;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,11 +23,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
 /**
@@ -124,6 +130,29 @@ class ChatFunctionExecutorTest {
         JsonNode resultado = new ObjectMapper().readTree(resultadoJson);
         assertEquals(1, resultado.get("totalVip").asInt());
         assertEquals("Sofia Martinez", resultado.get("clientes").get(0).get("nombre").asText());
+    }
+
+    @Test
+    @DisplayName("getCitasProgramadas devuelve citas pendientes ordenadas para admin")
+    void getCitasProgramadas_adminDevuelveCitasPendientes() throws Exception {
+        Cita cita = Cita.builder()
+                .fechaHora(LocalDate.now().with(java.time.DayOfWeek.WEDNESDAY).atTime(10, 30))
+                .estado(EstadoCita.PENDIENTE)
+                .cliente(Cliente.builder().nombre("Sofia").apellidos("Martinez").build())
+                .peluquero(Peluquero.builder().nombre("Laura").build())
+                .servicios(List.of(Servicio.builder().nombre("Corte").build()))
+                .build();
+
+        when(citaRepository.findByCriteria(any(), any(), isNull()))
+                .thenReturn(List.of(cita));
+
+        JsonNode args = new ObjectMapper().createObjectNode().put("periodo", "semana");
+        String resultadoJson = executor.execute("getCitasProgramadas", args, UUID.randomUUID(), true);
+
+        JsonNode resultado = new ObjectMapper().readTree(resultadoJson);
+        assertEquals(1, resultado.get("totalCitas").asInt());
+        assertEquals("Sofia Martinez", resultado.get("citas").get(0).get("cliente").asText());
+        assertEquals("Laura", resultado.get("citas").get(0).get("peluquera").asText());
     }
 
     @Test
