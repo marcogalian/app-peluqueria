@@ -233,7 +233,7 @@ async function eliminarMensaje(mensajeId: string) {
         <button
           class="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left"
           :class="contactoActivo?.id === c.id ? 'bg-surface-container-low border-r-4 border-primary-container' : ''"
-          :aria-label="`${c.nombre}, ${c.rol === 'ROLE_ADMIN' ? 'Administrador' : 'Empleado'}${c.online ? ', en línea' : ''}`"
+          :aria-label="`${c.nombre}, ${c.rol === 'ROLE_ADMIN' ? 'Administrador' : 'Peluquero/a'}${c.online ? ', en línea' : ''}`"
           :aria-pressed="contactoActivo?.id === c.id"
           @click="seleccionarContacto(c)"
         >
@@ -245,7 +245,7 @@ async function eliminarMensaje(mensajeId: string) {
           </div>
           <div class="min-w-0">
             <p class="font-bold text-on-surface text-sm truncate">{{ c.nombre }}</p>
-            <p class="text-[10px] text-on-surface-variant">{{ c.rol === 'ROLE_ADMIN' ? 'Administrador' : 'Empleado' }}</p>
+            <p class="text-[10px] text-on-surface-variant">{{ c.rol === 'ROLE_ADMIN' ? 'Administrador' : 'Peluquero/a' }}</p>
           </div>
         </button>
         </li>

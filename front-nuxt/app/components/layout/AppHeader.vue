@@ -195,7 +195,7 @@ function formatHora(timestamp: number): string {
             {{ authStore.usuario?.username ?? 'Usuario' }}
           </p>
           <p class="text-[10px] text-on-surface-variant mt-0.5">
-            {{ authStore.isAdmin ? 'Administrador' : 'Empleado' }}
+            {{ authStore.isAdmin ? 'Administrador' : 'Peluquero/a' }}
           </p>
         </div>
         <div class="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center

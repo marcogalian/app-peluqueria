@@ -18,6 +18,7 @@ import {
   LayoutDashboard, Calendar, Users, Scissors,
   Package, UserCog, BarChart3, LogOut, X,
   MessageCircle, Palmtree, ShoppingBag, Sparkles,
+  ClipboardList,
 } from 'lucide-vue-next'
 import { useSidebarCollapsed } from '~/modules/shared/composables/useSidebarCollapsed'
 
@@ -52,6 +53,7 @@ const grupos: GrupoMenu[] = [
     titulo: 'Gestión',
     items: [
       { path: '/admin/clientes',   label: 'Clientes',   icon: Users,        visiblePara: ['admin'] },
+      { path: '/clientes',         label: 'Clientes',   icon: Users,        visiblePara: ['empleado'] },
       { path: '/admin/servicios',  label: 'Servicios',  icon: Scissors,     visiblePara: ['admin'] },
       { path: '/admin/inventario', label: 'Inventario', icon: Package,      visiblePara: ['admin'] },
       { path: '/ventas',           label: 'Ventas',     icon: ShoppingBag,  visiblePara: ['admin', 'empleado'] },
@@ -68,6 +70,7 @@ const grupos: GrupoMenu[] = [
     titulo: 'Análisis',
     items: [
       { path: '/admin/resultados', label: 'Resultados',  icon: BarChart3, visiblePara: ['admin'] },
+      { path: '/admin/auditoria',  label: 'Auditoría',   icon: ClipboardList, visiblePara: ['admin'] },
       { path: '/chat-ia',          label: 'Asistente gestión', icon: Sparkles, visiblePara: ['admin', 'empleado'] },
     ],
   },
@@ -119,7 +122,7 @@ function bloquearScroll(evento: WheelEvent) {
           Peluquería Isabella
         </h1>
         <p class="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant/60 mt-1">
-          {{ authStore.isAdmin ? 'Panel de administración' : 'Portal Empleado' }}
+          {{ authStore.isAdmin ? 'Panel de administración' : 'Portal Peluquero/a' }}
           <span class="ml-1 text-on-surface-variant/40">· v1.0.0</span>
         </p>
       </template>

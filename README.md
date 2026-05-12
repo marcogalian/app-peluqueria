@@ -29,10 +29,12 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 - Resultados financieros: ingresos, gastos, beneficios, productos y rendimiento.
 - Configuracion del negocio, dias especiales y dias bloqueados para vacaciones.
 - Asistente de gestion para consultar datos del negocio.
+- Auditoria de actividad para revisar creaciones, modificaciones y eliminaciones del equipo.
 
-### Portal empleado
+### Portal peluquero/a
 
 - Agenda propia.
+- Clientes para consulta y alta operativa.
 - Mensajes internos.
 - Ventas de productos.
 - Solicitud de vacaciones y bajas.
@@ -115,6 +117,15 @@ El caso de uso de ausencias incluye un control de concurrencia con `Semaphore(1,
 Las bajas medicas quedan fuera de este bloqueo porque representan una situacion inevitable y no deberian depender de disponibilidad de calendario.
 
 Esta decision tiene valor tecnico porque demuestra gestion de hilos, seccion critica y proteccion de reglas de negocio en el backend. Para el despliegue actual con una instancia de Spring Boot es suficiente. Si el sistema escalara a varias instancias, el siguiente paso seria mover este bloqueo a base de datos o a un mecanismo distribuido.
+
+### Roles y auditoria
+
+La aplicacion trabaja con dos roles principales:
+
+- `ADMIN`: acceso completo al panel, configuracion, empleados, resultados, inventario, servicios, clientes, agenda y auditoria.
+- `ROLE_HAIRDRESSER` (peluquero/a): agenda, clientes operativos, ventas, productos en lectura, vacaciones, mensajes y asistente sin datos economicos.
+
+El backend aplica permisos con Spring Security y no depende solo de ocultar opciones en el menu. Ademas, existe un registro de actividad para administracion: cada accion autenticada que crea, modifica o elimina datos queda guardada con usuario, rol, modulo, metodo HTTP, ruta, estado y fecha. Esto permite responder a preguntas como quien creo una cita, quien edito un cliente o quien cambio una solicitud.
 
 ## Asistente de gestion con IA
 
