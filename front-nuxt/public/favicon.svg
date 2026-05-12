@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Peluqueria Isabella">
+  <rect width="64" height="64" rx="14" fill="#07244a"/>
+  <text
+    x="32"
+    y="39"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="25"
+    font-weight="700"
+    letter-spacing="1"
+    fill="#ffffff"
+  >PI</text>
+  <path d="M17 48H47" stroke="#c2a15d" stroke-width="3" stroke-linecap="round"/>
+</svg>
