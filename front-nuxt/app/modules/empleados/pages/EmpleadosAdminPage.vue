@@ -255,19 +255,19 @@ function abrirEmail(empleado: Empleado) {
 
     <!-- ── KPI bento ─────────────────────────────────────── -->
     <div class="grid grid-cols-4 gap-4">
-      <div class="card-kpi empleados-kpi-card">
+      <div class="card-kpi empleados-kpi-card !shadow-card !transition-none hover:!translate-y-0 hover:!bg-surface-container-low hover:!shadow-card">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-1">Total Empleados</p>
         <p class="text-3xl font-bold text-primary-container">{{ empleados.length }}</p>
       </div>
-      <div class="card-kpi empleados-kpi-card empleados-kpi-card-primary !bg-primary-container shadow-lg shadow-primary-container/20">
+      <div class="card-kpi empleados-kpi-card empleados-kpi-card-primary !bg-primary-container !shadow-card !transition-none hover:!translate-y-0 hover:!bg-primary-container hover:!shadow-card">
         <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-1">En Turno Hoy</p>
         <p class="text-3xl font-bold text-white">{{ enTurnoHoy }}</p>
       </div>
-      <div class="card-kpi empleados-kpi-card">
+      <div class="card-kpi empleados-kpi-card !shadow-card !transition-none hover:!translate-y-0 hover:!bg-surface-container-low hover:!shadow-card">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-1">De Baja</p>
         <p class="text-3xl font-bold text-red-500">{{ enBaja }}</p>
       </div>
-      <div class="card-kpi empleados-kpi-card">
+      <div class="card-kpi empleados-kpi-card !shadow-card !transition-none hover:!translate-y-0 hover:!bg-surface-container-low hover:!shadow-card">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-1">De Vacaciones</p>
         <p class="text-3xl font-bold text-blue-500">{{ enVacaciones }}</p>
       </div>
@@ -637,18 +637,19 @@ function abrirEmail(empleado: Empleado) {
 
 <style scoped>
 .empleados-kpi-card {
-  transition: none;
+  transition: none !important;
+  transform: none !important;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.07), 0 1px 2px rgb(0 0 0 / 0.05) !important;
 }
 
 .empleados-kpi-card:hover {
-  transform: none;
-  background-color: #f4f3f7;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+  transform: none !important;
+  background-color: #f4f3f7 !important;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.07), 0 1px 2px rgb(0 0 0 / 0.05) !important;
 }
 
 .empleados-kpi-card-primary:hover {
-  background-color: #1a365d;
-  box-shadow: 0 10px 15px -3px rgb(26 54 93 / 0.2), 0 4px 6px -4px rgb(26 54 93 / 0.2);
+  background-color: #1a365d !important;
 }
 
 .empleados-panel-card {
