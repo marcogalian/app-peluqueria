@@ -30,14 +30,12 @@ interface Contacto {
 
 const authStore = useAuthStore()
 const route = useRoute()
-const runtimeConfig = useRuntimeConfig()
 const toast = useToast()
 
 const mensajes = ref<Mensaje[]>([])
 const contactos = ref<Contacto[]>([])
 const contactoActivo = ref<Contacto | null>(null)
 const cargando = ref(true)
-const conectado = ref(false)
 const enviandoEmail = ref(false)
 const emailEstado = ref<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
 
@@ -45,14 +43,6 @@ const emailForm = reactive({
   asunto: '',
   cuerpo: '',
 })
-
-let stompClient: any = null
-
-function normalizarBrokerURL(raw: string) {
-  if (raw.startsWith('https://')) return raw.replace('https://', 'wss://')
-  if (raw.startsWith('http://')) return raw.replace('http://', 'ws://')
-  return raw
-}
 
 function prepararBorrador(contacto: Contacto | null) {
   emailEstado.value = null
@@ -64,34 +54,6 @@ function prepararBorrador(contacto: Contacto | null) {
 
   emailForm.asunto = ''
   emailForm.cuerpo = `Hola ${contacto.nombre},\n\n`
-}
-
-async function conectarWebSocket() {
-  try {
-    const { Client } = await import('@stomp/stompjs')
-    const token = localStorage.getItem('access_token')
-
-    stompClient = new Client({
-      brokerURL: normalizarBrokerURL(runtimeConfig.public.wsBase || 'http://localhost:8080/chat-websocket'),
-      connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
-      reconnectDelay: 5000,
-
-      onConnect: () => {
-        conectado.value = true
-        stompClient.subscribe('/user/queue/mensajes', (frame: any) => {
-          const msg: Mensaje = JSON.parse(frame.body)
-          mensajes.value.push(msg)
-        })
-      },
-
-      onDisconnect: () => { conectado.value = false },
-      onStompError: () => { conectado.value = false },
-    })
-
-    stompClient.activate()
-  } catch {
-    conectado.value = false
-  }
 }
 
 onMounted(async () => {
@@ -111,12 +73,7 @@ onMounted(async () => {
     // vacío
   } finally {
     cargando.value = false
-    await conectarWebSocket()
   }
-})
-
-onUnmounted(() => {
-  stompClient?.deactivate()
 })
 
 async function seleccionarContacto(c: Contacto) {
@@ -214,13 +171,13 @@ async function eliminarMensaje(mensajeId: string) {
 </script>
 
 <template>
-  <div class="flex gap-6 min-h-full items-start pb-6">
-    <aside class="w-72 self-start card flex flex-col overflow-hidden flex-shrink-0" aria-label="Contactos">
-      <div class="p-5 border-b border-surface-container">
+  <div class="flex min-h-full flex-col items-stretch gap-5 pb-6">
+    <aside class="card flex w-full flex-col overflow-hidden" aria-label="Contactos">
+      <div class="border-b border-surface-container p-5 sm:flex sm:items-center sm:justify-between">
         <h3 class="font-bold text-primary text-sm">Mensajes</h3>
         <div class="flex items-center gap-2 mt-1">
-          <div class="w-2 h-2 rounded-full" :class="conectado ? 'bg-green-500' : 'bg-surface-container-high'" aria-hidden="true" />
-          <p class="text-[10px] text-on-surface-variant" role="status" aria-live="polite">{{ conectado ? 'Conectado' : 'Desconectado' }}</p>
+          <Mail class="w-3.5 h-3.5 text-on-surface-variant" aria-hidden="true" />
+          <p class="text-[10px] text-on-surface-variant">Correo interno</p>
         </div>
       </div>
 
@@ -228,11 +185,11 @@ async function eliminarMensaje(mensajeId: string) {
         <Loader2 class="w-5 h-5 animate-spin text-primary" aria-hidden="true" />
       </div>
 
-      <ul v-else class="flex-1 overflow-y-auto" role="list" aria-label="Lista de contactos">
-        <li v-for="c in contactos" :key="c.id">
+      <ul v-else class="flex gap-2 overflow-x-auto p-3 lg:flex-wrap" role="list" aria-label="Lista de contactos">
+        <li v-for="c in contactos" :key="c.id" class="min-w-[13rem] lg:min-w-0 lg:flex-1">
         <button
-          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left"
-          :class="contactoActivo?.id === c.id ? 'bg-surface-container-low border-r-4 border-primary-container' : ''"
+          class="w-full flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-surface-container-low transition-colors text-left"
+          :class="contactoActivo?.id === c.id ? 'bg-surface-container-low ring-2 ring-primary-container/20' : ''"
           :aria-label="`${c.nombre}, ${c.rol === 'ROLE_ADMIN' ? 'Administrador' : 'Peluquero/a'}${c.online ? ', en línea' : ''}`"
           :aria-pressed="contactoActivo?.id === c.id"
           @click="seleccionarContacto(c)"
@@ -256,33 +213,33 @@ async function eliminarMensaje(mensajeId: string) {
       </ul>
     </aside>
 
-    <section class="flex-1 self-start card flex flex-col overflow-hidden">
+    <section class="card flex w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div v-if="!contactoActivo" class="flex-1 flex flex-col items-center justify-center text-on-surface-variant gap-3">
         <MessageSquare class="w-10 h-10 opacity-20" />
         <p class="text-sm">Selecciona un contacto para escribirle</p>
       </div>
 
       <template v-else>
-        <div class="px-6 py-4 border-b border-surface-container flex items-center justify-between flex-shrink-0">
-          <div class="flex items-center gap-3">
+        <div class="flex flex-shrink-0 flex-col gap-3 border-b border-surface-container px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div class="flex min-w-0 items-center gap-3">
             <div class="w-9 h-9 rounded-full bg-primary-container text-white flex items-center justify-center text-xs font-bold">
               {{ contactoActivo.iniciales }}
             </div>
-            <div>
-              <p class="font-bold text-on-surface text-sm">{{ contactoActivo.nombre }}</p>
-              <p class="text-[10px] text-on-surface-variant">{{ contactoActivo.email || 'Sin email configurado' }}</p>
+            <div class="min-w-0">
+              <p class="truncate font-bold text-on-surface text-sm">{{ contactoActivo.nombre }}</p>
+              <p class="truncate text-[10px] text-on-surface-variant">{{ contactoActivo.email || 'Sin email configurado' }}</p>
             </div>
           </div>
 
-          <div class="flex items-center gap-2 rounded-full bg-surface-container-low px-3 py-1.5 text-xs font-bold text-primary">
+          <div class="inline-flex self-start items-center gap-2 rounded-full bg-surface-container-low px-3 py-1.5 text-xs font-bold text-primary sm:self-auto">
             <Mail class="w-3.5 h-3.5" />
             Mailtrap
           </div>
         </div>
 
-        <div class="px-6 pt-5 pb-10 bg-surface-container-low/40 flex-shrink-0">
+        <div class="flex-shrink-0 bg-surface-container-low/40 px-4 pt-4 pb-8 sm:px-6 sm:pt-5 sm:pb-10">
           <div class="space-y-4">
-            <div class="rounded-2xl bg-white border border-surface-container px-6 pt-6 pb-6 shadow-sm">
+            <div class="rounded-2xl bg-white border border-surface-container px-4 pt-5 pb-5 shadow-sm sm:px-6 sm:pt-6 sm:pb-6">
             <div class="flex items-center gap-2 mb-4">
               <Mail class="w-4 h-4 text-primary-container" />
               <h4 class="font-bold text-primary text-sm">Redactar correo</h4>
@@ -308,9 +265,9 @@ async function eliminarMensaje(mensajeId: string) {
                 />
               </div>
 
-              <div class="mt-2 rounded-2xl bg-surface-container-low/70 px-4 py-4 flex justify-end">
+              <div class="mt-2 flex rounded-2xl bg-surface-container-low/70 px-4 py-4 sm:justify-end">
                 <button
-                  class="min-w-36 bg-primary-container text-white px-4 py-2.5 rounded-full text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                  class="flex w-full items-center justify-center gap-2 rounded-full bg-primary-container px-4 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto sm:min-w-36"
                   :disabled="enviandoEmail"
                   @click="enviarEmailManual"
                 >
@@ -337,8 +294,8 @@ async function eliminarMensaje(mensajeId: string) {
             </div>
             </div>
 
-            <div class="rounded-2xl bg-white border border-surface-container px-6 py-5 shadow-sm space-y-3">
-              <div class="flex items-center justify-between gap-3 border-b border-surface-container pb-3">
+            <div class="rounded-2xl bg-white border border-surface-container px-4 py-5 shadow-sm space-y-3 sm:px-6">
+              <div class="flex flex-col gap-3 border-b border-surface-container pb-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h5 class="text-sm font-bold text-primary">Mensajes para {{ contactoActivo.nombre }}</h5>
                   <p class="text-[11px] text-on-surface-variant">Se muestran solo los mensajes activos de este peluquero.</p>
@@ -355,7 +312,7 @@ async function eliminarMensaje(mensajeId: string) {
               <article
                 v-for="m in mensajesVisibles"
                 :key="m.id"
-                class="rounded-xl border border-surface-container bg-white px-4 py-4 transition-colors hover:bg-surface-container-lowest/60"
+                class="rounded-xl border border-surface-container bg-white px-4 py-4"
               >
                 <div class="flex flex-col gap-3">
                   <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

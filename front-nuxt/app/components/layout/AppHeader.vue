@@ -12,11 +12,10 @@ const authStore = useAuthStore()
 const route     = useRoute()
 const router    = useRouter()
 
-const { noLeidos, conteo, conectar, limpiarConteo } = useNotificacionesChat()
 const { collapsed, toggle: toggleSidebar, openMobile } = useSidebarCollapsed()
 
-// Conectar al WebSocket al montar el header
-onMounted(() => conectar())
+const noLeidos = ref<{ emisor: string; timestamp: number }[]>([])
+const conteo = ref(0)
 
 // Limpiar conteo al entrar a mensajes
 watch(() => route.path, (path) => {
@@ -39,6 +38,10 @@ function irAMensajes() {
   router.push('/mensajes')
 }
 
+function limpiarConteo() {
+  conteo.value = 0
+  noLeidos.value = []
+}
 
 const iniciales = computed(() => {
   const username = authStore.usuario?.username?.trim()
