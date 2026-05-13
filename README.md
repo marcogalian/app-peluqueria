@@ -180,6 +180,26 @@ En backend se usan JUnit 5 y Mockito para validar casos de uso, reglas de negoci
 
 En frontend se usa Vitest para comprobar stores, servicios y composables clave. La idea es cubrir la logica que no debe romperse al cambiar la interfaz: autenticacion, cliente HTTP, estado global y comportamiento del asistente.
 
+### Tests backend
+
+| Test | Que valida | Para que sirve |
+|---|---|---|
+| `PeluqueriaApiApplicationTests` | Arranque del contexto Spring completo con perfil de test | Detectar fallos de configuracion, inyeccion de dependencias, entidades, repositorios o seguridad antes de ejecutar la app |
+| `GestionarAgendaTest` | Creacion y edicion de citas, solapamientos y citas consecutivas permitidas | Evitar que dos citas del mismo peluquero ocupen el mismo tramo horario |
+| `GestionarAusenciasTest` | Serializacion de solicitudes concurrentes de vacaciones con semaforo | Demostrar control de hilos y evitar carreras cuando dos empleados solicitan ausencias a la vez |
+| `AutenticarUsuarioTest` | Registro seguro, rol por defecto, password hasheado y tokens | Garantizar que un registro publico no pueda crear administradores ni guardar contrasenas en plano |
+| `AESCryptoUtilTest` | Cifrado y descifrado AES, IV aleatorio, claves invalidas y payloads corruptos | Proteger la utilidad de cifrado usada por el chat interno y evitar regresiones de seguridad |
+| `ResponderConsultasGestionTest` | Asistente IA, function calling, respuestas directas, permisos por rol y sugerencias | Validar que el asistente no inventa datos criticos y respeta diferencias entre admin y peluquero/a |
+| `ChatFunctionExecutorTest` | Ejecucion de funciones del asistente contra repositorios simulados y control de permisos | Comprobar que las funciones de negocio del chatbot devuelven datos correctos y bloquean informacion de admin a empleados |
+
+### Tests frontend
+
+| Test | Que valida | Para que sirve |
+|---|---|---|
+| `auth.store.test.ts` | Guardado, restauracion y cierre de sesion; roles admin/peluquero; token expirado | Evitar errores de sesion, menus incorrectos o acceso visual con token invalido |
+| `authService.test.ts` | Llamadas de login, solicitud de reset y cambio de contrasena | Garantizar que el frontend llama a los endpoints correctos de autenticacion |
+| `useChatbot.test.ts` | Mensajes del usuario y asistente, historial, errores, loading, sugerencias y limpiar chat | Proteger el comportamiento del asistente de gestion aunque se cambie la interfaz |
+
 Comandos principales:
 
 ```bash

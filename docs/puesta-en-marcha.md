@@ -127,6 +127,18 @@ cd backend-spring
 
 El backend usa JUnit 5 y Mockito para probar casos de uso, reglas de negocio y permisos sin levantar dependencias externas innecesarias.
 
+Pruebas principales del backend:
+
+| Test | Que comprueba |
+|---|---|
+| `PeluqueriaApiApplicationTests` | Que la aplicacion Spring arranca completa en entorno de test |
+| `GestionarAgendaTest` | Que no se permiten citas solapadas y si se permiten citas consecutivas |
+| `GestionarAusenciasTest` | Que las solicitudes concurrentes de vacaciones se serializan con semaforo |
+| `AutenticarUsuarioTest` | Que el registro asigna rol seguro, hashea password y devuelve tokens |
+| `AESCryptoUtilTest` | Que el cifrado AES descifra correctamente y usa IV aleatorio |
+| `ResponderConsultasGestionTest` | Que el asistente IA respeta permisos, function calling y respuestas directas |
+| `ChatFunctionExecutorTest` | Que las funciones del asistente devuelven datos correctos y bloquean funciones admin a empleados |
+
 Frontend:
 
 ```bash
@@ -135,6 +147,14 @@ npm test
 ```
 
 El frontend usa Vitest para validar stores, servicios y composables, especialmente autenticacion, llamadas HTTP y comportamiento del asistente.
+
+Pruebas principales del frontend:
+
+| Test | Que comprueba |
+|---|---|
+| `auth.store.test.ts` | Sesion, token, restauracion, cierre y roles |
+| `authService.test.ts` | Endpoints de login y recuperacion de contrasena |
+| `useChatbot.test.ts` | Flujo del asistente, historial, errores, loading, sugerencias y limpiar chat |
 
 ## Usuarios demo
 
