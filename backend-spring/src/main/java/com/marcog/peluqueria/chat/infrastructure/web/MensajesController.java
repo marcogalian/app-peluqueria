@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -51,6 +52,25 @@ public class MensajesController {
     @GetMapping("/contactos")
     public ResponseEntity<List<ContactoDTO>> contactos(Authentication auth) {
         return ResponseEntity.ok(construirContactos(auth));
+    }
+
+    @Operation(summary = "Contar mensajes no leidos", description = "Retorna cuantos mensajes internos tiene pendientes el usuario autenticado")
+    @ApiResponse(responseCode = "200", description = "Conteo de mensajes no leidos")
+    @GetMapping("/no-leidos")
+    public ResponseEntity<NoLeidosDTO> contarNoLeidos(Authentication auth) {
+        UserEntity usuario = usuarioActual(auth);
+        long total = mensajeInternoRepository.countByReceptorUserIdAndLeidoFalseAndArchivadoFalse(usuario.getId());
+        return ResponseEntity.ok(NoLeidosDTO.builder().total(total).build());
+    }
+
+    @Operation(summary = "Marcar mensajes como leidos", description = "Marca como leidos todos los mensajes internos recibidos por el usuario autenticado")
+    @ApiResponse(responseCode = "200", description = "Mensajes marcados como leidos")
+    @PatchMapping("/no-leidos/marcar-leidos")
+    @Transactional
+    public ResponseEntity<NoLeidosDTO> marcarNoLeidosComoLeidos(Authentication auth) {
+        UserEntity usuario = usuarioActual(auth);
+        mensajeInternoRepository.marcarRecibidosComoLeidos(usuario.getId());
+        return ResponseEntity.ok(NoLeidosDTO.builder().total(0).build());
     }
 
     @Operation(summary = "Historial mensajes", description = "Retorna el historial de mensajes con un contacto")
@@ -272,5 +292,11 @@ public class MensajesController {
         private String enviadoEn;
         private boolean leido;
         private boolean archivado;
+    }
+
+    @Data
+    @Builder
+    public static class NoLeidosDTO {
+        private long total;
     }
 }

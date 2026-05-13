@@ -1,6 +1,7 @@
 package com.marcog.peluqueria.chat.infrastructure.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -23,4 +24,16 @@ public interface JpaMensajeInternoRepository extends JpaRepository<MensajeIntern
             @Param("usuarioId") UUID usuarioId,
             @Param("contactoUserId") UUID contactoUserId
     );
+
+    long countByReceptorUserIdAndLeidoFalseAndArchivadoFalse(UUID receptorUserId);
+
+    @Modifying
+    @Query("""
+            update MensajeInternoEntity m
+            set m.leido = true
+            where m.receptorUserId = :usuarioId
+              and m.leido = false
+              and m.archivado = false
+            """)
+    int marcarRecibidosComoLeidos(@Param("usuarioId") UUID usuarioId);
 }

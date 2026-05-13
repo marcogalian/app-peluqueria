@@ -3,7 +3,7 @@
  * Header superior — diseño Atelier Sapphire.
  *
  * Izquierda: búsqueda global (rounded-full, fondo gris)
- * Derecha: notificaciones (campana con contador WS), ajustes, divisor, nombre usuario + avatar
+ * Derecha: notificaciones, ajustes, divisor, nombre usuario + avatar
  */
 import { Bell, Settings, PanelLeftClose, PanelLeftOpen, Menu } from 'lucide-vue-next'
 import { useSidebarCollapsed } from '~/modules/shared/composables/useSidebarCollapsed'
@@ -14,12 +14,58 @@ const router    = useRouter()
 
 const { collapsed, toggle: toggleSidebar, openMobile } = useSidebarCollapsed()
 
-const noLeidos = ref<{ emisor: string; timestamp: number }[]>([])
 const conteo = ref(0)
+let pollingNotificaciones: ReturnType<typeof setInterval> | null = null
+
+async function consultarNoLeidos() {
+  if (!import.meta.client || !authStore.usuario) return
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    const { data } = await api.get('/mensajes/no-leidos')
+    conteo.value = Number(data?.total ?? 0)
+    if (route.path === '/mensajes' && conteo.value > 0) {
+      await marcarMensajesComoLeidos()
+    }
+  } catch {
+    // La campana no debe romper la navegacion si el backend no responde.
+  }
+}
+
+async function marcarMensajesComoLeidos() {
+  if (!import.meta.client || !authStore.usuario) return
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    await api.patch('/mensajes/no-leidos/marcar-leidos')
+  } catch {
+    // Si falla, se reintentara en el siguiente polling.
+  } finally {
+    limpiarConteo()
+  }
+}
+
+function activarPollingNotificaciones() {
+  consultarNoLeidos()
+  pollingNotificaciones = setInterval(consultarNoLeidos, 60_000)
+}
+
+function onVentanaEnfocada() {
+  consultarNoLeidos()
+}
+
+onMounted(() => {
+  activarPollingNotificaciones()
+  if (route.path === '/mensajes') marcarMensajesComoLeidos()
+  window.addEventListener('focus', onVentanaEnfocada)
+})
+
+onUnmounted(() => {
+  if (pollingNotificaciones) clearInterval(pollingNotificaciones)
+  window.removeEventListener('focus', onVentanaEnfocada)
+})
 
 // Limpiar conteo al entrar a mensajes
 watch(() => route.path, (path) => {
-  if (path === '/mensajes') limpiarConteo()
+  if (path === '/mensajes') marcarMensajesComoLeidos()
 })
 
 // Dropdown de notificaciones
@@ -40,7 +86,6 @@ function irAMensajes() {
 
 function limpiarConteo() {
   conteo.value = 0
-  noLeidos.value = []
 }
 
 const iniciales = computed(() => {
@@ -53,9 +98,6 @@ function irAConfiguracion() {
   router.push('/admin/configuracion')
 }
 
-function formatHora(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-}
 </script>
 
 <template>
@@ -135,33 +177,32 @@ function formatHora(timestamp: number): string {
                 v-if="conteo > 0"
                 class="text-[10px] text-primary-container hover:underline"
                 role="menuitem"
-                @click="limpiarConteo"
+                @click="marcarMensajesComoLeidos"
               >
                 Marcar todo leído
               </button>
             </div>
 
-            <!-- Lista de mensajes no leídos -->
-            <div v-if="noLeidos.length > 0" class="max-h-64 overflow-y-auto">
+            <!-- Resumen de mensajes no leídos -->
+            <div v-if="conteo > 0" class="max-h-64 overflow-y-auto">
               <button
-                v-for="(m, i) in noLeidos"
-                :key="i"
                 class="w-full flex items-start gap-3 px-4 py-3
                        hover:bg-surface-container-low transition-colors text-left"
                 role="menuitem"
-                :aria-label="`Mensaje de ${m.emisor} a las ${formatHora(m.timestamp)}`"
+                :aria-label="`${conteo} mensajes internos sin leer`"
                 @click="irAMensajes"
               >
                 <div class="w-8 h-8 rounded-full bg-primary-container text-white
                             flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
                      aria-hidden="true">
-                  {{ m.emisor.slice(0, 2).toUpperCase() }}
+                  {{ conteo > 9 ? '9+' : conteo }}
                 </div>
                 <div class="min-w-0 flex-1">
-                  <p class="text-sm font-bold text-on-surface truncate">{{ m.emisor }}</p>
-                  <p class="text-xs text-on-surface-variant">Nuevo mensaje</p>
+                  <p class="text-sm font-bold text-on-surface truncate">Mensajes internos pendientes</p>
+                  <p class="text-xs text-on-surface-variant">
+                    {{ conteo === 1 ? 'Tienes 1 mensaje sin leer' : `Tienes ${conteo} mensajes sin leer` }}
+                  </p>
                 </div>
-                <p class="text-[10px] text-on-surface-variant flex-shrink-0 mt-1">{{ formatHora(m.timestamp) }}</p>
               </button>
             </div>
 
