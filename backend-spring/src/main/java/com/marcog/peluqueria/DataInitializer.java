@@ -75,7 +75,7 @@ public class DataInitializer implements CommandLineRunner {
                 .username("admin")
                 .password(passwordEncoder.encode("1234"))
                 .role(Role.ROLE_ADMIN)
-                .email("admin@peluqueria.com")
+                .email("admin@email.com")
                 .active(true)
                 .build());
 
@@ -96,7 +96,7 @@ public class DataInitializer implements CommandLineRunner {
                     .username(p.user())
                     .password(passwordEncoder.encode("1234"))
                     .role(Role.ROLE_HAIRDRESSER)
-                    .email(p.user() + "@peluqueria.com")
+                    .email(p.user() + "@email.com")
                     .active(true)
                     .build());
 

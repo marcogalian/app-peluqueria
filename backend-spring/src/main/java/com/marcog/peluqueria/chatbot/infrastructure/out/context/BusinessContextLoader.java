@@ -59,7 +59,7 @@ public class BusinessContextLoader {
             List<Producto> productos = productoRepository.findAll();
             ArrayNode productosNode = mapper.createArrayNode();
             for (Producto p : productos) {
-                if (p.getActivo() == null || !p.getActivo()) continue;
+                if (!p.isActivo()) continue;
                 ObjectNode pn = mapper.createObjectNode();
                 pn.put("nombre", p.getNombre());
                 pn.put("precio", p.getPrecio() != null ? p.getPrecio().doubleValue() : 0);

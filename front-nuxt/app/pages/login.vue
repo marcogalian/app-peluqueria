@@ -230,7 +230,7 @@ async function handleRecuperar() {
               class="text-sm text-primary hover:text-primary-light font-medium transition-colors"
               @click="modalRecuperar = true"
             >
-              ¿Olvidaste tu contraseña?
+              ¿Eres admin y olvidaste tu contraseña?
             </button>
           </div>
 
@@ -284,19 +284,19 @@ async function handleRecuperar() {
           class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
         >
 
-          <h3 id="modal-recuperar-titulo" class="text-lg font-semibold text-text-primary mb-1">Recuperar contraseña</h3>
+          <h3 id="modal-recuperar-titulo" class="text-lg font-semibold text-text-primary mb-1">Recuperar contraseña admin</h3>
           <p class="text-sm text-text-secondary mb-5">
-            Introduce tu email y te enviaremos un enlace para restablecer tu contraseña.
+            Introduce el email del administrador para recibir un enlace temporal.
           </p>
 
           <template>
             <div class="mb-4">
-              <label class="label" for="recuperar-email">Email</label>
+              <label class="label" for="recuperar-email">Email del administrador</label>
               <input
                 id="recuperar-email"
                 v-model="emailRecuperar"
                 type="email"
-                placeholder="nombre@ejemplo.com"
+                placeholder="admin@email.com"
                 class="input"
               />
             </div>
