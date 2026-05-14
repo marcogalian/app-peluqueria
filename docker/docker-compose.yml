@@ -5,9 +5,9 @@ services:
     image: postgres:15
     container_name: peluqueria-db
     environment:
-      POSTGRES_USER: 2DAM
-      POSTGRES_PASSWORD: secret123
-      POSTGRES_DB: peluqueria_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -27,9 +27,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/peluqueria_db
-      SPRING_DATASOURCE_USERNAME: 2DAM
-      SPRING_DATASOURCE_PASSWORD: secret123
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       UPLOADS_DIR: /app/uploads
       # Ajusta estos valores con tus credenciales reales
       MAILTRAP_HOST: sandbox.smtp.mailtrap.io
