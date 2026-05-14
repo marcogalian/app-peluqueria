@@ -14,7 +14,7 @@
 import {
   LayoutDashboard, Calendar, Users, Scissors,
   Package, UserCog, BarChart3, Settings, LogOut,
-  MessageCircle, Palmtree, ShoppingBag,
+  MessageCircle, Palmtree, ShoppingBag, KeyRound,
 } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
@@ -29,9 +29,10 @@ const itemsAdmin = [
   { path: '/admin/servicios',  label: 'Servicios',        icon: Scissors },
   { path: '/admin/inventario', label: 'Inventario',       icon: Package },
   { path: '/ventas',           label: 'Ventas',           icon: ShoppingBag },
-  { path: '/admin/empleados',  label: 'Empleados',        icon: UserCog },
-  { path: '/mensajes',         label: 'Mensajes',         icon: MessageCircle },
-  { path: '/admin/resultados', label: 'Resultados',       icon: BarChart3 },
+  { path: '/admin/empleados',   label: 'Empleados',        icon: UserCog },
+  { path: '/admin/contrasenas', label: 'Contraseñas',      icon: KeyRound },
+  { path: '/mensajes',          label: 'Mensajes',         icon: MessageCircle },
+  { path: '/admin/resultados',  label: 'Resultados',       icon: BarChart3 },
 ]
 
 const itemsEmpleado = [

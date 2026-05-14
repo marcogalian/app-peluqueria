@@ -27,4 +27,11 @@ export const authService = {
   async resetPassword(token: string, nuevaPassword: string): Promise<void> {
     await api.post('/auth/reset-password', { token, nuevaPassword })
   },
+
+  /**
+   * Admin cambia la contraseña de un empleado por su ID de peluquero.
+   */
+  async cambiarPasswordEmpleado(peluqueroId: string, nuevaPassword: string): Promise<void> {
+    await api.post(`/credenciales/empleado/${peluqueroId}/contrasena`, { nuevaPassword })
+  },
 }
