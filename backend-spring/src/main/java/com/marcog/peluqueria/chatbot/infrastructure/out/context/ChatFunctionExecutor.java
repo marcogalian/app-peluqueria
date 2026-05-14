@@ -113,10 +113,10 @@ public class ChatFunctionExecutor {
         try {
             return mapper.writeValueAsString(Map.of(
                     "periodo", periodo,
-                    "ingresos", stats.getIngresos(),
-                    "gastos", stats.getGastos(),
-                    "beneficio", stats.getBeneficio(),
-                    "totalCitas", stats.getTotalCitas()
+                    "ingresos", stats.getIngresosTotales(),
+                    "gastos", stats.getGastosTotales(),
+                    "beneficio", stats.getBalance(),
+                    "totalCitas", stats.getCitasCompletadasMes()
             ));
         } catch (Exception e) {
             return "{\"error\": \"Error serializando ganancias\"}";
@@ -158,7 +158,7 @@ public class ChatFunctionExecutor {
     private String getProductosStockBajo() {
         List<Producto> productos = productoRepository.findAll();
         List<Map<String, Object>> stockBajo = productos.stream()
-                .filter(p -> p.getActivo() != null && p.getActivo())
+                .filter(Producto::isActivo)
                 .filter(p -> p.getStock() != null && p.getStockMinimo() != null && p.getStock() <= p.getStockMinimo())
                 .map(p -> Map.<String, Object>of(
                         "nombre", p.getNombre(),
