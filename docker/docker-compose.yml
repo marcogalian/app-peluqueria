@@ -36,9 +36,6 @@ services:
       MAILTRAP_PORT: 2525
       MAILTRAP_USERNAME: ${MAILTRAP_USERNAME:-}
       MAILTRAP_PASSWORD: ${MAILTRAP_PASSWORD:-}
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
-      TWILIO_WHATSAPP_FROM: ${TWILIO_WHATSAPP_FROM:-}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
