@@ -1,4 +1,4 @@
-# Peluqueria Isabella - Sistema de Gestion
+# Peluqueria - Sistema de Gestion
 
 Aplicacion full-stack para gestionar una peluqueria desde un panel web: agenda, clientes, empleados, servicios, inventario, ventas, ausencias, resultados, mensajeria interna y asistente de gestion con IA.
 
@@ -21,7 +21,7 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 
 ## Que hace la aplicacion
 
-Peluqueria Isabella no es solo un chatbot ni una demo de pantallas aisladas. Es una aplicacion de gestion completa para un salon de peluqueria, con separacion entre administracion y empleados, datos reales en PostgreSQL, seguridad por roles, auditoria, agenda, ventas, inventario, mensajeria, resultados financieros y un asistente IA integrado en el negocio.
+Este proyecto no es solo un chatbot ni una demo de pantallas aisladas. Es una aplicacion de gestion completa para un salon de peluqueria, con separacion entre administracion y empleados, datos reales en PostgreSQL, seguridad por roles, auditoria, agenda, ventas, inventario, mensajeria, resultados financieros y un asistente IA integrado en el negocio.
 
 ### Panel administrador
 
