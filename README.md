@@ -34,7 +34,7 @@ Peluqueria Isabella no es solo un chatbot ni una demo de pantallas aisladas. Es 
 - Servicios con precio promocional y visualizacion de precio normal tachado.
 - Inventario de productos con stock, stock minimo, filtros y ventas.
 - Mensajeria interna y envio de emails a empleados.
-- Resultados financieros: ingresos, gastos, beneficios, productos y rendimiento.
+- Resultados financieros: ingresos, gastos, beneficios, productos y rendimiento. Registro de gastos operativos mes a mes por categoria (nominas, alquiler, suministros...) con grafica de reparto. Grafica de origen de ingresos por servicios vs productos.
 - Configuracion del negocio, horarios por franjas, sabados, dias especiales y dias bloqueados para vacaciones.
 - Dias especiales con descuento en porcentaje para el usuario, convertido internamente al multiplicador que espera el backend.
 - Asistente de gestion para consultar datos del negocio.
