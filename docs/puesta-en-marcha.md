@@ -38,10 +38,14 @@ Variables principales. El repositorio solo incluye nombres de variables y placeh
 | `CHAT_AES_KEY` | Clave AES para chat interno |
 | `MAILTRAP_USERNAME` | Usuario Mailtrap |
 | `MAILTRAP_PASSWORD` | Contrasena Mailtrap |
-| `AI_PROVIDER` | Proveedor IA: `gemini` u `openrouter` |
+| `APP_ADMIN_EMAIL` | Email del administrador para recuperacion de contrasena |
+| `FRONTEND_BASE_URL` | URL publica del frontend para enlaces de recuperacion |
+| `AI_PROVIDER` | Proveedor IA, recomendado `spring-ai` |
 | `GEMINI_API_KEY` | Clave del asistente IA con Gemini |
-| `OPENROUTER_API_KEY` | Clave del asistente IA con OpenRouter |
-| `OPENROUTER_MODEL` | Modelo OpenRouter, por defecto `openrouter/free` |
+| `OPENAI_API_KEY` | Clave del asistente IA con OpenAI |
+| `OPENAI_MODEL` | Modelo OpenAI para Spring AI, por defecto `gpt-4.1-nano` |
+| `OPENAI_MAX_TOKENS` | Limite de respuesta del asistente, recomendado `200` |
+| `SPRING_AI_MODEL_CHAT` | Activacion de Spring AI. Usar `none` sin clave externa u `openai` con OpenAI |
 | `APP_DEMO_PASSWORD` | Contrasena local para usuarios demo |
 
 ## Arranque con Docker
@@ -160,6 +164,17 @@ Pruebas principales del frontend:
 
 El backend crea usuarios demo en el primer arranque. Sus nombres de usuario son visibles en el seed, pero la contrasena se lee desde `APP_DEMO_PASSWORD` y no se documenta en el repositorio publico.
 
+Usuarios generados en una base nueva:
+
+| Usuario | Email | Rol |
+|---|---|---|
+| `admin` | `admin@email.com` | Administrador |
+| `carmen` | `carmen@email.com` | Empleada |
+| `lucia` | `lucia@email.com` | Empleada |
+| `sofia` | `sofia@email.com` | Empleada |
+
+Los empleados no tienen recuperacion de contrasena desde login. Si pierden acceso, el administrador cambia su contrasena desde `/admin/contrasenas`.
+
 ## Datos iniciales
 
 Al arrancar por primera vez, el backend crea:
@@ -175,6 +190,17 @@ Si `randomuser.me` no esta disponible, usa clientes locales de respaldo.
 
 ## Problemas frecuentes
 
+### El email de recuperacion no llega
+
+Revisar credenciales Mailtrap:
+
+```bash
+cd docker
+docker compose logs api --tail 160
+```
+
+Si aparece `Authentication failed`, el token de recuperacion puede haberse creado, pero Mailtrap ha rechazado el envio por credenciales SMTP incorrectas.
+
 ### El chat no responde
 
 Revisar:
@@ -184,7 +210,24 @@ cd docker
 docker compose logs api --tail 160
 ```
 
-Si aparecen errores `403` o `429` de Gemini, la clave o la cuota de Gemini no estan disponibles. Si se usa OpenRouter, revisar que `AI_PROVIDER=openrouter` y `OPENROUTER_API_KEY` esten configuradas en `docker/.env`. Las consultas directas de clientes deben seguir funcionando.
+Para demo sin clave externa, dejar:
+
+```env
+AI_PROVIDER=spring-ai
+SPRING_AI_MODEL_CHAT=none
+```
+
+Para probar integracion generativa con OpenAI:
+
+```env
+AI_PROVIDER=spring-ai
+SPRING_AI_MODEL_CHAT=openai
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4.1-nano
+OPENAI_MAX_TOKENS=200
+```
+
+Spring AI queda desactivado con `SPRING_AI_MODEL_CHAT=none` para que los tests y entornos sin clave no intenten crear el cliente IA. Las consultas directas de clientes, citas y vacaciones deben seguir funcionando aunque el proveedor externo falle.
 
 ### Cambios de codigo no aparecen
 
