@@ -61,6 +61,7 @@ public class AutenticarUsuario {
                                                 request.getPassword()));
 
                 var userEntity = repository.findByUsername(request.getUsername())
+                                .or(() -> repository.findByEmail(request.getUsername()))
                                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
                 var customUserDetails = new CustomUserDetails(userEntity);

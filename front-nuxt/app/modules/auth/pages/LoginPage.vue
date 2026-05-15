@@ -2,7 +2,7 @@
 /**
  * Página de login — diseño split 50/50.
  * Izquierda: foto peluquería con overlay oscuro azulado y texto de marca.
- * Derecha: formulario blanco con email, contraseña, recuérdame, olvidé contraseña.
+ * Derecha: formulario blanco con email, contraseña, recuérdame y recuperación admin.
  *
  * No requiere autenticación previa.
  */
@@ -23,7 +23,6 @@ const error           = ref('')
 const modalRecuperar  = ref(false)
 const emailRecuperar  = ref('')
 const enviandoReset   = ref(false)
-const resetEnviado    = ref(false)
 
 const authStore = useAuthStore()
 const route     = useRoute()
@@ -85,11 +84,11 @@ async function handleRecuperar() {
     const { authService } = await import('~/modules/auth/services/authService')
     await authService.solicitarResetPassword(emailRecuperar.value)
   } catch {
-    // Silenciar — no revelar si el email existe
+  // Silenciar: no revelar si el email existe ni si pertenece al admin.
   } finally {
     enviandoReset.value = false
     modalRecuperar.value = false
-    toast.info('Si el email existe, recibirás un enlace en breve')
+    toast.info('Si el email corresponde al admin, recibirás un enlace en breve')
   }
 }
 </script>
@@ -225,7 +224,7 @@ async function handleRecuperar() {
               class="text-sm text-primary hover:text-primary-light font-medium transition-colors"
               @click="modalRecuperar = true"
             >
-              ¿Olvidaste tu contraseña?
+              ¿Eres admin y olvidaste tu contraseña?
             </button>
           </div>
 
@@ -252,7 +251,7 @@ async function handleRecuperar() {
         <!-- Pie del formulario -->
         <p class="text-center text-sm text-text-muted mt-6">
           ¿No tienes acceso?
-          <a href="mailto:admin@peluqueria.es" class="text-primary hover:text-primary-light font-medium transition-colors">
+          <a href="mailto:admin@email.com" class="text-primary hover:text-primary-light font-medium transition-colors">
             Contacta con administración
           </a>
         </p>
@@ -279,30 +278,28 @@ async function handleRecuperar() {
           class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
         >
 
-          <h3 id="modal-recuperar-titulo" class="text-lg font-semibold text-text-primary mb-1">Recuperar contraseña</h3>
+          <h3 id="modal-recuperar-titulo" class="text-lg font-semibold text-text-primary mb-1">Recuperar contraseña admin</h3>
           <p class="text-sm text-text-secondary mb-5">
-            Introduce tu email y te enviaremos un enlace para restablecer tu contraseña.
+            Introduce el email del administrador para recibir un enlace temporal.
           </p>
 
-          <template>
-            <div class="mb-4">
-              <label class="label" for="recuperar-email">Email</label>
-              <input
-                id="recuperar-email"
-                v-model="emailRecuperar"
-                type="email"
-                placeholder="nombre@ejemplo.com"
-                class="input"
-              />
-            </div>
-            <div class="flex gap-3">
-              <button class="btn-secondary flex-1" @click="modalRecuperar = false">Cancelar</button>
-              <button class="btn-primary flex-1" :disabled="enviandoReset" @click="handleRecuperar">
-                <Loader2 v-if="enviandoReset" class="w-4 h-4 animate-spin" />
-                <span>{{ enviandoReset ? 'Enviando...' : 'Enviar enlace' }}</span>
-              </button>
-            </div>
-          </template>
+          <div class="mb-4">
+            <label class="label" for="recuperar-email">Email</label>
+            <input
+              id="recuperar-email"
+              v-model="emailRecuperar"
+              type="email"
+              placeholder="nombre@ejemplo.com"
+              class="input"
+            />
+          </div>
+          <div class="flex gap-3">
+            <button class="btn-secondary flex-1" @click="modalRecuperar = false">Cancelar</button>
+            <button class="btn-primary flex-1" :disabled="enviandoReset || !emailRecuperar" @click="handleRecuperar">
+              <Loader2 v-if="enviandoReset" class="w-4 h-4 animate-spin" />
+              <span>{{ enviandoReset ? 'Enviando...' : 'Enviar enlace' }}</span>
+            </button>
+          </div>
 
 
         </div>
