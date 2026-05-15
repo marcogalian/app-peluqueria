@@ -212,6 +212,7 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
                 - Sus propias citas de hoy, manana, semana o mes
                 - Sus vacaciones, ausencias y dias aprobados o pendientes
                 - Los dias de vacaciones que ya ha usado y los que le quedan del cupo anual
+                - Su propio nombre y perfil (nombre, especialidad, horario)
                 - Su horario, su porcentaje de comision y su comision o ingresos PROPIOS estimados por periodo (su retribucion es por comision, no hay salario fijo)
                 - Los servicios que ha realizado en hoy, ayer, esta semana, la semana pasada, este mes, el mes pasado o una fecha concreta no futura
                 - Informacion publica del negocio: servicios, precios, duracion, horario, politicas, ofertas
@@ -327,7 +328,9 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
             }
             return new EnrutamientoEmpleado("getRendimientoEmpleado", args);
         }
-        if (contieneAlguno(texto, "horario", "turno", "jornada") || preguntaPaga) {
+        boolean preguntaIdentidad = contieneAlguno(texto, "como me llamo", "cual es mi nombre",
+                "mi nombre", "quien soy", "mi perfil");
+        if (contieneAlguno(texto, "horario", "turno", "jornada") || preguntaPaga || preguntaIdentidad) {
             return new EnrutamientoEmpleado("getPerfilEmpleado", MAPPER.createObjectNode());
         }
 

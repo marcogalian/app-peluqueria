@@ -60,6 +60,8 @@ public class DataInitializer implements CommandLineRunner {
         sincronizarEmailsDemo();
         if (peluqueroRepository.count() == 0) {
             crearPeluqueros();
+        } else {
+            sincronizarPeluquerosDemo();
         }
         if (clienteRepository.count() == 0) {
             crearClientes();
@@ -140,16 +142,17 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
+    private record PeluqueroDemo(String user, String nombre, String especialidad,
+                                 String horario, double comision) {}
+
+    private static final List<PeluqueroDemo> PELUQUEROS_DEMO = List.of(
+        new PeluqueroDemo("sofia",  "Sofía Martínez",  "Colorimetría y mechas",     "L-V 09:00-17:00", 15.0),
+        new PeluqueroDemo("carmen", "Carmen López",    "Corte femenino y alisados", "L-V 10:00-18:00", 18.0),
+        new PeluqueroDemo("lucia",  "Lucía Fernández", "Tratamientos capilares",    "M-S 09:00-17:00", 12.0)
+    );
+
     private void crearPeluqueros() {
-        record P(String user, String nombre, String especialidad, String horario) {}
-
-        List<P> datos = List.of(
-            new P("sofia",  "Sofía Martínez",  "Colorimetría y mechas",    "L-V 09:00-17:00"),
-            new P("carmen", "Carmen López",    "Corte femenino y alisados", "L-V 10:00-18:00"),
-            new P("lucia",  "Lucía Fernández", "Tratamientos capilares",    "M-S 09:00-17:00")
-        );
-
-        for (P p : datos) {
+        for (PeluqueroDemo p : PELUQUEROS_DEMO) {
             UserEntity u = userRepository.save(UserEntity.builder()
                     .username(p.user())
                     .password(passwordEncoder.encode(requireDemoPassword()))
@@ -164,12 +167,45 @@ public class DataInitializer implements CommandLineRunner {
                     .especialidad(p.especialidad())
                     .especialidades(p.especialidad())
                     .horarioBase(p.horario())
+                    .porcentajeComision(p.comision())
                     .disponible(true)
                     .enBaja(false)
                     .enVacaciones(false)
                     .build());
         }
         log.info("DataInitializer: 3 peluqueras demo creadas.");
+    }
+
+    /**
+     * Rellena horario y comisión de peluqueros demo ya existentes en BD
+     * persistida de versiones anteriores donde estos campos quedaron vacíos.
+     */
+    private void sincronizarPeluquerosDemo() {
+        int actualizados = 0;
+        for (PeluqueroDemo p : PELUQUEROS_DEMO) {
+            var usuario = userRepository.findByUsername(p.user());
+            if (usuario.isEmpty()) continue;
+            var peluquero = peluqueroRepository.findByUserId(usuario.get().getId());
+            if (peluquero.isEmpty()) continue;
+
+            PeluqueroEntity entity = peluquero.get();
+            boolean modificado = false;
+            if (entity.getHorarioBase() == null || entity.getHorarioBase().isBlank()) {
+                entity.setHorarioBase(p.horario());
+                modificado = true;
+            }
+            if (entity.getPorcentajeComision() <= 0.0) {
+                entity.setPorcentajeComision(p.comision());
+                modificado = true;
+            }
+            if (modificado) {
+                peluqueroRepository.save(entity);
+                actualizados++;
+            }
+        }
+        if (actualizados > 0) {
+            log.info("DataInitializer: {} peluqueros demo sincronizados.", actualizados);
+        }
     }
 
     private String requireDemoPassword() {
