@@ -310,24 +310,15 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
             return new EnrutamientoEmpleado("getVacacionesEmpleado", MAPPER.createObjectNode());
         }
 
-        boolean preguntaPaga = contieneAlguno(texto, "cobro", "cobrar", "comision", "sueldo",
-                "nomina", "salario", "salarial", "gano", "ganar", "ganado", "paga",
-                "remuneracion", "retribucion");
-        // Si pregunta cuanto gana/cobra en un periodo concreto -> rendimiento real
-        // (comision estimada). Si solo pide horario o el porcentaje -> perfil.
-        boolean preguntaImportePeriodo = preguntaPaga
-                && contieneAlguno(texto, "hoy", "ayer", "semana", "mes", "cuanto", "cuanta",
-                        "ganado", "gane", "llevo", "facturado");
-        if (preguntaImportePeriodo) {
-            var args = MAPPER.createObjectNode();
-            String fecha = extraerFecha(texto);
-            if (fecha != null) {
-                args.put("fecha", fecha);
-            } else {
-                args.put("periodo", extraerPeriodo(texto));
-            }
-            return new EnrutamientoEmpleado("getRendimientoEmpleado", args);
-        }
+        // Preguntas sobre la economia GLOBAL del negocio (plural "hemos", "negocio",
+        // "salon") no se enrutan: las bloquea el prompt/tools para empleados.
+        boolean contextoNegocio = contieneAlguno(texto, "hemos", "negocio", "salon",
+                "empresa", "facturacion", "facturado");
+
+        boolean preguntaPaga = !contextoNegocio
+                && contieneAlguno(texto, "cobro", "cobrar", "comision", "sueldo",
+                        "nomina", "salario", "salarial", "gano", "ganar", "ganado", "paga",
+                        "remuneracion", "retribucion");
         boolean preguntaIdentidad = contieneAlguno(texto, "como me llamo", "cual es mi nombre",
                 "mi nombre", "quien soy", "mi perfil");
         if (contieneAlguno(texto, "horario", "turno", "jornada") || preguntaPaga || preguntaIdentidad) {
