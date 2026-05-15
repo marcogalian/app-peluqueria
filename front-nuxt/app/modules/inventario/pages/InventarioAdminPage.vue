@@ -121,7 +121,7 @@ onMounted(async () => {
     productos.value = productosResponse.data
     resumenVentas.value = resumenResponse.data
   } catch {
-    // vacío si falla
+    toast.error('No se pudo cargar el inventario. Revisa la conexión e inténtalo de nuevo.')
   } finally {
     cargando.value = false
   }

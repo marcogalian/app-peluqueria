@@ -25,7 +25,7 @@ public class GestionarSesion {
 
     @Transactional
     public RefreshTokenEntity createRefreshToken(UUID userId) {
-        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new java.util.NoSuchElementException("Usuario no encontrado"));
 
         // Disable old token and flush immediately to avoid OneToOne unique constraint
         // violation
@@ -48,14 +48,16 @@ public class GestionarSesion {
     public RefreshTokenEntity verifyExpiration(RefreshTokenEntity token) {
         if (token.getExpiryDate().compareTo(Instant.now()) < 0) {
             refreshTokenRepository.delete(token);
-            throw new RuntimeException("Refresh token was expired. Please make a new signin request");
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED,
+                    "Refresh token expirado, vuelve a iniciar sesión");
         }
         return token;
     }
 
     @Transactional
     public void deleteByUserId(UUID userId) {
-        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new java.util.NoSuchElementException("Usuario no encontrado"));
         refreshTokenRepository.deleteByUser(user);
     }
 }

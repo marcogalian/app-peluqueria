@@ -28,7 +28,7 @@ public class ConsultarClientes {
 
     public HistorialClinicoDTO getHistorialClinico(UUID clienteId) {
         Cliente cliente = clienteRepository.findById(clienteId)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Cliente no encontrado"));
 
         List<Cita> citasList = gestionarAgenda.getCitasByCliente(clienteId);
 

@@ -89,7 +89,7 @@ onMounted(async () => {
       }
     })
   } catch {
-    // vacío
+    toast.error('No se pudieron cargar los empleados. Revisa la conexión e inténtalo de nuevo.')
   } finally {
     cargando.value = false
   }

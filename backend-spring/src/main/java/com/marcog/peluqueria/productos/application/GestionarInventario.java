@@ -70,7 +70,7 @@ public class GestionarInventario implements GestionarProducto {
     @CacheEvict(value = "productos", allEntries = true)
     public Producto actualizar(UUID id, Producto detalles) {
         Producto existente = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Producto no encontrado: " + id));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Producto no encontrado: " + id));
         if (detalles.getNombre() != null)          existente.setNombre(detalles.getNombre());
         if (detalles.getDescripcion() != null)     existente.setDescripcion(detalles.getDescripcion());
         if (detalles.getPrecio() != null)          existente.setPrecio(detalles.getPrecio());
@@ -92,7 +92,7 @@ public class GestionarInventario implements GestionarProducto {
     @CacheEvict(value = "productos", allEntries = true)
     public void eliminar(UUID id) {
         Producto p = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Producto no encontrado: " + id));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Producto no encontrado: " + id));
         p.setActivo(false);
         repository.guardar(p);
     }

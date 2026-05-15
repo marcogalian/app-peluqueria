@@ -5,6 +5,7 @@
  */
 import { TrendingUp, TrendingDown, Loader2 } from 'lucide-vue-next'
 import GastosPanel from '../components/GastosPanel.vue'
+import { useToast } from '~/modules/shared/composables/useToast'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
@@ -37,6 +38,7 @@ interface ResultadosData {
 }
 
 // ── Estado ────────────────────────────────────────────────
+const toast     = useToast()
 const cargando  = ref(true)
 const periodo   = ref<Periodo>('mes')
 const datos     = ref<ResultadosData | null>(null)
@@ -151,7 +153,7 @@ async function cargarDatos() {
     const { data } = await api.get(`/finanzas/resultados?periodo=${periodo.value}`)
     datos.value = data
   } catch {
-    // vacío si falla
+    toast.error('No se pudieron cargar los resultados. Revisa la conexión e inténtalo de nuevo.')
   } finally {
     cargando.value = false
   }

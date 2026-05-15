@@ -10,6 +10,7 @@ import {
   ClipboardList,
 } from 'lucide-vue-next'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
+import { useToast } from '~/modules/shared/composables/useToast'
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
   LineElement, PointElement, Title, Tooltip, Legend, Filler,
@@ -18,6 +19,7 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, Filler, ArcElement, BarElement)
 
+const toast = useToast()
 const cargando = ref(true)
 
 // Filtros
@@ -148,6 +150,7 @@ async function fetchDashboardData() {
       empleadosStats: [], peluquerosActivosAhora: [],
       productosStats: { rankingProductos: [], pocoStock: [], productoMasVendido: '', ventasMasVendido: 0, productoMenosVendido: '', ventasMenosVendido: 0 }
     }
+    toast.error('No se pudieron cargar los datos del panel. Revisa la conexión e inténtalo de nuevo.')
   } finally {
     cargando.value = false
   }

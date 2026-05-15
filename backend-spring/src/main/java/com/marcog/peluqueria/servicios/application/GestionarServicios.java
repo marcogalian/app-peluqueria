@@ -36,7 +36,7 @@ public class GestionarServicios implements CrearServicio {
     @CacheEvict(value = "servicios", allEntries = true)
     public Servicio updateServicio(UUID id, Servicio detalles) {
         Servicio existente = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Servicio no encontrado"));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Servicio no encontrado"));
 
         if (detalles.getNombre() != null)
             existente.setNombre(detalles.getNombre());

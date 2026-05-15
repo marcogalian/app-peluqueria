@@ -28,7 +28,7 @@ public class GestionarGastos {
     }
 
     public Gasto getGastoById(UUID id) {
-        return repository.findById(id).orElseThrow(() -> new RuntimeException("Gasto not found"));
+        return repository.findById(id).orElseThrow(() -> new java.util.NoSuchElementException("Gasto no encontrado"));
     }
 
     public Gasto updateGasto(UUID id, Gasto detalles) {
