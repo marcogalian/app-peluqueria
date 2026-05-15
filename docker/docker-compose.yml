@@ -33,17 +33,26 @@ services:
       MAILTRAP_PORT: 2525
       MAILTRAP_USERNAME: ${MAILTRAP_USERNAME}
       MAILTRAP_PASSWORD: ${MAILTRAP_PASSWORD}
-      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      APP_ADMIN_EMAIL: ${APP_ADMIN_EMAIL:-admin@email.com}
+      APP_FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
+      AI_PROVIDER: ${AI_PROVIDER:-spring-ai}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openrouter/free}
-      OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-http://localhost:3000}
-      OPENROUTER_APP_NAME: ${OPENROUTER_APP_NAME:-Peluqueria Isabella}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-nano}
+      OPENAI_MAX_TOKENS: ${OPENAI_MAX_TOKENS:-200}
+      SPRING_AI_MODEL_CHAT: ${SPRING_AI_MODEL_CHAT:-none}
+      CHATBOT_CONTEXT_FILE: /app/data/chatbot/contexto-negocio.json
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      ANTI_ABUSE_ENABLED: ${ANTI_ABUSE_ENABLED:-true}
+      ANTI_ABUSE_GENERAL_PER_MINUTE: ${ANTI_ABUSE_GENERAL_PER_MINUTE:-240}
+      ANTI_ABUSE_AUTH_PER_MINUTE: ${ANTI_ABUSE_AUTH_PER_MINUTE:-20}
+      ANTI_ABUSE_CHAT_PER_MINUTE: ${ANTI_ABUSE_CHAT_PER_MINUTE:-8}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       CHAT_AES_KEY: ${CHAT_AES_KEY}
       APP_DEMO_PASSWORD: ${APP_DEMO_PASSWORD}
     volumes:
       - uploads_data:/app/uploads
+      - ../backend-spring/data:/app/data
     depends_on:
       db:
         condition: service_healthy

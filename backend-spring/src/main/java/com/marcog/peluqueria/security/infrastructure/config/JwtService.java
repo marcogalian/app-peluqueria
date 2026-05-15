@@ -14,6 +14,11 @@ import java.util.Date;
 import java.util.Map;
 import java.util.function.Function;
 
+/**
+ * Servicio de gestión de tokens JWT.
+ * Genera tokens firmados con HS256, los valida y extrae el subject (username) y otros claims.
+ * La clave secreta y el tiempo de expiración se inyectan desde application.properties.
+ */
 @Service
 public class JwtService {
 
@@ -22,7 +27,7 @@ public class JwtService {
     @Value("${application.security.jwt.secret-key}")
     private String secretKey;
 
-    @Value("${application.security.jwt.expiration:7200000}") // 2 hours by default
+    @Value("${application.security.jwt.expiration:7200000}") // 2 horas por defecto
     private long jwtExpiration;
 
     public String extractUsername(String token) {

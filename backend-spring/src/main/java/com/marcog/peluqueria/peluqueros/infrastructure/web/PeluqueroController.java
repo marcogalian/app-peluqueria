@@ -3,6 +3,9 @@ package com.marcog.peluqueria.peluqueros.infrastructure.web;
 import com.marcog.peluqueria.fotos.infrastructure.config.FileStorageConfig;
 import com.marcog.peluqueria.peluqueros.application.GestionarEmpleados;
 import com.marcog.peluqueria.peluqueros.domain.Peluquero;
+import com.marcog.peluqueria.security.application.GestionarCredenciales;
+import com.marcog.peluqueria.security.application.dto.CambiarPasswordEmpleadoRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +18,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -27,6 +31,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class PeluqueroController {
 
     private final GestionarEmpleados gestionarEmpleados;
+    private final GestionarCredenciales gestionarCredenciales;
     private final FileStorageConfig  storageConfig;
 
     @Operation(summary = "Listar empleados", description = "Retorna todos los peluqueros del centro")
@@ -89,6 +94,21 @@ public class PeluqueroController {
         return ResponseEntity.ok(gestionarEmpleados.reactivar(id));
     }
 
+    @Operation(summary = "Cambiar contraseña de empleado", description = "Permite al admin definir una nueva contraseña para un empleado")
+    @ApiResponse(responseCode = "204", description = "Contraseña actualizada")
+    @PostMapping("/clave-empleado")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Void> cambiarPasswordEmpleado(
+            @RequestParam UUID peluqueroId,
+            @Valid @RequestBody CambiarPasswordEmpleadoRequest request) {
+        gestionarCredenciales.cambiarPasswordEmpleado(
+                peluqueroId,
+                request.getNuevaPassword(),
+                request.getRepetirPassword()
+        );
+        return ResponseEntity.noContent().build();
+    }
+
     @Operation(summary = "Subir foto", description = "Sube la foto de perfil de un peluquero")
     @ApiResponse(responseCode = "200", description = "Foto subida")
     @PostMapping("/{id}/foto")
@@ -100,10 +120,14 @@ public class PeluqueroController {
         Path dir = Paths.get(storageConfig.getUploadsDir(), "fotos-peluqueros", id.toString());
         Files.createDirectories(dir);
 
-        String ext        = file.getOriginalFilename() != null && file.getOriginalFilename().contains(".")
-                            ? file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf('.'))
-                            : ".jpg";
-        String nombre     = UUID.randomUUID() + ext;
+        String ext = file.getOriginalFilename() != null && file.getOriginalFilename().contains(".")
+                ? file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf('.')).toLowerCase()
+                : ".jpg";
+        // Solo se permiten imágenes — se rechaza cualquier otro tipo de archivo
+        if (!Set.of(".jpg", ".jpeg", ".png", ".webp").contains(ext)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Tipo de archivo no permitido. Use JPG, PNG o WEBP."));
+        }
+        String nombre = UUID.randomUUID() + ext;
         Files.copy(file.getInputStream(), dir.resolve(nombre));
 
         String rutaRelativa = "fotos-peluqueros/" + id + "/" + nombre;
