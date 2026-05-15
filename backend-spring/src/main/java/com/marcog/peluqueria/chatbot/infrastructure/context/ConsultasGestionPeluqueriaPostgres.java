@@ -13,6 +13,9 @@ import com.marcog.peluqueria.citas.domain.CitaRepository;
 import com.marcog.peluqueria.clientes.domain.Cliente;
 import com.marcog.peluqueria.clientes.domain.ClienteRepository;
 import com.marcog.peluqueria.finanzas.application.ConsultarPanelFinanciero;
+import com.marcog.peluqueria.finanzas.domain.CategoriaGasto;
+import com.marcog.peluqueria.finanzas.domain.Gasto;
+import com.marcog.peluqueria.finanzas.domain.GastoRepository;
 import com.marcog.peluqueria.finanzas.domain.DashboardStats;
 import com.marcog.peluqueria.peluqueros.domain.Peluquero;
 import com.marcog.peluqueria.peluqueros.domain.PeluqueroRepository;
@@ -62,6 +65,7 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
     private final ProductoRepository productoRepository;
     private final ClienteRepository clienteRepository;
     private final PeluqueroRepository peluqueroRepository;
+    private final GastoRepository gastoRepository;
     // ObjectMapper inyectado de Spring para mantener config consistente con el resto.
     private final ObjectMapper mapper;
 
@@ -246,15 +250,39 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
         }
 
         return peluqueroRepository.findById(peluqueroId)
-                .map(peluquero -> toJson(Map.of(
-                        "nombre", valorSeguro(peluquero.getNombre()),
-                        "horario", valorSeguro(peluquero.getHorarioBase()),
-                        "porcentajeComision", peluquero.getPorcentajeComision(),
-                        "disponible", peluquero.isDisponible(),
-                        "enBaja", peluquero.isEnBaja(),
-                        "enVacaciones", peluquero.isEnVacaciones()
-                ), "Error serializando perfil del empleado"))
+                .map(peluquero -> {
+                    Map<String, Object> perfil = new LinkedHashMap<>();
+                    perfil.put("nombre", valorSeguro(peluquero.getNombre()));
+                    perfil.put("horario", valorSeguro(peluquero.getHorarioBase()));
+                    perfil.put("porcentajeComision", peluquero.getPorcentajeComision());
+                    perfil.put("disponible", peluquero.isDisponible());
+                    perfil.put("enBaja", peluquero.isEnBaja());
+                    perfil.put("enVacaciones", peluquero.isEnVacaciones());
+                    nominaBrutaDe(peluquero.getNombre()).ifPresentOrElse(g -> {
+                        perfil.put("nominaBrutaMensual", g.getImporte());
+                        perfil.put("fechaNomina", g.getFecha() != null ? g.getFecha().toString() : "");
+                    }, () -> perfil.put("nominaBrutaMensual", "No registrada"));
+                    return toJson(perfil, "Error serializando perfil del empleado");
+                })
                 .orElse("{\"error\": \"Empleado no encontrado\"}");
+    }
+
+    /**
+     * Busca la nomina bruta mas reciente del empleado entre los gastos de
+     * categoria SALARIOS cuyo concepto contiene su nombre. Solo expone la
+     * propia del empleado autenticado (no datos economicos globales).
+     */
+    private java.util.Optional<Gasto> nominaBrutaDe(String nombre) {
+        if (nombre == null || nombre.isBlank()) return java.util.Optional.empty();
+        String objetivo = Normalizer.normalize(nombre, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase();
+        return gastoRepository.findAll().stream()
+                .filter(g -> g.getCategoria() == CategoriaGasto.SALARIOS)
+                .filter(g -> g.getConcepto() != null
+                        && Normalizer.normalize(g.getConcepto(), Normalizer.Form.NFD)
+                                .replaceAll("\\p{M}", "").toLowerCase().contains(objetivo))
+                .max(java.util.Comparator.comparing(Gasto::getFecha,
+                        java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())));
     }
 
     private String getRendimientoEmpleado(JsonNode args, UUID peluqueroId) {
