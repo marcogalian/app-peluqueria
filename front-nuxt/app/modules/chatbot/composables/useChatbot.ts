@@ -17,7 +17,7 @@ export function useChatbot() {
       const { data } = await api.post('/chat', {
         message: text,
         history: messages.value.slice(0, -1).map(m => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
+          role: m.role,
           content: m.content,
         })),
       })

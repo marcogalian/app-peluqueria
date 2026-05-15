@@ -36,9 +36,8 @@ services:
       APP_ADMIN_EMAIL: ${APP_ADMIN_EMAIL:-admin@email.com}
       APP_FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
       AI_PROVIDER: ${AI_PROVIDER:-spring-ai}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-nano}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       OPENAI_MAX_TOKENS: ${OPENAI_MAX_TOKENS:-200}
       SPRING_AI_MODEL_CHAT: ${SPRING_AI_MODEL_CHAT:-none}
       CHATBOT_CONTEXT_FILE: /app/data/chatbot/contexto-negocio.json
@@ -47,9 +46,11 @@ services:
       ANTI_ABUSE_GENERAL_PER_MINUTE: ${ANTI_ABUSE_GENERAL_PER_MINUTE:-240}
       ANTI_ABUSE_AUTH_PER_MINUTE: ${ANTI_ABUSE_AUTH_PER_MINUTE:-20}
       ANTI_ABUSE_CHAT_PER_MINUTE: ${ANTI_ABUSE_CHAT_PER_MINUTE:-8}
+      ANTI_ABUSE_TRUST_FORWARDED_FOR: ${ANTI_ABUSE_TRUST_FORWARDED_FOR:-false}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       CHAT_AES_KEY: ${CHAT_AES_KEY}
       APP_DEMO_PASSWORD: ${APP_DEMO_PASSWORD}
+      APP_SYNC_DEMO_PASSWORDS: ${APP_SYNC_DEMO_PASSWORDS:-true}
     volumes:
       - uploads_data:/app/uploads
       - ../backend-spring/data:/app/data

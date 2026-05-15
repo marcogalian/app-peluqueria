@@ -1,7 +1,6 @@
 package com.marcog.peluqueria.chat.infrastructure.web;
 
 import com.marcog.peluqueria.chat.domain.ChatMessage;
-import com.marcog.peluqueria.security.application.util.AESCryptoUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -21,8 +20,6 @@ import java.time.LocalDateTime;
 @Slf4j
 public class ChatController {
 
-    private final AESCryptoUtil aesCryptoUtil;
-
     /**
      * Las aplicaciones cliente enviarán mensajes aquí usando la ruta
      * "/app/chat.sendMessage"
@@ -32,18 +29,10 @@ public class ChatController {
     @MessageMapping("/chat.sendMessage")
     @SendTo("/topic/public")
     public ChatMessage interceptarAESYEnviar(@Payload ChatMessage chatMessage) {
-        log.info("Mensaje encriptado recibido de: {} -> [{}]",
-                chatMessage.getEmisor(),
-                chatMessage.getContenidoAES());
+        log.info("Mensaje cifrado recibido de: {}", chatMessage.getEmisor());
 
-        // El servidor no necesita saber el contenido si solo hace de puente (Pasarela
-        // Segura),
-        // pero vamos a descifrarlo únicamente por motivos de registro/auditoría (Log)
-        // en consola:
-        String textoReal = aesCryptoUtil.decrypt(chatMessage.getContenidoAES());
-        log.info("El texto original en memoria interna fue: \"{}\"", textoReal);
-
-        // Volvemos a enviarlo cifrado (Tal como venía).
+        // Mantengo el mensaje cifrado de extremo a extremo dentro del servidor:
+        // para auditar basta con emisor y fecha, no con el contenido privado.
         chatMessage.setFecha(LocalDateTime.now());
         return chatMessage;
     }
