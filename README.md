@@ -468,7 +468,7 @@ DB_PASSWORD=una_clave_local_segura
 DB_NAME=peluqueria_db
 JWT_SECRET_KEY=clave_larga_de_32_bytes_o_mas_para_jwt
 CHAT_AES_KEY=clave_larga_de_32_bytes_o_mas_para_aes
-APP_DEMO_PASSWORD=Demo1234
+APP_DEMO_PASSWORD=1234
 ```
 
 Para probar recuperacion por email hay que rellenar `MAILTRAP_USERNAME` y `MAILTRAP_PASSWORD`. Para probar el chatbot real hay que rellenar `OPENAI_API_KEY` y dejar `SPRING_AI_MODEL_CHAT=openai`.
