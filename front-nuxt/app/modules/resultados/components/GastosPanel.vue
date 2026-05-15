@@ -4,8 +4,14 @@
  * Nóminas se pre-cargan desde el listado de empleados.
  */
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-vue-next'
+import { Doughnut } from 'vue-chartjs'
+import {
+  Chart as ChartJS, ArcElement, Tooltip, Legend,
+} from 'chart.js'
 import type { Gasto, CategoriaGasto } from '../types/gasto.types'
 import { CATEGORIAS, CATEGORIAS_LABEL, CATEGORIAS_ICONO } from '../types/gasto.types'
+
+ChartJS.register(ArcElement, Tooltip, Legend)
 
 // ── Estado mes/año ────────────────────────────────────────
 const hoy = new Date()
@@ -187,6 +193,39 @@ async function ejecutarEliminar() {
   }
 }
 
+// ── Gráfica de tarta ──────────────────────────────────────
+const COLORES_GRAFICA = [
+  '#1a365d', '#2f855a', '#d69e2e', '#9f7aea',
+  '#e53e3e', '#38b2ac', '#ed8936',
+]
+
+const datosGrafica = computed(() => {
+  const conDatos = CATEGORIAS.filter(c => totalPorCategoria.value[c] > 0)
+  return {
+    labels: conDatos.map(c => CATEGORIAS_LABEL[c]),
+    datasets: [{
+      data: conDatos.map(c => totalPorCategoria.value[c]),
+      backgroundColor: conDatos.map((_, i) => COLORES_GRAFICA[i % COLORES_GRAFICA.length]),
+      borderColor: '#ffffff',
+      borderWidth: 3,
+      hoverOffset: 0,
+    }],
+  }
+})
+
+const opcionesGrafica = {
+  responsive: true,
+  cutout: '58%',
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+      labels: { boxWidth: 10, usePointStyle: true, font: { size: 11 } },
+    },
+  },
+}
+
+const hayDatosGrafica = computed(() => totalMes.value > 0)
+
 // ── Helpers ───────────────────────────────────────────────
 function formatEur(n: number): string {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n)
@@ -246,6 +285,14 @@ function formatFecha(iso: string): string {
     <div class="flex items-center justify-between rounded-xl bg-primary/5 px-4 sm:px-5 py-3 sm:py-4">
       <p class="text-xs sm:text-sm font-bold text-on-surface-variant uppercase tracking-wider">Total gastos {{ labelMes }}</p>
       <p class="text-xl sm:text-2xl font-extrabold text-primary">{{ formatEur(totalMes) }}</p>
+    </div>
+
+    <!-- ── Gráfica reparto ───────────────────────────── -->
+    <div v-if="hayDatosGrafica && !cargando" class="card p-6">
+      <h5 class="text-base font-bold text-primary mb-4">Reparto de gastos</h5>
+      <div class="max-w-xs mx-auto">
+        <Doughnut :data="datosGrafica" :options="opcionesGrafica" />
+      </div>
     </div>
 
     <!-- ── Spinner ────────────────────────────────────── -->
