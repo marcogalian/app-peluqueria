@@ -84,8 +84,8 @@ Este proyecto no es solo un chatbot ni una demo de pantallas aisladas. Es una ap
 | MapStruct | Mapeo entre dominio y entidades |
 | Lombok | Reduccion de boilerplate |
 | Spring Mail + Mailtrap | Emails en entorno de pruebas |
-| Spring AI + OpenAI | Asistente IA con function calling |
-| Springdoc OpenAPI | Swagger UI y contrato REST |
+| Spring AI 1.x + OpenAI | Asistente IA con tool/function calling |
+| Springdoc OpenAPI | Swagger UI y contrato REST, desactivable por entorno |
 | JUnit 5 + Mockito | Tests unitarios y de casos de uso |
 
 ### Frontend
@@ -217,6 +217,27 @@ FRONTEND_BASE_URL=http://localhost:3000
 
 Si Mailtrap devuelve `Authentication failed`, el flujo crea el token pero el email no se entrega hasta corregir las credenciales SMTP.
 
+### Proteccion anti-abuso
+
+El backend incluye un filtro anti-abuso antes de llegar a los controladores. Su objetivo es reducir fuerza bruta, scraping y consumo innecesario de IA:
+
+- `/api/chat`: limite mas estricto por IP porque puede generar coste externo.
+- `/api/auth`: limite especifico para login, refresh y recuperacion.
+- resto de `/api/**`: limite general para evitar rafagas.
+- bloqueo de user agents de crawlers y scanners conocidos.
+
+Se configura desde Docker con:
+
+```env
+ANTI_ABUSE_ENABLED=true
+ANTI_ABUSE_GENERAL_PER_MINUTE=240
+ANTI_ABUSE_AUTH_PER_MINUTE=20
+ANTI_ABUSE_CHAT_PER_MINUTE=8
+ANTI_ABUSE_TRUST_FORWARDED_FOR=false
+```
+
+`ANTI_ABUSE_TRUST_FORWARDED_FOR` debe mantenerse en `false` salvo que la API este detras de un proxy inverso confiable que limpie y reescriba la cabecera `X-Forwarded-For`.
+
 ## API y manejo de errores
 
 El backend expone una API REST protegida por JWT. Las rutas de administracion y empleado se validan en servidor mediante Spring Security, de modo que el frontend no es la unica barrera de seguridad.
@@ -242,7 +263,8 @@ El backend expone una API REST protegida por JWT. Las rutas de administracion y 
 | Asistente IA | `/api/chat` |
 | Auditoria | `/api/v1/auditoria` |
 
-El contrato se puede consultar desde Swagger:
+El contrato se puede consultar desde Swagger si se activa la variable `SWAGGER_ENABLED=true`.
+Por seguridad, en Docker queda desactivado por defecto para no exponer la documentacion de la API en una entrega publica o despliegue real.
 
 ```text
 http://localhost:8080/swagger-ui.html
@@ -266,12 +288,22 @@ La aplicacion incluye un asistente interno para administradores y empleados. No 
 
 ### Como funciona
 
-El frontend envia la pregunta al backend mediante el modulo de chatbot. El backend autentica al usuario, detecta su rol y decide que informacion puede consultar. A partir de ahi combina dos mecanismos:
+El frontend envia la pregunta al backend mediante el modulo de chatbot. El backend autentica al usuario, detecta su rol y construye un prompt de sistema con las reglas del salon, la fecha actual, los permisos del usuario y el contexto estatico permitido.
 
-- Contexto de negocio cacheado: datos que cambian poco, como nombre del centro, horario, politicas, equipo, servicios, productos y ofertas activas. Este contexto se genera al arrancar y se regenera automaticamente cada noche.
-- Consultas en tiempo real: datos que deben salir de base de datos en el momento, como clientes VIP, total de clientes, inventario, stock bajo, ganancias, productos mas vendidos, citas del empleado o vacaciones.
+No son respuestas preestablecidas. La respuesta se genera con OpenAI y puede apoyarse en datos reales del sistema mediante dos fuentes:
 
-Para las consultas mas criticas, como clientes VIP o total de clientes, el backend responde directamente desde base de datos. Asi la respuesta no depende de la cuota del proveedor IA y no se inventan datos. Para preguntas mas abiertas, el backend usa un proveedor LLM configurable con function calling: el modelo puede pedir una funcion concreta, el backend ejecuta esa funcion contra PostgreSQL y devuelve el resultado para construir la respuesta final.
+- Contexto de negocio cacheado: datos que cambian poco, como nombre del centro, horario, politicas, equipo, servicios, productos y ofertas activas. El backend lo genera desde la base de datos al arrancar, lo guarda como JSON visible en `backend-spring/data/chatbot/contexto-negocio.json` y lo regenera cada noche a las 03:00 o desde `POST /api/chat/regenerar-contexto` con rol admin.
+- Consultas en tiempo real a PostgreSQL: datos que no deben cachearse, como citas, vacaciones, clientes VIP, total de clientes, inventario, stock bajo, ganancias, productos mas vendidos y resultados.
+
+El flujo interno es:
+
+1. `ChatbotController` recibe `POST /api/chat` con JWT.
+2. `ResponderConsultasGestion` prepara el prompt, filtra contexto por rol y declara las tools disponibles.
+3. `SpringAiModeloLenguaje` usa la configuracion de Spring AI 1.x y llama a OpenAI Chat Completions con `tools` y `tool_choice=auto`.
+4. Si el modelo pide una tool, por ejemplo `getClientesVip` o `getCitasProgramadas`, el backend ejecuta `ConsultasGestionPeluqueriaPostgres` contra la BD.
+5. El resultado JSON de la funcion vuelve al modelo como mensaje `tool`, y el modelo redacta la respuesta final en espanol.
+
+El modelo no accede nunca directamente a la base de datos ni ejecuta SQL libre. Solo puede pedir las funciones declaradas por el backend, y esas funciones vuelven a comprobar permisos por rol antes de consultar datos sensibles.
 
 Tambien se ha mejorado el formato de respuesta del chat para que sea mas util dentro del panel: respuestas sin iconos decorativos, datos estructurados cuando pregunta por agenda, clientes, ventas o inventario, sugerencias limpias y foco mantenido en el input para poder seguir preguntando sin interrupciones.
 
@@ -279,14 +311,19 @@ Tambien se ha mejorado el formato de respuesta del chat para que sea mas util de
 
 El asistente respeta permisos. Un empleado puede consultar informacion propia, como sus citas o vacaciones, mientras que las metricas de negocio y clientes quedan limitadas al administrador. Esta comprobacion se hace en el backend, no solo en la pantalla.
 
-El proveedor IA se configura con la variable de entorno `AI_PROVIDER`. Por defecto usa Spring AI sobre OpenAI (`AI_PROVIDER=spring-ai`). La clave no se publica en el repositorio.
+El proveedor IA se configura con la variable de entorno `AI_PROVIDER`. Por defecto usa Spring AI 1.x sobre OpenAI (`AI_PROVIDER=spring-ai`). La clave no se publica en el repositorio.
+
+Para una demo con coste bajo se recomienda `gpt-4o-mini`, modelo economico de OpenAI compatible con Chat Completions y function calling segun la documentacion oficial de modelos de OpenAI. El limite `OPENAI_MAX_TOKENS=200` mantiene respuestas cortas y ayuda a controlar coste.
 
 ```env
 AI_PROVIDER=spring-ai
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4.1-nano
+OPENAI_MODEL=gpt-4o-mini
 OPENAI_MAX_TOKENS=200
+SPRING_AI_MODEL_CHAT=openai
 ```
+
+Si no se configura `OPENAI_API_KEY`, la aplicacion completa puede arrancar igualmente, pero el asistente generativo devolvera un mensaje de error controlado al intentar consultar OpenAI. Para enseñar el chatbot real en la presentacion hay que poner una clave valida.
 
 ### Puntos fuertes para la presentacion
 
@@ -294,9 +331,8 @@ OPENAI_MAX_TOKENS=200
 - Arquitectura limpia: el caso de uso del asistente vive en `chatbot/application`, el dominio define contratos de negocio y la infraestructura contiene Spring AI, contexto y consultas PostgreSQL.
 - Control por roles: admin y empleado tienen capacidades diferentes, lo que demuestra seguridad aplicada a una funcionalidad IA.
 - Function calling: el modelo no accede directamente a la base de datos; pide funciones controladas y el backend decide que ejecutar.
-- Spring AI: el proyecto usa Spring AI sobre OpenAI, compatible con Spring Boot 3.5. Gestiona el ciclo de tools de forma nativa: el modelo solicita una herramienta, el backend ejecuta una consulta segura del dominio y el modelo recibe el resultado para redactar la respuesta.
-- Proveedor intercambiable: el dominio depende de `ModeloLenguaje`, por lo que el proveedor IA se puede cambiar por configuracion sin tocar el frontend.
-- Fallback local: algunas respuestas importantes se resuelven sin depender del proveedor externo, mejorando fiabilidad.
+- Spring AI 1.x + OpenAI: el proyecto usa configuracion Spring AI 1.x y una integracion controlada con OpenAI Chat Completions. El modelo solicita una herramienta, el backend ejecuta una consulta segura del dominio y el modelo recibe el resultado para redactar la respuesta.
+- Proveedor aislado por contrato: el dominio depende de `ModeloLenguaje`, asi que se puede sustituir la implementacion IA sin tocar el frontend ni el caso de uso principal.
 - Contexto regenerable: el asistente se alimenta de datos actualizados del centro y puede regenerar su contexto.
 - Buen enfoque de producto: convierte el panel en una herramienta mas rapida para preguntar "que productos tienen bajo stock", "quienes son clientes VIP" o "cuantas citas tengo hoy".
 
@@ -317,7 +353,7 @@ En frontend se usa Vitest para comprobar stores, servicios y composables clave. 
 | `GestionarAusenciasTest` | Serializacion de solicitudes concurrentes de vacaciones con semaforo | Demostrar control de hilos y evitar carreras cuando dos empleados solicitan ausencias a la vez |
 | `AutenticarUsuarioTest` | Registro seguro, rol por defecto, password hasheado y tokens | Garantizar que un registro publico no pueda crear administradores ni guardar contrasenas en plano |
 | `GestionarCredencialesTest` | Recuperacion admin, invalidacion de tokens, password de empleados y hash seguro | Evitar que empleados usen recuperacion, proteger tokens y asegurar cambios de contrasena solo desde admin |
-| `AESCryptoUtilTest` | Cifrado y descifrado AES, IV aleatorio, claves invalidas y payloads corruptos | Proteger la utilidad de cifrado usada por el chat interno y evitar regresiones de seguridad |
+| `AESCryptoUtilTest` | Cifrado y descifrado AES, IV aleatorio, claves invalidas y payloads corruptos | Proteger la utilidad de cifrado AES-256 y evitar regresiones de seguridad |
 | `ResponderConsultasGestionTest` | Asistente IA, function calling, respuestas directas, permisos por rol y sugerencias | Validar que el asistente no inventa datos criticos y respeta diferencias entre admin y peluquero/a |
 | `ChatFunctionExecutorTest` | Ejecucion de funciones del asistente contra repositorios simulados y control de permisos | Comprobar que las funciones de negocio del chatbot devuelven datos correctos y bloquean informacion de admin a empleados |
 
@@ -394,9 +430,17 @@ peluqueria/
 
 ### Requisitos
 
-- Docker Desktop
-- Java 21, si se ejecuta backend fuera de Docker
-- Node.js 22, si se ejecuta frontend fuera de Docker
+- Docker Desktop instalado y abierto.
+- Docker Compose v2, incluido normalmente con Docker Desktop. Se comprueba con `docker compose version`.
+- Conexion a internet en el primer build para descargar imagenes y dependencias.
+- Puertos libres: `3000`, `8080` y `5432`.
+- Git solo si se clona desde GitHub. Si se entrega ZIP, basta con descomprimirlo.
+
+Con Docker no hace falta instalar Java, Node.js, npm, Maven ni PostgreSQL. Solo son necesarios para ejecutar el proyecto fuera de Docker:
+
+- Java 21 para el backend local.
+- Node.js LTS 20 o superior con npm para el frontend local.
+- PostgreSQL local o Docker para la base de datos.
 
 ### Con Docker
 
@@ -404,8 +448,32 @@ Crear primero `docker/.env` a partir de `docker/.env.example` y rellenar las var
 
 ```bash
 cd docker
+cp .env.example .env
 docker compose up --build -d
 ```
+
+En Windows PowerShell, si no existe `cp`, se puede usar:
+
+```powershell
+cd docker
+Copy-Item .env.example .env
+docker compose up --build -d
+```
+
+`docker/.env.example` ya incluye valores locales de ejemplo para que el proyecto pueda arrancar tras copiarlo. En una entrega real o despliegue fuera del equipo local conviene cambiar al menos:
+
+```env
+DB_USER=peluqueria
+DB_PASSWORD=una_clave_local_segura
+DB_NAME=peluqueria_db
+JWT_SECRET_KEY=clave_larga_de_32_bytes_o_mas_para_jwt
+CHAT_AES_KEY=clave_larga_de_32_bytes_o_mas_para_aes
+APP_DEMO_PASSWORD=Demo1234
+```
+
+Para probar recuperacion por email hay que rellenar `MAILTRAP_USERNAME` y `MAILTRAP_PASSWORD`. Para probar el chatbot real hay que rellenar `OPENAI_API_KEY` y dejar `SPRING_AI_MODEL_CHAT=openai`.
+
+Si el profesor recibe una carpeta privada `entrega-profesor` con credenciales de demo, debe copiar `entrega-profesor/docker/.env` en `docker/.env` antes de ejecutar Docker. Esa carpeta no se sube a Git porque contiene claves API y contrasenas.
 
 Servicios:
 
@@ -413,7 +481,7 @@ Servicios:
 |---|---|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8080 |
-| Swagger UI | http://localhost:8080/swagger-ui.html |
+| Swagger UI | http://localhost:8080/swagger-ui.html, solo si `SWAGGER_ENABLED=true` |
 | PostgreSQL | localhost:5432 |
 
 ### Sin Docker
@@ -497,16 +565,19 @@ Resumen de mejoras recientes:
 - Error page global en Nuxt y respuestas JSON uniformes desde Spring Boot.
 - Limpieza de configuracion IA para usar Spring AI con OpenAI y dejar el proveedor externo desactivable en demo.
 
-Verificaciones recientes:
+Verificaciones recientes realizadas sobre el proyecto dockerizado y los builds locales:
 
 ```bash
 cd backend-spring
 ./mvnw test
 
 cd front-nuxt
-npx vue-tsc --noEmit
 npm test
 npm run build
+
+cd docker
+docker compose up --build -d
+docker compose ps
 ```
 
-Listo para demo y presentacion. Para demostrar el email real de recuperacion hace falta configurar credenciales SMTP validas de Mailtrap en el entorno local.
+Listo para demo y presentacion. Para demostrar el email real de recuperacion hace falta configurar credenciales SMTP validas de Mailtrap. Para demostrar el asistente IA generativo hace falta configurar una clave OpenAI valida.

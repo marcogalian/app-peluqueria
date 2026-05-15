@@ -39,7 +39,7 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
     private final PeluqueroRepository peluqueroRepository;
 
     private static final int MAX_ITERACIONES_FUNCTION_CALLING = 3;
-    private static final Locale LOCALE_ES = new Locale("es", "ES");
+    private static final Locale LOCALE_ES = Locale.of("es", "ES");
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static final String SYSTEM_PROMPT = """

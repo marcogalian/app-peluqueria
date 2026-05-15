@@ -20,6 +20,7 @@ import com.marcog.peluqueria.productos.infrastructure.persistence.VentaProductoE
 import com.marcog.peluqueria.servicios.domain.Servicio;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.marcog.peluqueria.finanzas.domain.ResultadosDTO;
 
@@ -42,7 +43,9 @@ public class ConsultarPanelFinanciero {
     private final AusenciaRepository ausenciaRepository;
     private final ProductoRepository productoRepository;
     private final JpaVentaProductoRepository ventaProductoRepository;
+    private static final Locale LOCALE_ES = Locale.of("es", "ES");
 
+    @Transactional(readOnly = true)
     public DashboardStats getStatsByMesAndAnio(int mes, int anio) {
         // 1. Obtener Gastos
         List<Gasto> gastosDelMes = gastoRepository.findByMesAndAnio(mes, anio);
@@ -254,6 +257,7 @@ public class ConsultarPanelFinanciero {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public ResultadosDTO getResultados(String periodo) {
         LocalDateTime ahora = LocalDateTime.now();
 
@@ -432,7 +436,7 @@ public class ConsultarPanelFinanciero {
             for (int dia = 0; dia < 7; dia++) {
                 LocalDateTime diaInicio = inicio.plusDays(dia);
                 LocalDateTime diaFin    = diaInicio.plusDays(1);
-                labels.add(diaInicio.getDayOfWeek().getDisplayName(TextStyle.SHORT, new java.util.Locale("es")));
+                labels.add(diaInicio.getDayOfWeek().getDisplayName(TextStyle.SHORT, LOCALE_ES));
                 double ingresosServicios = sumarIngresos(completadas.stream()
                         .filter(c -> !c.getFechaHora().isBefore(diaInicio) && c.getFechaHora().isBefore(diaFin))
                         .collect(Collectors.toList()));
@@ -460,7 +464,7 @@ public class ConsultarPanelFinanciero {
             for (int mes = 0; mes < 3; mes++) {
                 LocalDateTime mesInicio = inicio.plusMonths(mes);
                 LocalDateTime mesFin    = mesInicio.plusMonths(1);
-                labels.add(mesInicio.getMonth().getDisplayName(TextStyle.SHORT, new java.util.Locale("es")));
+                labels.add(mesInicio.getMonth().getDisplayName(TextStyle.SHORT, LOCALE_ES));
                 double ingresosServicios = sumarIngresos(completadas.stream()
                         .filter(c -> !c.getFechaHora().isBefore(mesInicio) && c.getFechaHora().isBefore(mesFin))
                         .collect(Collectors.toList()));
@@ -473,7 +477,7 @@ public class ConsultarPanelFinanciero {
             for (int mes = 1; mes <= 12; mes++) {
                 int mesFinal = mes;
                 labels.add(LocalDateTime.of(fin.getYear(), mes, 1, 0, 0)
-                        .getMonth().getDisplayName(TextStyle.SHORT, new java.util.Locale("es")));
+                        .getMonth().getDisplayName(TextStyle.SHORT, LOCALE_ES));
                 double ingresosServicios = sumarIngresos(completadas.stream()
                         .filter(c -> c.getFechaHora().getMonthValue() == mesFinal
                                   && c.getFechaHora().getYear() == fin.getYear())

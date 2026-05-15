@@ -16,9 +16,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class ChatMessage {
 
-    private String emisor; // Quién lo manda ("Admin" o "Peluquero A")
-    private String contenidoAES; // El texto cifrado (Ilegible)
-    private LocalDateTime fecha; // Cuando se envió
+    private String emisor;
+    private String contenidoAES;
+    private LocalDateTime fecha;
     private MessageType tipo;
 
     public enum MessageType {

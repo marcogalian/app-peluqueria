@@ -39,6 +39,7 @@ docs/sesion-*.md
 .claude/
 
 # ── Documentación interna / TFG (no subir al repo público) ─
+peluqueria-documentos/
 documentacion-no-github/
 entrega-profesor/
 MEMORANDUM_DEFENSA_TFG.md
