@@ -203,12 +203,12 @@ function formatFecha(iso: string): string {
   <div class="space-y-6">
 
     <!-- ── Navegador de mes ────────────────────────────── -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h3 class="text-2xl font-extrabold text-primary">Gastos operativos</h3>
+        <h3 class="text-xl sm:text-2xl font-extrabold text-primary">Gastos operativos</h3>
         <p class="text-sm text-on-surface-variant mt-0.5">Registra los gastos fijos del negocio mes a mes</p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 self-start sm:self-auto">
         <button
           class="btn-ghost p-2 rounded-lg"
           aria-label="Mes anterior"
@@ -216,7 +216,7 @@ function formatFecha(iso: string): string {
         >
           <ChevronLeft class="w-4 h-4" />
         </button>
-        <span class="text-sm font-bold text-primary w-36 text-center">{{ labelMes }}</span>
+        <span class="text-sm font-bold text-primary w-32 sm:w-36 text-center">{{ labelMes }}</span>
         <button
           class="btn-ghost p-2 rounded-lg"
           aria-label="Mes siguiente"
@@ -228,24 +228,24 @@ function formatFecha(iso: string): string {
     </div>
 
     <!-- ── Cards resumen por categoría ───────────────── -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3">
+    <div class="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3">
       <div
         v-for="cat in CATEGORIAS"
         :key="cat"
-        class="card p-4 text-center"
+        class="card p-3 sm:p-4 text-center"
       >
-        <p class="text-xl mb-1">{{ CATEGORIAS_ICONO[cat] }}</p>
-        <p class="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant leading-tight mb-2">
+        <p class="text-lg sm:text-xl mb-1">{{ CATEGORIAS_ICONO[cat] }}</p>
+        <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-on-surface-variant leading-tight mb-1 sm:mb-2">
           {{ CATEGORIAS_LABEL[cat] }}
         </p>
-        <p class="text-sm font-extrabold text-primary">{{ formatEur(totalPorCategoria[cat]) }}</p>
+        <p class="text-xs sm:text-sm font-extrabold text-primary">{{ formatEur(totalPorCategoria[cat]) }}</p>
       </div>
     </div>
 
     <!-- ── Total mes ──────────────────────────────────── -->
-    <div class="flex items-center justify-between rounded-xl bg-primary/5 px-5 py-4">
-      <p class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">Total gastos {{ labelMes }}</p>
-      <p class="text-2xl font-extrabold text-primary">{{ formatEur(totalMes) }}</p>
+    <div class="flex items-center justify-between rounded-xl bg-primary/5 px-4 sm:px-5 py-3 sm:py-4">
+      <p class="text-xs sm:text-sm font-bold text-on-surface-variant uppercase tracking-wider">Total gastos {{ labelMes }}</p>
+      <p class="text-xl sm:text-2xl font-extrabold text-primary">{{ formatEur(totalMes) }}</p>
     </div>
 
     <!-- ── Spinner ────────────────────────────────────── -->
@@ -278,27 +278,29 @@ function formatFecha(iso: string): string {
           <div
             v-for="gasto in gastosPorCategoria[cat]"
             :key="gasto.id"
-            class="flex items-center gap-3 px-5 py-3 hover:bg-surface-container-low transition-colors"
+            class="flex items-center gap-2 sm:gap-3 px-3 sm:px-5 py-3 hover:bg-surface-container-low transition-colors"
           >
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-on-surface truncate">{{ gasto.concepto }}</p>
               <p class="text-[11px] text-on-surface-variant">{{ formatFecha(gasto.fecha) }}</p>
             </div>
-            <p class="text-sm font-bold text-primary flex-shrink-0">{{ formatEur(gasto.importe) }}</p>
-            <button
-              class="p-1.5 rounded-md text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
-              title="Editar gasto"
-              @click="abrirEditar(gasto)"
-            >
-              <Pencil class="w-3.5 h-3.5" />
-            </button>
-            <button
-              class="p-1.5 rounded-md text-on-surface-variant hover:text-red-600 hover:bg-red-50 transition-colors"
-              title="Eliminar gasto"
-              @click="pedirConfirmacion(gasto)"
-            >
-              <Trash2 class="w-3.5 h-3.5" />
-            </button>
+            <p class="text-sm font-bold text-primary flex-shrink-0 ml-auto">{{ formatEur(gasto.importe) }}</p>
+            <div class="flex gap-1 flex-shrink-0">
+              <button
+                class="p-1.5 rounded-md text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
+                title="Editar gasto"
+                @click="abrirEditar(gasto)"
+              >
+                <Pencil class="w-3.5 h-3.5" />
+              </button>
+              <button
+                class="p-1.5 rounded-md text-on-surface-variant hover:text-red-600 hover:bg-red-50 transition-colors"
+                title="Eliminar gasto"
+                @click="pedirConfirmacion(gasto)"
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -368,7 +370,7 @@ function formatFecha(iso: string): string {
           </div>
 
           <!-- Importe + Fecha -->
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 xs:grid-cols-2 gap-4">
             <div>
               <label class="label" for="gasto-importe">Importe (€)</label>
               <input

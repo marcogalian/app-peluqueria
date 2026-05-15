@@ -147,15 +147,15 @@ function formatPct(n: number): string {
   <div class="space-y-8">
 
     <!-- ── Cabecera + tabs ───────────────────────────────── -->
-    <div class="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-0 sm:justify-between">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Resultados</h2>
+        <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-primary mb-1">Resultados</h2>
         <p class="text-on-surface-variant text-sm">Análisis financiero de Peluquería Isabella</p>
       </div>
       <!-- Tabs Rendimiento / Gastos -->
-      <div class="flex gap-1 bg-surface-container rounded-xl p-1">
+      <div class="flex gap-1 bg-surface-container rounded-xl p-1 self-start sm:self-auto">
         <button
-          class="px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors"
+          class="px-3 sm:px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors"
           :class="vistaActiva === 'rendimiento'
             ? 'bg-white text-primary shadow-sm'
             : 'text-on-surface-variant hover:text-on-surface'"
@@ -164,7 +164,7 @@ function formatPct(n: number): string {
           Rendimiento
         </button>
         <button
-          class="px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors"
+          class="px-3 sm:px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors"
           :class="vistaActiva === 'gastos'
             ? 'bg-white text-primary shadow-sm'
             : 'text-on-surface-variant hover:text-on-surface'"
