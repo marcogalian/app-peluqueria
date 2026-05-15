@@ -62,9 +62,10 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
             FUNCIONES (datos en tiempo real desde BD):
             - getCitasEmpleado(fecha?): citas del empleado autenticado, default hoy
             - getCitasProgramadas(periodo?): citas previstas del negocio para admin o propias para empleado. Periodo: hoy, semana, mes
-            - getVacacionesEmpleado(): vacaciones del empleado autenticado
-            - getPerfilEmpleado(): horario y comision del empleado autenticado
-            - getRendimientoEmpleado(periodo?, fecha?): servicios completados, ingresos y comision estimada del empleado autenticado
+            - getVacacionesEmpleado(): vacaciones, ausencias y dias disponibles del empleado autenticado
+            - getPerfilEmpleado(): nombre, horario, porcentaje de comision y salario/nomina bruta mensual del empleado autenticado (leido de su ficha y de la tabla de gastos de salarios)
+            - getRendimientoEmpleado(periodo?, fecha?): servicios completados, ingresos y comision estimada del empleado autenticado en un periodo o fecha
+            - getCitasProgramadas(periodo?): para el empleado, sus citas del periodo (hoy, manana, semana, mes)
             - getEmpleados(): listado y estado operativo del equipo
             - Solo admin: getVacacionesEmpleadoPorNombre(nombre), getVacacionesEmpleados
             - Solo admin: getGanancias, getResultados, getCitasAtendidas, getProductosStockBajo, getProductosMasVendidos, getInventario, getClientesVip, getTotalClientes
@@ -94,6 +95,8 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
             - No uses Markdown visible como **negritas**. Si necesitas listar, usa lineas simples con guiones
             - Para preguntas sobre empleados, servicios, productos, precios, horarios, ofertas, politicas: USA EL JSON DE CONTEXTO, NO digas que no sabes
             - Para citas, vacaciones, ausencias, dinero, ventas, stock actual: LLAMA a la funcion correspondiente
+            - Si un empleado pregunta por su salario, nomina, sueldo, comision, horario, nombre o perfil: LLAMA a getPerfilEmpleado y presenta los datos que devuelva (incluye nominaBrutaMensual y porcentajeComision). NUNCA respondas que no tienes esa informacion ni la redirijas a administracion.
+            - Si un empleado pregunta cuantas citas tiene (hoy, semana, mes): LLAMA a getCitasProgramadas. Si pregunta cuantos servicios ha hecho o cuanto ha ganado en un periodo: LLAMA a getRendimientoEmpleado.
             - Si existe una funcion para el dato solicitado, usala antes de responder. Si no existe, responde solo con el contexto disponible y explica brevemente el limite.
             - No inventes datos
             - Al final, sugiere 2-3 preguntas relacionadas: [SUGERENCIAS]: ["pregunta1", "pregunta2", "pregunta3"]
@@ -213,7 +216,7 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
                 - Sus vacaciones, ausencias y dias aprobados o pendientes
                 - Los dias de vacaciones que ya ha usado y los que le quedan del cupo anual
                 - Su propio nombre y perfil (nombre, especialidad, horario)
-                - Su horario, su porcentaje de comision y su comision o ingresos PROPIOS estimados por periodo (su retribucion es por comision, no hay salario fijo)
+                - Su horario, su porcentaje de comision, su salario o nomina bruta mensual PROPIA y su comision o ingresos PROPIOS estimados por periodo
                 - Los servicios que ha realizado en hoy, ayer, esta semana, la semana pasada, este mes, el mes pasado o una fecha concreta no futura
                 - Informacion publica del negocio: servicios, precios, duracion, horario, politicas, ofertas
                 - Catalogo orientativo de productos y sus precios, pero nunca stock ni datos de inventario interno
@@ -422,7 +425,7 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
         ));
         tools.add(Map.of(
                 "name", "getPerfilEmpleado",
-                "description", "Obtiene el horario base, disponibilidad y porcentaje de comision del empleado autenticado",
+                "description", "Obtiene nombre, horario base, disponibilidad, porcentaje de comision y salario/nomina bruta mensual del empleado autenticado. Usar para cualquier pregunta del empleado sobre su salario, sueldo, nomina, comision, horario o nombre.",
                 "parameters", Map.of("type", "object", "properties", Map.of())
         ));
         tools.add(Map.of(

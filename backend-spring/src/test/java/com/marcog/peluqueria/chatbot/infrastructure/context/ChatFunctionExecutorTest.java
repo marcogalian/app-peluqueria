@@ -48,6 +48,7 @@ class ChatFunctionExecutorTest {
     @Mock private ProductoRepository productoRepository;
     @Mock private ClienteRepository clienteRepository;
     @Mock private PeluqueroRepository peluqueroRepository;
+    @Mock private com.marcog.peluqueria.finanzas.domain.GastoRepository gastoRepository;
 
     private ConsultasGestionPeluqueriaPostgres executor;
 
@@ -56,7 +57,7 @@ class ChatFunctionExecutorTest {
         executor = new ConsultasGestionPeluqueriaPostgres(
                 citaRepository, ausenciaRepository, dashboardService,
                 ventaProductoRepository, productoRepository, clienteRepository,
-                peluqueroRepository,
+                peluqueroRepository, gastoRepository,
                 new ObjectMapper());
     }
 
