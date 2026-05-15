@@ -9,8 +9,11 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 - [Que hace la aplicacion](#que-hace-la-aplicacion)
 - [Stack tecnico](#stack-tecnico)
 - [Arquitectura](#arquitectura)
+- [Seguridad y credenciales](#seguridad-y-credenciales)
+- [API y manejo de errores](#api-y-manejo-de-errores)
 - [Asistente de gestion con IA](#asistente-de-gestion-con-ia)
 - [Calidad y pruebas](#calidad-y-pruebas)
+- [Responsive](#responsive)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Arranque rapido](#arranque-rapido)
 - [Documentacion](#documentacion)
@@ -18,17 +21,22 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 
 ## Que hace la aplicacion
 
+Peluqueria Isabella no es solo un chatbot ni una demo de pantallas aisladas. Es una aplicacion de gestion completa para un salon de peluqueria, con separacion entre administracion y empleados, datos reales en PostgreSQL, seguridad por roles, auditoria, agenda, ventas, inventario, mensajeria, resultados financieros y un asistente IA integrado en el negocio.
+
 ### Panel administrador
 
 - Panel de control con KPIs, evolucion de ventas, citas, inventario y alertas.
 - Agenda visual para crear, editar, cancelar y completar citas.
 - Gestion de clientes con datos personales, VIP, historial, consentimiento y fotos.
 - Gestion de empleados, especialidades, disponibilidad, bajas y vacaciones.
+- Gestion de contrasenas de empleados desde administracion.
 - Catalogo de servicios con precio, duracion, categoria y genero.
+- Servicios con precio promocional y visualizacion de precio normal tachado.
 - Inventario de productos con stock, stock minimo, filtros y ventas.
 - Mensajeria interna y envio de emails a empleados.
 - Resultados financieros: ingresos, gastos, beneficios, productos y rendimiento.
-- Configuracion del negocio, dias especiales y dias bloqueados para vacaciones.
+- Configuracion del negocio, horarios por franjas, sabados, dias especiales y dias bloqueados para vacaciones.
+- Dias especiales con descuento en porcentaje para el usuario, convertido internamente al multiplicador que espera el backend.
 - Asistente de gestion para consultar datos del negocio.
 - Auditoria de actividad para revisar creaciones, modificaciones y eliminaciones del equipo.
 
@@ -42,6 +50,23 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 - Notificaciones de aprobacion o rechazo de ausencias.
 - Asistente de gestion limitado por rol.
 - Control de concurrencia en solicitudes de calendario para evitar carreras cuando varios empleados piden vacaciones a la vez.
+
+### Modulos principales
+
+| Modulo | Que resuelve |
+|---|---|
+| Agenda y calendario | Gestion diaria de citas, estados, solapamientos y vista operativa para admin y empleados |
+| Clientes | Alta, consulta, historial, consentimiento, cliente VIP, archivado/reactivado y fotos |
+| Empleados | Equipo, especialidad, disponibilidad, bajas, vacaciones y calendario laboral |
+| Servicios | Catalogo, duracion, precio, genero, categoria y precio promocional |
+| Inventario | Productos, stock, stock minimo, ventas, ranking y alertas |
+| Ventas | Venta de productos y actualizacion automatica de stock |
+| Finanzas y resultados | Ingresos, gastos, beneficio, balance, ticket medio y evolucion mensual |
+| Configuracion | Datos del centro, horarios por franjas, sabados, dias bloqueados y dias especiales |
+| Mensajeria | Mensajes internos y envio de emails a empleados con Mailtrap en local |
+| Auditoria | Registro de acciones sensibles con usuario, rol, ruta, metodo, estado y fecha |
+| Credenciales | Recuperacion exclusiva para admin y cambio de contrasena de empleados desde administracion |
+| Asistente IA | Consultas en lenguaje natural sobre datos reales del negocio con permisos por rol |
 
 ## Stack tecnico
 
@@ -58,9 +83,8 @@ El proyecto esta desarrollado como aplicacion profesional de gestion para un sal
 | H2 | Base de datos para tests |
 | MapStruct | Mapeo entre dominio y entidades |
 | Lombok | Reduccion de boilerplate |
-| WebSocket STOMP | Chat interno en tiempo real |
 | Spring Mail + Mailtrap | Emails en entorno de pruebas |
-| Gemini API / OpenRouter | Asistente IA configurable |
+| Spring AI + OpenAI | Asistente IA con function calling |
 | Springdoc OpenAPI | Swagger UI y contrato REST |
 | JUnit 5 + Mockito | Tests unitarios y de casos de uso |
 
@@ -98,7 +122,7 @@ Cada modulo de negocio tiene su propio corte vertical:
 backend-spring/src/main/java/com/marcog/peluqueria/<modulo>/
 ├── application      # Casos de uso: GestionarAgenda, RegistrarCliente...
 ├── domain           # Modelo de negocio y contratos: Cliente, ClienteRepository...
-└── infrastructure   # Web, persistencia, email, Gemini, configuracion...
+└── infrastructure   # Web, persistencia, email, Spring AI, configuracion...
 ```
 
 La arquitectura evita nombres tecnicos ruidosos como `Port`, `Adapter`, `In` u `Out`. Los contratos viven en `domain` con nombres de negocio y las implementaciones viven en `infrastructure` indicando la tecnologia cuando aporta claridad, por ejemplo `PostgresClienteRepository`.
@@ -130,6 +154,112 @@ La aplicacion trabaja con dos roles principales:
 
 El backend aplica permisos con Spring Security y no depende solo de ocultar opciones en el menu. Ademas, existe un registro de actividad para administracion: cada accion autenticada que crea, modifica o elimina datos queda guardada con usuario, rol, modulo, metodo HTTP, ruta, estado y fecha. Esto permite responder a preguntas como quien creo una cita, quien edito un cliente o quien cambio una solicitud.
 
+## Seguridad y credenciales
+
+La aplicacion separa claramente el acceso de administracion y el acceso de empleados. El backend valida permisos con Spring Security y las pantallas solo muestran las acciones que corresponden a cada rol.
+
+### Recuperacion de contrasena
+
+- La recuperacion desde el login esta reservada para el administrador.
+- El formulario de login muestra el flujo como recuperacion admin, no como una opcion general para empleados.
+- Si el email no existe o no pertenece al admin, la API responde igual para no revelar informacion.
+- Si el email pertenece al admin activo, se genera un token temporal de 30 minutos y se envia un enlace a `/reset-password?token=...`.
+- Los tokens anteriores sin usar se invalidan cuando se solicita uno nuevo.
+- El token queda marcado como usado al restablecer la contrasena.
+
+### Contrasenas de empleados
+
+Los empleados no tienen "olvide mi contrasena". Si pierden acceso, el administrador les define una nueva contrasena desde:
+
+```text
+/admin/contrasenas
+```
+
+La pantalla permite buscar un empleado, seleccionar su ficha y escribir la nueva contrasena dos veces. La validacion se aplica tanto en frontend como en backend:
+
+- minimo 8 caracteres;
+- al menos una mayuscula;
+- al menos una minuscula;
+- al menos un numero;
+- ambos campos deben coincidir.
+
+El endpoint esta protegido con rol admin:
+
+```text
+POST /api/peluqueros/clave-empleado
+```
+
+La contrasena se guarda siempre hasheada con `PasswordEncoder`; nunca se almacena en texto plano.
+
+### Usuarios demo
+
+Los emails demo se normalizan en el arranque para evitar datos antiguos mezclados:
+
+| Usuario | Email |
+|---|---|
+| `admin` | `admin@email.com` |
+| `carmen` | `carmen@email.com` |
+| `lucia` | `lucia@email.com` |
+| `sofia` | `sofia@email.com` |
+
+Si existe un empleado demo antiguo como `maria`, tambien se sincroniza a `maria@email.com`. La contrasena demo se lee desde `APP_DEMO_PASSWORD` y no debe documentarse con valor real en el repositorio.
+
+### Emails
+
+El envio de recuperacion usa Spring Mail con Mailtrap en entorno local. Para que el enlace llegue realmente al inbox de Mailtrap deben estar configuradas estas variables:
+
+```env
+MAILTRAP_USERNAME=...
+MAILTRAP_PASSWORD=...
+APP_ADMIN_EMAIL=admin@email.com
+FRONTEND_BASE_URL=http://localhost:3000
+```
+
+Si Mailtrap devuelve `Authentication failed`, el flujo crea el token pero el email no se entrega hasta corregir las credenciales SMTP.
+
+## API y manejo de errores
+
+El backend expone una API REST protegida por JWT. Las rutas de administracion y empleado se validan en servidor mediante Spring Security, de modo que el frontend no es la unica barrera de seguridad.
+
+### Endpoints principales
+
+| Area | Endpoint base |
+|---|---|
+| Autenticacion | `/api/auth` |
+| Citas | `/api/citas` |
+| Clientes | `/api/v1/clientes` |
+| Fotos de clientes | `/api/v1/clientes/{clienteId}/fotos` |
+| Peluqueros / empleados | `/api/peluqueros` |
+| Servicios | `/api/v1/servicios` |
+| Productos e inventario | `/api/v1/productos` |
+| Ventas de productos | `/api/v1/productos/ventas` |
+| Ausencias | `/api/v1/ausencias` |
+| Dias bloqueados | `/api/v1/dias-bloqueados` |
+| Ofertas y dias especiales | `/api/v1/ofertas`, `/api/v1/dias-especiales` |
+| Finanzas | `/api/finanzas` |
+| Configuracion | `/api/configuracion` |
+| Mensajes | `/api/mensajes` |
+| Asistente IA | `/api/chat` |
+| Auditoria | `/api/v1/auditoria` |
+
+El contrato se puede consultar desde Swagger:
+
+```text
+http://localhost:8080/swagger-ui.html
+```
+
+### Errores controlados
+
+La aplicacion incluye una capa global para evitar errores crudos sin contexto:
+
+- `400`: validaciones y datos incorrectos.
+- `401`: sesion no valida o caducada.
+- `403`: permisos insuficientes.
+- `404`: recurso no encontrado.
+- `500`: error interno controlado con mensaje seguro.
+
+El backend devuelve una respuesta uniforme con estado, codigo, mensaje, ruta y fecha. El frontend normaliza esos errores en el cliente HTTP y muestra una pagina global de aviso cuando Nuxt recibe un error de navegacion, con acciones para volver, ir al inicio o iniciar sesion.
+
 ## Asistente de gestion con IA
 
 La aplicacion incluye un asistente interno para administradores y empleados. No es un chat generico pegado a la interfaz: esta conectado al dominio de la peluqueria y responde usando informacion real del sistema.
@@ -149,25 +279,23 @@ Tambien se ha mejorado el formato de respuesta del chat para que sea mas util de
 
 El asistente respeta permisos. Un empleado puede consultar informacion propia, como sus citas o vacaciones, mientras que las metricas de negocio y clientes quedan limitadas al administrador. Esta comprobacion se hace en el backend, no solo en la pantalla.
 
-El proveedor IA se elige por variable de entorno con `AI_PROVIDER`. Por defecto usa Gemini (`AI_PROVIDER=gemini` y `GEMINI_API_KEY`). Para probar OpenRouter se puede usar `AI_PROVIDER=openrouter`, `OPENROUTER_API_KEY` y `OPENROUTER_MODEL=openrouter/free`. Las claves no se publican en el repositorio.
-
-Para activar OpenRouter en local:
+El proveedor IA se configura con la variable de entorno `AI_PROVIDER`. Por defecto usa Spring AI sobre OpenAI (`AI_PROVIDER=spring-ai`). La clave no se publica en el repositorio.
 
 ```env
-AI_PROVIDER=openrouter
-OPENROUTER_API_KEY=sk-or-v1-...
-OPENROUTER_MODEL=openrouter/free
+AI_PROVIDER=spring-ai
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4.1-nano
+OPENAI_MAX_TOKENS=200
 ```
-
-La clave se crea en el panel de OpenRouter, se copia una sola vez y se pega solo en `docker/.env`.
 
 ### Puntos fuertes para la presentacion
 
 - Integracion real con el negocio: el asistente consulta clientes, agenda, inventario, ventas y ausencias, no responde solo con texto estatico.
-- Arquitectura limpia: el caso de uso del asistente vive en `chatbot/application`, el dominio define contratos de negocio y la infraestructura contiene Gemini, contexto y consultas PostgreSQL.
+- Arquitectura limpia: el caso de uso del asistente vive en `chatbot/application`, el dominio define contratos de negocio y la infraestructura contiene Spring AI, contexto y consultas PostgreSQL.
 - Control por roles: admin y empleado tienen capacidades diferentes, lo que demuestra seguridad aplicada a una funcionalidad IA.
 - Function calling: el modelo no accede directamente a la base de datos; pide funciones controladas y el backend decide que ejecutar.
-- Proveedor intercambiable: el dominio depende de `ModeloLenguaje`, por lo que Gemini y OpenRouter se pueden cambiar por configuracion sin tocar el frontend.
+- Spring AI: el proyecto usa Spring AI sobre OpenAI, compatible con Spring Boot 3.5. Gestiona el ciclo de tools de forma nativa: el modelo solicita una herramienta, el backend ejecuta una consulta segura del dominio y el modelo recibe el resultado para redactar la respuesta.
+- Proveedor intercambiable: el dominio depende de `ModeloLenguaje`, por lo que el proveedor IA se puede cambiar por configuracion sin tocar el frontend.
 - Fallback local: algunas respuestas importantes se resuelven sin depender del proveedor externo, mejorando fiabilidad.
 - Contexto regenerable: el asistente se alimenta de datos actualizados del centro y puede regenerar su contexto.
 - Buen enfoque de producto: convierte el panel en una herramienta mas rapida para preguntar "que productos tienen bajo stock", "quienes son clientes VIP" o "cuantas citas tengo hoy".
@@ -188,6 +316,7 @@ En frontend se usa Vitest para comprobar stores, servicios y composables clave. 
 | `GestionarAgendaTest` | Creacion y edicion de citas, solapamientos y citas consecutivas permitidas | Evitar que dos citas del mismo peluquero ocupen el mismo tramo horario |
 | `GestionarAusenciasTest` | Serializacion de solicitudes concurrentes de vacaciones con semaforo | Demostrar control de hilos y evitar carreras cuando dos empleados solicitan ausencias a la vez |
 | `AutenticarUsuarioTest` | Registro seguro, rol por defecto, password hasheado y tokens | Garantizar que un registro publico no pueda crear administradores ni guardar contrasenas en plano |
+| `GestionarCredencialesTest` | Recuperacion admin, invalidacion de tokens, password de empleados y hash seguro | Evitar que empleados usen recuperacion, proteger tokens y asegurar cambios de contrasena solo desde admin |
 | `AESCryptoUtilTest` | Cifrado y descifrado AES, IV aleatorio, claves invalidas y payloads corruptos | Proteger la utilidad de cifrado usada por el chat interno y evitar regresiones de seguridad |
 | `ResponderConsultasGestionTest` | Asistente IA, function calling, respuestas directas, permisos por rol y sugerencias | Validar que el asistente no inventa datos criticos y respeta diferencias entre admin y peluquero/a |
 | `ChatFunctionExecutorTest` | Ejecucion de funciones del asistente contra repositorios simulados y control de permisos | Comprobar que las funciones de negocio del chatbot devuelven datos correctos y bloquean informacion de admin a empleados |
@@ -212,9 +341,44 @@ npm test
 
 ## Responsive
 
-La aplicacion esta pensada como panel de gestion de escritorio, pero se esta adaptando para que tambien sea util en tablet y movil. El layout general ya contempla menu lateral como drawer en pantallas pequenas, cabecera compacta, paddings responsive, toasts adaptativos y paneles laterales que no se salen del viewport.
+La aplicacion esta pensada como panel de gestion de escritorio, pero se ha trabajado para que las pantallas clave tambien funcionen en tablet y movil. El layout general contempla menu lateral como drawer en pantallas pequenas, cabecera compacta, paddings responsive, toasts adaptativos, modales centrados y paneles que no se salen del viewport.
 
-Antes de la entrega conviene revisar manualmente las pantallas principales en movil y tablet: login, panel de control, agenda, clientes, inventario, ventas, vacaciones, mensajes, resultados y asistente de gestion.
+Breakpoints y tamanos revisados manualmente:
+
+| Vista | Tamano de referencia |
+|---|---|
+| Movil estrecho | `360x800` |
+| Movil medio | `414x896` |
+| Tablet vertical | `768x1024` |
+| Desktop base | `1366x768` |
+| Desktop grande | `1920x1080` |
+
+Pantallas revisadas con foco responsive:
+
+- Configuracion admin.
+- Panel de control admin.
+- Modales y popups de cabecera.
+- Cards de KPIs, graficas, estado del equipo, gastos, personal e inventario.
+- Formularios de horario, dias especiales y precios.
+- Mensajes.
+- Servicios.
+- Inventario.
+- Empleados.
+- Calendario laboral.
+
+Mejoras aplicadas:
+
+- cards con contenido ajustado en movil;
+- inputs y botones sin desbordar;
+- textos largos acortados en formularios de horario;
+- modales centrados en movil;
+- graficas y leyendas con centrado corregido;
+- espaciados mas respirables en cards densas;
+- tablas sustituidas por cards en movil y tablet cuando era necesario;
+- filtros y acciones reorganizados para evitar scroll horizontal;
+- calendario laboral con cabecera y celdas compactas en movil;
+- menu lateral y enlaces protegidos tras refrescar sesion;
+- login y recuperacion admin preparados para movil.
 
 ## Estructura del repositorio
 
@@ -236,6 +400,8 @@ peluqueria/
 
 ### Con Docker
 
+Crear primero `docker/.env` a partir de `docker/.env.example` y rellenar las variables necesarias. Las credenciales reales no se guardan en Git.
+
 ```bash
 cd docker
 docker compose up --build -d
@@ -254,12 +420,20 @@ Servicios:
 
 Backend:
 
+Configurar las variables de entorno equivalentes a `docker/.env` en el entorno local o en el IDE antes de arrancar Spring Boot.
+
 ```bash
 cd backend-spring
 ./mvnw spring-boot:run
 ```
 
 Frontend:
+
+Crear `front-nuxt/.env` con:
+
+```env
+NUXT_PUBLIC_API_BASE=http://localhost:8080/api
+```
 
 ```bash
 cd front-nuxt
@@ -271,7 +445,7 @@ npm run dev
 
 - [Puesta en marcha](docs/puesta-en-marcha.md)
 
-Las credenciales demo y notas internas se mantienen fuera del repositorio publico, dentro de `documentacion-no-github/`.
+Las credenciales demo y notas privadas se entregan aparte y no deben subirse al repositorio publico.
 
 ## Comandos utiles
 
@@ -306,4 +480,33 @@ docker compose up --build -d
 
 ## Estado actual
 
-El proyecto esta en fase de cierre funcional. Queda recomendado realizar una ronda completa de pruebas manuales, revisar textos finales de documentacion y preparar capturas o demo guiada para presentacion.
+El proyecto esta completo y funcional. Cubre todos los modulos previstos: agenda, clientes, empleados, servicios, inventario, ventas, ausencias, mensajeria, resultados, configuracion, auditoria, credenciales y asistente de gestion con IA.
+
+Las ultimas mejoras incluyen responsive en configuracion, panel de control, mensajes, servicios, inventario, empleados y calendario laboral; recuperacion de contrasena exclusiva para admin; pantalla admin para cambiar contrasenas de empleados; emails demo normalizados; descuentos promocionales en servicios; dias especiales expresados como porcentaje para el usuario; y manejo global de errores `400`, `401`, `403`, `404` y `500`.
+
+Resumen de mejoras recientes:
+
+- Ajuste responsive en vistas moviles `360x800` y `414x896`, tablet vertical `768x1024`, desktop `1366x768` y desktop grande `1920x1080`.
+- Correccion de tarjetas, modales, popups, tablas, filtros y graficas para evitar desbordes y scroll horizontal.
+- Cambio de "multiplicador" por "descuento (%)" en dias especiales, manteniendo compatibilidad con el backend actual.
+- Precio promocional en servicios, mostrando precio anterior tachado y precio rebajado.
+- Uso del precio con descuento en tickets y calculos financieros.
+- Recuperacion de contrasena solo para el administrador mediante email.
+- Cambio de contrasena de empleados desde administracion, con doble campo y validaciones.
+- Normalizacion de emails demo.
+- Error page global en Nuxt y respuestas JSON uniformes desde Spring Boot.
+- Limpieza de configuracion IA para usar Spring AI con OpenAI y dejar el proveedor externo desactivable en demo.
+
+Verificaciones recientes:
+
+```bash
+cd backend-spring
+./mvnw test
+
+cd front-nuxt
+npx vue-tsc --noEmit
+npm test
+npm run build
+```
+
+Listo para demo y presentacion. Para demostrar el email real de recuperacion hace falta configurar credenciales SMTP validas de Mailtrap en el entorno local.
