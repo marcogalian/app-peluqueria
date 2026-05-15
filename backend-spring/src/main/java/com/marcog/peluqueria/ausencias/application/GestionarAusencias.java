@@ -94,7 +94,7 @@ public class GestionarAusencias implements GestionarAusencia {
     @Override
     public SolicitudAusencia aprobar(UUID id) {
         SolicitudAusencia s = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada: " + id));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Solicitud no encontrada: " + id));
         s.setEstado(EstadoAusencia.APROBADA);
         s.setResueltaEn(LocalDateTime.now());
         // Empleado debe ver el card de notificacion la proxima vez que entre a /vacaciones
@@ -107,7 +107,7 @@ public class GestionarAusencias implements GestionarAusencia {
     @Override
     public SolicitudAusencia rechazar(UUID id, String motivo) {
         SolicitudAusencia s = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada: " + id));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Solicitud no encontrada: " + id));
         s.setEstado(EstadoAusencia.RECHAZADA);
         s.setMotivoRechazo(motivo);
         s.setResueltaEn(LocalDateTime.now());
@@ -120,7 +120,7 @@ public class GestionarAusencias implements GestionarAusencia {
     @Override
     public SolicitudAusencia marcarComoVista(UUID id) {
         SolicitudAusencia s = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada: " + id));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Solicitud no encontrada: " + id));
         s.setVistaPorEmpleado(true);
         return repository.guardar(s);
     }
@@ -158,7 +158,7 @@ public class GestionarAusencias implements GestionarAusencia {
     @Override
     public SolicitudAusencia cancelar(UUID id) {
         SolicitudAusencia s = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada: " + id));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Solicitud no encontrada: " + id));
         s.setEstado(EstadoAusencia.CANCELADA);
         s.setResueltaEn(LocalDateTime.now());
         return repository.guardar(s);

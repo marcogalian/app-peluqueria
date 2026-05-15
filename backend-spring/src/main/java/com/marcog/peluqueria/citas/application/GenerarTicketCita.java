@@ -33,7 +33,7 @@ public class GenerarTicketCita {
 
         // 1. Buscamos la cita real en la DB
         Cita cita = citaRepository.findById(citaId)
-                .orElseThrow(() -> new RuntimeException("Cita no encontrada para generar ticket."));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Cita no encontrada para generar ticket."));
 
         Document document = new Document(PageSize.A4, 50, 50, 50, 50);
         ByteArrayOutputStream out = new ByteArrayOutputStream();

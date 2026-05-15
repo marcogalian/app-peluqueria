@@ -49,7 +49,7 @@ public class GestionarAgenda {
     @Transactional(readOnly = true)
     public Cita getCitaById(UUID id) {
         return repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Cita not found"));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Cita no encontrada"));
     }
 
     public Cita createCita(Cita cita) {

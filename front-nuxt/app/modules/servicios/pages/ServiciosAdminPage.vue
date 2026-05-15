@@ -51,8 +51,11 @@ onMounted(async () => {
   try {
     const { api } = await import('~/infrastructure/http/api')
     const { data } = await api.get('/v1/servicios')
-    servicios.value = data
-  } catch { /* vacío */ } finally { cargando.value = false }
+    servicios.value = data ?? []
+  } catch {
+    servicios.value = []
+    toast.error('No se pudieron cargar los servicios. Revisa la conexión e inténtalo de nuevo.')
+  } finally { cargando.value = false }
 })
 
 function abrirCrear() {

@@ -20,7 +20,7 @@ public class GestionarOfertas implements GestionarOferta {
 
     @Override
     public Oferta actualizarOferta(UUID id, Oferta detalles) {
-        Oferta o = ofertaRepo.findById(id).orElseThrow(() -> new RuntimeException("Oferta no encontrada"));
+        Oferta o = ofertaRepo.findById(id).orElseThrow(() -> new java.util.NoSuchElementException("Oferta no encontrada"));
         if (detalles.getNombre() != null) o.setNombre(detalles.getNombre());
         if (detalles.getDescripcion() != null) o.setDescripcion(detalles.getDescripcion());
         if (detalles.getDescuentoPorcentaje() != null) o.setDescuentoPorcentaje(detalles.getDescuentoPorcentaje());
@@ -31,7 +31,7 @@ public class GestionarOfertas implements GestionarOferta {
 
     @Override
     public Oferta toggleActiva(UUID id) {
-        Oferta o = ofertaRepo.findById(id).orElseThrow(() -> new RuntimeException("Oferta no encontrada"));
+        Oferta o = ofertaRepo.findById(id).orElseThrow(() -> new java.util.NoSuchElementException("Oferta no encontrada"));
         o.setActiva(!o.isActiva());
         return ofertaRepo.guardar(o);
     }

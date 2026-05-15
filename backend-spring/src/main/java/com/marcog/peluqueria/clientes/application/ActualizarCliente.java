@@ -15,7 +15,7 @@ public class ActualizarCliente {
 
     public Cliente actualizarCliente(UUID clienteId, Cliente clienteDetails) {
         Cliente cliente = clienteRepository.findById(clienteId)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Cliente no encontrado"));
 
         if (clienteDetails.getNombre() != null)
             cliente.setNombre(clienteDetails.getNombre());
@@ -42,14 +42,14 @@ public class ActualizarCliente {
 
     public Cliente actualizarConsentimiento(UUID clienteId, boolean consentimientoFotos) {
         Cliente cliente = clienteRepository.findById(clienteId)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Cliente no encontrado"));
         cliente.setConsentimientoFotos(consentimientoFotos);
         return clienteRepository.save(cliente);
     }
 
     public Cliente actualizarArchivado(UUID clienteId, boolean archivado) {
         Cliente cliente = clienteRepository.findById(clienteId)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Cliente no encontrado"));
         cliente.setArchivado(archivado);
         return clienteRepository.save(cliente);
     }

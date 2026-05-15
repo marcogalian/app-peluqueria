@@ -23,7 +23,7 @@ public class GestionarEmpleados {
 
     public Peluquero getPeluqueroById(UUID id) {
         return repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Peluquero not found"));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Peluquero no encontrado"));
     }
 
     @CacheEvict(value = "peluqueros", allEntries = true)

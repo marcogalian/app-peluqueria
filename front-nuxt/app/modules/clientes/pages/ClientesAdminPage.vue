@@ -152,6 +152,7 @@ async function cargarClientes() {
     clientes.value = data || []
   } catch {
     clientes.value = []
+    toast.error('No se pudieron cargar los clientes. Revisa la conexión e inténtalo de nuevo.')
   } finally {
     cargando.value = false
   }
@@ -189,6 +190,7 @@ async function cargarHistorialCliente(clienteId: string) {
     historialCliente.value = data
   } catch {
     historialCliente.value = null
+    toast.error('No se pudo cargar el historial del cliente.')
   } finally {
     cargandoHistorial.value = false
   }
@@ -281,6 +283,7 @@ async function eliminarFoto() {
     if (fotoAmpliada.value?.id === foto.id) fotoAmpliada.value = null
   } catch {
     // La foto permanece en la lista si falla
+    toast.error('No se pudo eliminar la foto.')
   }
 }
 
@@ -299,6 +302,7 @@ async function actualizarDescripcionFoto() {
     editandoDesc.value = false
   } catch {
     // No cambiar nada si falla
+    toast.error('No se pudo actualizar la descripción de la foto.')
   }
 }
 
