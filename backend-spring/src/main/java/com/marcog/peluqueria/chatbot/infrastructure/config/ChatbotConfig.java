@@ -10,19 +10,11 @@ import java.time.Duration;
 @Configuration
 public class ChatbotConfig {
 
-    @Bean("geminiRestTemplate")
-    public RestTemplate geminiRestTemplate() {
+    @Bean("openAiRestTemplate")
+    public RestTemplate openAiRestTemplate() {
         return new RestTemplateBuilder()
-                .setConnectTimeout(Duration.ofSeconds(10))
-                .setReadTimeout(Duration.ofSeconds(30))
-                .build();
-    }
-
-    @Bean("openRouterRestTemplate")
-    public RestTemplate openRouterRestTemplate() {
-        return new RestTemplateBuilder()
-                .setConnectTimeout(Duration.ofSeconds(10))
-                .setReadTimeout(Duration.ofSeconds(45))
+                .connectTimeout(Duration.ofSeconds(10))
+                .readTimeout(Duration.ofSeconds(45))
                 .build();
     }
 }

@@ -17,9 +17,13 @@ import com.marcog.peluqueria.servicios.domain.ServicioRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -46,6 +50,9 @@ public class ArchivoContextoNegocio implements ContextoNegocio {
     // en lugar de new ObjectMapper() para mantener configuracion consistente.
     private final ObjectMapper mapper;
 
+    @Value("${chatbot.context-file:./data/chatbot/contexto-negocio.json}")
+    private String contextFile;
+
     private volatile String cachedContext = "";
 
     // ── Ciclo de vida ───────────────────────────────────────────────
@@ -65,7 +72,8 @@ public class ArchivoContextoNegocio implements ContextoNegocio {
             raiz.set("productos", construirCatalogoProductos());
             raiz.set("ofertas", construirOfertasActivas());
 
-            cachedContext = mapper.writeValueAsString(raiz);
+            cachedContext = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(raiz);
+            guardarContextoVisible(cachedContext);
             log.info("Contexto del chatbot regenerado correctamente");
         } catch (Exception ex) {
             log.error("Error regenerando contexto del chatbot: {}", ex.getMessage());
@@ -75,6 +83,19 @@ public class ArchivoContextoNegocio implements ContextoNegocio {
     @Override
     public String getContext() {
         return cachedContext;
+    }
+
+    private void guardarContextoVisible(String json) {
+        try {
+            Path destino = Path.of(contextFile);
+            Path carpeta = destino.getParent();
+            if (carpeta != null) {
+                Files.createDirectories(carpeta);
+            }
+            Files.writeString(destino, json, StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            log.warn("No se pudo escribir el contexto visible del chatbot: {}", ex.getMessage());
+        }
     }
 
     // ── Construccion del JSON ───────────────────────────────────────
@@ -93,14 +114,24 @@ public class ArchivoContextoNegocio implements ContextoNegocio {
         ObjectNode horario = mapper.createObjectNode();
         String apertura = config.getHorarioApertura() != null ? config.getHorarioApertura() : "09:00";
         String cierre = config.getHorarioCierre() != null ? config.getHorarioCierre() : "21:00";
+        String pausaInicio = config.getHorarioPausaInicio();
+        String pausaFin = config.getHorarioPausaFin();
+        String aperturaSabado = config.getHorarioAperturaSabado() != null ? config.getHorarioAperturaSabado() : apertura;
         String cierreSabado = config.getHorarioCierreSabado() != null ? config.getHorarioCierreSabado() : "14:00";
 
-        horario.put("lunesViernes", apertura + " - " + cierre);
-        horario.put("sabado", config.isAbreSabado() ? (apertura + " - " + cierreSabado) : "Cerrado");
+        horario.put("lunesViernes", formatearHorario(apertura, pausaInicio, pausaFin, cierre));
+        horario.put("sabado", config.isAbreSabado() ? (aperturaSabado + " - " + cierreSabado) : "Cerrado");
         horario.put("domingo", config.isAbreDomingo() ? (apertura + " - " + cierreSabado) : "Cerrado");
         negocio.set("horario", horario);
 
         return negocio;
+    }
+
+    private String formatearHorario(String apertura, String pausaInicio, String pausaFin, String cierre) {
+        if (pausaInicio == null || pausaInicio.isBlank() || pausaFin == null || pausaFin.isBlank()) {
+            return apertura + " - " + cierre;
+        }
+        return apertura + " - " + pausaInicio + " y " + pausaFin + " - " + cierre;
     }
 
     private ObjectNode construirPoliticas() {
@@ -138,6 +169,9 @@ public class ArchivoContextoNegocio implements ContextoNegocio {
             nodoServicio.put("nombre", servicio.getNombre());
             nodoServicio.put("precio",
                     servicio.getPrecio() != null ? servicio.getPrecio().doubleValue() : 0);
+            if (servicio.getPrecioDescuento() != null) {
+                nodoServicio.put("precioDescuento", servicio.getPrecioDescuento().doubleValue());
+            }
             nodoServicio.put("duracionMinutos",
                     servicio.getDuracionMinutos() != null ? servicio.getDuracionMinutos() : 0);
             if (servicio.getGenero() != null) {
@@ -162,6 +196,12 @@ public class ArchivoContextoNegocio implements ContextoNegocio {
             nodoProducto.put("nombre", producto.getNombre());
             nodoProducto.put("precio",
                     producto.getPrecio() != null ? producto.getPrecio().doubleValue() : 0);
+            nodoProducto.put("stock", producto.getStock() != null ? producto.getStock() : 0);
+            nodoProducto.put("stockMinimo", producto.getStockMinimo() != null ? producto.getStockMinimo() : 0);
+            nodoProducto.put("stockBajo",
+                    producto.getStock() != null
+                            && producto.getStockMinimo() != null
+                            && producto.getStock() <= producto.getStockMinimo());
             if (producto.getCategoria() != null) {
                 nodoProducto.put("categoria", producto.getCategoria().name());
             }

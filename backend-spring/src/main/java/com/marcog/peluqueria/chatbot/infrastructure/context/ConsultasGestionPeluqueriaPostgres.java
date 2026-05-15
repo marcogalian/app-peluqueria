@@ -13,6 +13,8 @@ import com.marcog.peluqueria.clientes.domain.Cliente;
 import com.marcog.peluqueria.clientes.domain.ClienteRepository;
 import com.marcog.peluqueria.finanzas.application.ConsultarPanelFinanciero;
 import com.marcog.peluqueria.finanzas.domain.DashboardStats;
+import com.marcog.peluqueria.peluqueros.domain.Peluquero;
+import com.marcog.peluqueria.peluqueros.domain.PeluqueroRepository;
 import com.marcog.peluqueria.productos.domain.Producto;
 import com.marcog.peluqueria.productos.domain.ProductoRepository;
 import com.marcog.peluqueria.productos.infrastructure.persistence.JpaVentaProductoRepository;
@@ -21,11 +23,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.text.Normalizer;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -50,6 +55,7 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
     private final JpaVentaProductoRepository ventaProductoRepository;
     private final ProductoRepository productoRepository;
     private final ClienteRepository clienteRepository;
+    private final PeluqueroRepository peluqueroRepository;
     // ObjectMapper inyectado de Spring para mantener config consistente con el resto.
     private final ObjectMapper mapper;
 
@@ -75,7 +81,11 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
                 case "getCitasEmpleado" -> getCitasEmpleado(args, peluqueroId);
                 case "getCitasProgramadas" -> getCitasProgramadas(args, peluqueroId, isAdmin);
                 case "getVacacionesEmpleado" -> getVacacionesEmpleado(peluqueroId);
+                case "getVacacionesEmpleadoPorNombre" -> isAdmin ? getVacacionesEmpleadoPorNombre(args) : ERROR_NO_ADMIN_CITAS;
+                case "getVacacionesEmpleados" -> isAdmin ? getVacacionesEmpleados() : ERROR_NO_ADMIN_CITAS;
+                case "getEmpleados" -> isAdmin ? getEmpleados() : ERROR_NO_ADMIN_CITAS;
                 case "getGanancias" -> isAdmin ? getGanancias(args) : ERROR_NO_ADMIN_GANANCIAS;
+                case "getResultados" -> isAdmin ? getResultados(args) : ERROR_NO_ADMIN_GANANCIAS;
                 case "getCitasAtendidas" -> isAdmin ? getCitasAtendidas(args) : ERROR_NO_ADMIN_CITAS;
                 case "getProductosStockBajo" -> isAdmin ? getProductosStockBajo() : ERROR_NO_ADMIN_STOCK;
                 case "getProductosMasVendidos" -> isAdmin ? getProductosMasVendidos(args) : ERROR_NO_ADMIN_VENTAS;
@@ -159,6 +169,32 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
         ), "Error serializando citas programadas");
     }
 
+    private String getEmpleados() {
+        List<Map<String, Object>> empleados = peluqueroRepository.findAll().stream()
+                .map(peluquero -> Map.<String, Object>of(
+                        "id", peluquero.getId() != null ? peluquero.getId().toString() : "",
+                        "nombre", peluquero.getNombre() != null ? peluquero.getNombre() : "",
+                        "especialidad", peluquero.getEspecialidad() != null ? peluquero.getEspecialidad() : "",
+                        "horario", peluquero.getHorarioBase() != null ? peluquero.getHorarioBase() : "",
+                        "disponible", peluquero.isDisponible(),
+                        "enBaja", peluquero.isEnBaja(),
+                        "enVacaciones", peluquero.isEnVacaciones()
+                ))
+                .collect(Collectors.toList());
+
+        long disponibles = empleados.stream()
+                .filter(empleado -> Boolean.TRUE.equals(empleado.get("disponible"))
+                        && Boolean.FALSE.equals(empleado.get("enBaja"))
+                        && Boolean.FALSE.equals(empleado.get("enVacaciones")))
+                .count();
+
+        return toJson(Map.of(
+                "totalEmpleados", empleados.size(),
+                "disponibles", disponibles,
+                "empleados", empleados
+        ), "Error serializando empleados");
+    }
+
     private Map<String, String> resumirCitaProgramada(Cita cita) {
         String cliente = cita.getCliente() != null
                 ? cita.getCliente().getNombre() + " " + (cita.getCliente().getApellidos() != null ? cita.getCliente().getApellidos() : "")
@@ -183,15 +219,85 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
 
     private String getVacacionesEmpleado(UUID peluqueroId) {
         List<SolicitudAusencia> ausencias = ausenciaRepository.findByPeluqueroId(peluqueroId);
+        return toJson(resumirAusencias("empleado autenticado", ausencias), "Error serializando ausencias");
+    }
+
+    private String getVacacionesEmpleadoPorNombre(JsonNode args) {
+        String nombreSolicitado = args != null && args.has("nombre")
+                ? args.get("nombre").asText("")
+                : "";
+        if (nombreSolicitado.isBlank()) {
+            return "{\"error\": \"nombre requerido\"}";
+        }
+
+        String nombreNormalizado = normalizar(nombreSolicitado);
+        return peluqueroRepository.findAll().stream()
+                .filter(peluquero -> normalizar(peluquero.getNombre()).contains(nombreNormalizado)
+                        || nombreNormalizado.contains(normalizar(peluquero.getNombre())))
+                .findFirst()
+                .map(peluquero -> {
+                    List<SolicitudAusencia> ausencias = ausenciaRepository.findByPeluqueroId(peluquero.getId());
+                    return toJson(resumirAusencias(peluquero.getNombre(), ausencias), "Error serializando ausencias");
+                })
+                .orElse("{\"error\": \"Empleado no encontrado\"}");
+    }
+
+    private String getVacacionesEmpleados() {
+        List<Map<String, Object>> empleados = new ArrayList<>();
+        for (Peluquero peluquero : peluqueroRepository.findAll()) {
+            List<SolicitudAusencia> ausencias = ausenciaRepository.findByPeluqueroId(peluquero.getId());
+            empleados.add(resumirAusencias(peluquero.getNombre(), ausencias));
+        }
+
+        long empleadosConSolicitudes = empleados.stream()
+                .filter(empleado -> ((Number) empleado.get("totalSolicitudes")).intValue() > 0)
+                .count();
+
+        return toJson(Map.of(
+                "totalEmpleados", empleados.size(),
+                "empleadosConSolicitudes", empleadosConSolicitudes,
+                "empleados", empleados
+        ), "Error serializando ausencias del equipo");
+    }
+
+    private Map<String, Object> resumirAusencias(String nombre, List<SolicitudAusencia> ausencias) {
         // Comparacion contra el enum directo. Antes comparaba String con enum -> siempre 0.
         long aprobadas = contarPorEstado(ausencias, EstadoAusencia.APROBADA);
         long pendientes = contarPorEstado(ausencias, EstadoAusencia.PENDIENTE);
+        long rechazadas = contarPorEstado(ausencias, EstadoAusencia.RECHAZADA);
+        long canceladas = contarPorEstado(ausencias, EstadoAusencia.CANCELADA);
 
-        return toJson(Map.of(
-                "totalSolicitudes", ausencias.size(),
-                "aprobadas", aprobadas,
-                "pendientes", pendientes
-        ), "Error serializando ausencias");
+        List<Map<String, Object>> detalle = ausencias.stream()
+                .map(this::resumirAusencia)
+                .collect(Collectors.toList());
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("empleado", nombre);
+        payload.put("totalSolicitudes", ausencias.size());
+        payload.put("aprobadas", aprobadas);
+        payload.put("pendientes", pendientes);
+        payload.put("rechazadas", rechazadas);
+        payload.put("canceladas", canceladas);
+        payload.put("detalle", detalle);
+        return payload;
+    }
+
+    private Map<String, Object> resumirAusencia(SolicitudAusencia ausencia) {
+        return Map.of(
+                "tipo", ausencia.getTipo() != null ? ausencia.getTipo().name() : "",
+                "estado", ausencia.getEstado() != null ? ausencia.getEstado().name() : "",
+                "fechaInicio", ausencia.getFechaInicio() != null ? ausencia.getFechaInicio().toString() : "",
+                "fechaFin", ausencia.getFechaFin() != null ? ausencia.getFechaFin().toString() : "",
+                "motivo", ausencia.getMotivo() != null ? ausencia.getMotivo() : ""
+        );
+    }
+
+    private String normalizar(String texto) {
+        if (texto == null) return "";
+        return Normalizer.normalize(texto, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase()
+                .trim();
     }
 
     private long contarPorEstado(List<SolicitudAusencia> ausencias, EstadoAusencia estado) {
@@ -199,7 +305,6 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
                 .filter(ausencia -> estado.equals(ausencia.getEstado()))
                 .count();
     }
-
     // ── Funciones admin ─────────────────────────────────────────────
 
     private String getGanancias(JsonNode args) {
@@ -220,6 +325,45 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
                 "citasCompletadasMes", stats.getCitasCompletadasMes(),
                 "nota", "Cifras del mes en curso. Si piden hoy/semana matizalo en la respuesta."
         ), "Error serializando ganancias");
+    }
+
+    private String getResultados(JsonNode args) {
+        String periodo = args != null && args.has("periodo")
+                ? args.get("periodo").asText("mes")
+                : "mes";
+        var resultados = dashboardService.getResultados(periodo);
+
+        List<Map<String, Object>> topServicios = resultados.getTopServicios().stream()
+                .map(servicio -> Map.<String, Object>of(
+                        "nombre", servicio.getNombre(),
+                        "ingresos", servicio.getIngresos(),
+                        "citas", servicio.getCitas()
+                ))
+                .collect(Collectors.toList());
+
+        List<Map<String, Object>> topEmpleados = resultados.getTopEmpleados().stream()
+                .map(empleado -> Map.<String, Object>of(
+                        "nombre", empleado.getNombre(),
+                        "citas", empleado.getCitas(),
+                        "ingresos", empleado.getIngresos(),
+                        "comision", empleado.getComision()
+                ))
+                .collect(Collectors.toList());
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("periodo", periodo);
+        payload.put("ingresosPeriodo", resultados.getKpis().getIngresosPeriodo());
+        payload.put("ingresosDia", resultados.getKpis().getIngresosDia());
+        payload.put("ingresosSemana", resultados.getKpis().getIngresosSemana());
+        payload.put("ingresosMes", resultados.getKpis().getIngresosMes());
+        payload.put("ingresosAnio", resultados.getKpis().getIngresosAnio());
+        payload.put("ticketMedio", resultados.getKpis().getTicketMedio());
+        payload.put("citasCompletadas", resultados.getKpis().getCitasCompletadas());
+        payload.put("tasaCancelacion", resultados.getKpis().getTasaCancelacion());
+        payload.put("variacionMes", resultados.getKpis().getVariacionMes());
+        payload.put("topServicios", topServicios);
+        payload.put("topEmpleados", topEmpleados);
+        return toJson(payload, "Error serializando resultados");
     }
 
     private String getCitasAtendidas(JsonNode args) {

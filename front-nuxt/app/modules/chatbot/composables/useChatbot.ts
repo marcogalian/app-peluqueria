@@ -23,9 +23,13 @@ export function useChatbot() {
       })
       messages.value.push({ role: 'assistant', content: data.reply })
       suggestedQuestions.value = data.suggestedQuestions || []
-    } catch (err: any) {
-      const status = err?.response?.status
-      const detail = err?.response?.data?.message || err?.message || 'sin detalles'
+    } catch (err: unknown) {
+      const isAxiosErr = (e: unknown): e is { response?: { status?: number; data?: { message?: string } }; message?: string } =>
+        typeof e === 'object' && e !== null && 'response' in e
+      const status = isAxiosErr(err) ? err.response?.status : undefined
+      const detail = isAxiosErr(err)
+        ? err.response?.data?.message ?? err.message ?? 'sin detalles'
+        : 'sin detalles'
       console.error('[Chatbot] Error:', status, detail)
       messages.value.push({
         role: 'assistant',

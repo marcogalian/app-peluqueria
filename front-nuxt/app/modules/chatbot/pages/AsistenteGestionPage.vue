@@ -2,8 +2,6 @@
 import { nextTick } from 'vue'
 import { Trash2, Send, Loader2, Sparkles, Scissors } from 'lucide-vue-next'
 
-definePageMeta({ middleware: 'auth' })
-
 const { messages, loading, suggestedQuestions, sendMessage, clearHistory } = useChatbot()
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)

@@ -1,4 +1,4 @@
-package com.marcog.peluqueria.chatbot.infrastructure.openrouter;
+package com.marcog.peluqueria.chatbot.infrastructure.springai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,36 +23,35 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Cliente HTTP compatible con OpenAI Chat Completions contra OpenRouter.
+ * Cliente principal contra OpenAI Chat Completions.
  *
- * Permite probar el router gratuito openrouter/free sin cambiar el caso de uso
- * del asistente ni el frontend.
+ * Mantiene el bean bajo ai.provider=spring-ai por compatibilidad con la
+ * configuracion actual, pero usa tools nativas de OpenAI para que el modelo
+ * decida que funcion de negocio necesita invocar.
  */
 @Component
-@ConditionalOnProperty(name = "ai.provider", havingValue = "openrouter")
+@ConditionalOnProperty(name = "ai.provider", havingValue = "spring-ai")
 @Slf4j
-public class OpenRouterModeloLenguaje implements ModeloLenguaje {
+public class SpringAiModeloLenguaje implements ModeloLenguaje {
 
-    private static final String OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
-    private static final String ERROR_RESPONSE = "Lo siento, no puedo responder ahora. Inténtalo de nuevo.";
+    private static final String OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String ERROR_RESPONSE =
+            "No he podido consultar la IA ahora mismo. Revisa la clave de OpenAI o vuelve a intentarlo en unos segundos.";
 
     private final RestTemplate restTemplate;
     private final ObjectMapper mapper;
 
-    @Value("${openrouter.api.key:}")
+    @Value("${spring.ai.openai.api-key:}")
     private String apiKey;
 
-    @Value("${openrouter.model:openrouter/free}")
+    @Value("${spring.ai.openai.chat.options.model:gpt-4.1-nano}")
     private String model;
 
-    @Value("${openrouter.site.url:http://localhost:3000}")
-    private String siteUrl;
+    @Value("${spring.ai.openai.chat.options.max-tokens:200}")
+    private int maxTokens;
 
-    @Value("${openrouter.app.name:Peluqueria Isabella}")
-    private String appName;
-
-    public OpenRouterModeloLenguaje(@Qualifier("openRouterRestTemplate") RestTemplate restTemplate,
-                                    ObjectMapper mapper) {
+    public SpringAiModeloLenguaje(@Qualifier("openAiRestTemplate") RestTemplate restTemplate,
+                                  ObjectMapper mapper) {
         this.restTemplate = restTemplate;
         this.mapper = mapper;
     }
@@ -66,33 +65,33 @@ public class OpenRouterModeloLenguaje implements ModeloLenguaje {
             ObjectNode body = construirCuerpoBase(systemInstruction, history, userMessage, tools);
             return enviarPeticion(model, body);
         } catch (Exception ex) {
-            log.error("Error llamando a OpenRouter: {}", abreviarMensajeError(ex));
+            log.error("Error llamando a OpenAI: {}", abreviarMensajeError(ex));
             return new LlmResult(ERROR_RESPONSE, null, null, model);
         }
     }
 
     @Override
-    public LlmResult sendFunctionResponse(String modeloUtilizado,
+    public LlmResult sendFunctionResponse(String modelUsed,
                                           String systemInstruction,
                                           List<ChatMessageDto> history,
                                           String userMessage,
                                           String functionName,
-                                          JsonNode functionArgsOriginales,
+                                          JsonNode functionArgsOriginal,
                                           String functionResult,
                                           List<Map<String, Object>> tools) {
         try {
-            String modelo = modeloUtilizado == null || modeloUtilizado.isBlank() ? model : modeloUtilizado;
+            String modelo = modelUsed == null || modelUsed.isBlank() ? model : modelUsed;
             ObjectNode body = construirCuerpoBase(systemInstruction, history, userMessage, tools);
             ArrayNode messages = (ArrayNode) body.get("messages");
 
             String toolCallId = "call_" + functionName;
-            messages.add(construirMensajeToolCall(toolCallId, functionName, functionArgsOriginales));
+            messages.add(construirMensajeToolCall(toolCallId, functionName, functionArgsOriginal));
             messages.add(construirMensajeToolResponse(toolCallId, functionName, functionResult));
 
             return enviarPeticion(modelo, body);
         } catch (Exception ex) {
-            log.error("Error procesando function response con OpenRouter: {}", abreviarMensajeError(ex));
-            return new LlmResult("No pude procesar la información. Inténtalo de nuevo.", null, null, model);
+            log.error("Error procesando function response con OpenAI: {}", abreviarMensajeError(ex));
+            return new LlmResult("No pude procesar la informacion consultada. Intentalo de nuevo.", null, null, model);
         }
     }
 
@@ -103,6 +102,7 @@ public class OpenRouterModeloLenguaje implements ModeloLenguaje {
         ObjectNode body = mapper.createObjectNode();
         body.put("model", model);
         body.put("temperature", 0.2);
+        body.put("max_tokens", maxTokens);
 
         ArrayNode messages = mapper.createArrayNode();
         messages.add(construirMensajeTexto("system", systemInstruction));
@@ -184,17 +184,13 @@ public class OpenRouterModeloLenguaje implements ModeloLenguaje {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(apiKey);
-        headers.set("HTTP-Referer", siteUrl);
-        headers.set("X-Title", appName);
 
         HttpEntity<String> entity = new HttpEntity<>(mapper.writeValueAsString(body), headers);
         ResponseEntity<String> response = restTemplate.exchange(
-                OPENROUTER_CHAT_URL, HttpMethod.POST, entity, String.class);
+                OPENAI_CHAT_URL, HttpMethod.POST, entity, String.class);
 
         JsonNode root = mapper.readTree(response.getBody());
-        JsonNode choice = root.path("choices").path(0);
-        JsonNode message = choice.path("message");
-
+        JsonNode message = root.path("choices").path(0).path("message");
         JsonNode toolCalls = message.path("tool_calls");
         if (toolCalls.isArray() && !toolCalls.isEmpty()) {
             JsonNode function = toolCalls.path(0).path("function");
@@ -225,7 +221,7 @@ public class OpenRouterModeloLenguaje implements ModeloLenguaje {
         try {
             return mapper.readTree(raw);
         } catch (Exception ex) {
-            log.warn("OpenRouter devolvio argumentos no JSON: {}", raw);
+            log.warn("OpenAI devolvio argumentos no JSON: {}", raw);
             return mapper.createObjectNode();
         }
     }
@@ -233,6 +229,6 @@ public class OpenRouterModeloLenguaje implements ModeloLenguaje {
     private String abreviarMensajeError(Exception ex) {
         String mensaje = ex.getMessage();
         if (mensaje == null) return "unknown";
-        return mensaje.substring(0, Math.min(120, mensaje.length()));
+        return mensaje.substring(0, Math.min(180, mensaje.length()));
     }
 }
