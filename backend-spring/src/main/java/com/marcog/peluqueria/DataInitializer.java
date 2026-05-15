@@ -38,6 +38,8 @@ import java.util.List;
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
 
+    private static final String ADMIN_EMAIL = "admin@email.com";
+
     private final JpaUserRepository      userRepository;
     private final JpaPeluqueroRepository peluqueroRepository;
     private final JpaClienteRepository   clienteRepository;
@@ -53,6 +55,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         crearAdminSiNoExiste();
+        sincronizarEmailsDemo();
         if (peluqueroRepository.count() == 0) {
             crearPeluqueros();
         }
@@ -69,7 +72,14 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void crearAdminSiNoExiste() {
-        if (userRepository.findByUsername("admin").isPresent()) {
+        var adminExistente = userRepository.findByUsername("admin");
+        if (adminExistente.isPresent()) {
+            UserEntity admin = adminExistente.get();
+            if (!ADMIN_EMAIL.equalsIgnoreCase(admin.getEmail())) {
+                admin.setEmail(ADMIN_EMAIL);
+                userRepository.save(admin);
+                log.info("DataInitializer: email del administrador demo sincronizado.");
+            }
             return;
         }
 
@@ -77,11 +87,37 @@ public class DataInitializer implements CommandLineRunner {
                 .username("admin")
                 .password(passwordEncoder.encode(requireDemoPassword()))
                 .role(Role.ROLE_ADMIN)
-                .email("admin@peluqueria.com")
+                .email(ADMIN_EMAIL)
                 .active(true)
                 .build());
 
         log.info("DataInitializer: usuario administrador demo creado.");
+    }
+
+    private void sincronizarEmailsDemo() {
+        record UsuarioDemo(String username, String email) {}
+
+        List<UsuarioDemo> usuarios = List.of(
+                new UsuarioDemo("sofia", "sofia@email.com"),
+                new UsuarioDemo("carmen", "carmen@email.com"),
+                new UsuarioDemo("lucia", "lucia@email.com"),
+                new UsuarioDemo("maria", "maria@email.com")
+        );
+
+        int actualizados = 0;
+        for (UsuarioDemo usuarioDemo : usuarios) {
+            var usuario = userRepository.findByUsername(usuarioDemo.username());
+            if (usuario.isPresent() && !usuarioDemo.email().equalsIgnoreCase(usuario.get().getEmail())) {
+                UserEntity user = usuario.get();
+                user.setEmail(usuarioDemo.email());
+                userRepository.save(user);
+                actualizados++;
+            }
+        }
+
+        if (actualizados > 0) {
+            log.info("DataInitializer: {} emails de empleados demo sincronizados.", actualizados);
+        }
     }
 
     private void crearPeluqueros() {
@@ -98,7 +134,7 @@ public class DataInitializer implements CommandLineRunner {
                     .username(p.user())
                     .password(passwordEncoder.encode(requireDemoPassword()))
                     .role(Role.ROLE_HAIRDRESSER)
-                    .email(p.user() + "@peluqueria.com")
+                    .email(p.user() + "@email.com")
                     .active(true)
                     .build());
 

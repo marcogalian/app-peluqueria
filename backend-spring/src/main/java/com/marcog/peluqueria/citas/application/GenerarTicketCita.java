@@ -93,7 +93,7 @@ public class GenerarTicketCita {
             if (cita.getServicios() != null && !cita.getServicios().isEmpty()) {
                 for (Servicio s : cita.getServicios()) {
                     String servicioNombre = s.getNombre();
-                    BigDecimal precio = s.getPrecio() != null ? s.getPrecio() : BigDecimal.ZERO;
+                    BigDecimal precio = precioVenta(s);
                     totalEsperado = totalEsperado.add(precio);
 
                     PdfPCell cellCant = new PdfPCell(new Phrase("1"));
@@ -151,5 +151,12 @@ public class GenerarTicketCita {
         }
 
         return out.toByteArray();
+    }
+
+    private BigDecimal precioVenta(Servicio servicio) {
+        if (servicio.getPrecioDescuento() != null && servicio.getPrecioDescuento().compareTo(BigDecimal.ZERO) > 0) {
+            return servicio.getPrecioDescuento();
+        }
+        return servicio.getPrecio() != null ? servicio.getPrecio() : BigDecimal.ZERO;
     }
 }
