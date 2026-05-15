@@ -11,7 +11,7 @@ import java.util.Map;
  * Contrato de negocio para conversar con un proveedor LLM.
  *
  * El caso de uso depende de esta interfaz, no del cliente HTTP concreto.
- * Esto permite cambiar Gemini por OpenRouter u otro proveedor sin tocar la logica.
+ * Esto permite cambiar el proveedor IA sin tocar la logica de negocio.
  */
 public interface ModeloLenguaje {
 

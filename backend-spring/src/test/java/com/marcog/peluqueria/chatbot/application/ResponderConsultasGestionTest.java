@@ -75,7 +75,7 @@ class ResponderConsultasGestionTest {
                 .thenReturn(new LlmResult("Hola, soy el asistente.", null, null, "gemini-2.5-flash"));
 
         ChatResponse respuesta = ResponderConsultasGestion.chat(
-                peticionConMensaje("Hola"), empleadoUser);
+                peticionConMensaje("Dime una recomendacion para organizar la agenda"), empleadoUser);
 
         assertEquals("Hola, soy el asistente.", respuesta.getReply());
         verify(functionExecutor, never()).execute(any(), any(), any(), anyBoolean());
@@ -118,8 +118,10 @@ class ResponderConsultasGestionTest {
     }
 
     @Test
-    @DisplayName("Consulta clientes VIP: responde con nombres desde funcion directa sin depender del modelo")
-    void chat_clientesVip_respuestaDirectaConNombres() {
+    @DisplayName("Consulta clientes VIP: el modelo decide llamar a la funcion")
+    void chat_clientesVip_functionCalling() {
+        when(llmClient.generateContent(any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult(null, "getClientesVip", null, "modelo"));
         when(functionExecutor.execute(eq("getClientesVip"), any(), any(), eq(true)))
                 .thenReturn("""
                         {"totalVip":2,"clientes":[
@@ -127,32 +129,152 @@ class ResponderConsultasGestionTest {
                           {"nombre":"Lucia Gomez","telefono":"600333444","descuento":15}
                         ]}
                         """);
+        when(llmClient.sendFunctionResponse(any(), any(), any(), any(), any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult("Tenemos 2 clientes VIP: Sofia Martinez y Lucia Gomez.", null, null, "modelo"));
 
         ChatResponse respuesta = ResponderConsultasGestion.chat(
                 peticionConMensaje("Dame los nombres de los clientes VIP"), adminUser);
 
-        assertEquals("Tenemos 2 clientes VIP: Sofia Martinez, Lucia Gomez.", respuesta.getReply());
+        assertEquals("Tenemos 2 clientes VIP: Sofia Martinez y Lucia Gomez.", respuesta.getReply());
         verify(functionExecutor).execute(eq("getClientesVip"), any(), any(), eq(true));
-        verify(llmClient, never()).generateContent(any(), any(), any(), anyList());
     }
 
     @Test
-    @DisplayName("Consulta total clientes: responde desde funcion directa sin depender del modelo")
-    void chat_totalClientes_respuestaDirecta() {
+    @DisplayName("Saludo: tambien lo responde el modelo, no un FAQ local")
+    void chat_saludo_delegaAlModelo() {
+        when(llmClient.generateContent(any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult("Hola. Soy el asistente de gestión de Peluquería Isabella.", null, null, "modelo"));
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("Hola"), empleadoUser);
+
+        assertTrue(respuesta.getReply().contains("Peluquería Isabella"));
+        verify(llmClient).generateContent(any(), any(), any(), anyList());
+    }
+
+    @Test
+    @DisplayName("Pregunta fuera del negocio: la restriccion vive en el system prompt")
+    void chat_fueraDelNegocio_seDelegaAlModeloConSystemPrompt() {
+        when(llmClient.generateContent(any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult(
+                        "Solo puedo ayudarte con informacion relacionada con la gestion de Peluqueria Isabella.",
+                        null,
+                        null,
+                        "modelo"));
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("quiero que me digas que es Spring Boot"), empleadoUser);
+
+        assertTrue(respuesta.getReply().contains("Solo puedo ayudarte"));
+        verify(llmClient).generateContent(
+                argThat(system -> system != null
+                        && system.contains("Solo puedes responder sobre temas relacionados")
+                        && system.contains("Solo puedo ayudarte con informacion relacionada")),
+                any(),
+                any(),
+                anyList());
+    }
+
+    @Test
+    @DisplayName("Consulta total clientes: el modelo decide llamar a la funcion")
+    void chat_totalClientes_functionCalling() {
+        when(llmClient.generateContent(any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult(null, "getTotalClientes", null, "modelo"));
         when(functionExecutor.execute(eq("getTotalClientes"), any(), any(), eq(true)))
                 .thenReturn("{\"activos\":30,\"archivados\":2,\"vip\":4}");
+        when(llmClient.sendFunctionResponse(any(), any(), any(), any(), any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult("Hay 30 clientes activos, 4 VIP y 2 archivados.", null, null, "modelo"));
 
         ChatResponse respuesta = ResponderConsultasGestion.chat(
                 peticionConMensaje("Cuantos clientes tenemos en total?"), adminUser);
 
-        assertEquals("En Peluquería Isabella tenemos 30 clientes activos, 4 VIP y 2 archivados.",
-                respuesta.getReply());
+        assertEquals("Hay 30 clientes activos, 4 VIP y 2 archivados.", respuesta.getReply());
         verify(functionExecutor).execute(eq("getTotalClientes"), any(), any(), eq(true));
-        verify(llmClient, never()).generateContent(any(), any(), any(), anyList());
     }
 
     @Test
-    @DisplayName("Empleado solo recibe tools propias (citas, vacaciones y citas programadas)")
+    @DisplayName("Admin consulta vacaciones de Sofía mediante function calling")
+    void chat_vacacionesEmpleadoPorNombre_functionCalling() {
+        when(llmClient.generateContent(any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult(null, "getVacacionesEmpleadoPorNombre", null, "modelo"));
+        when(functionExecutor.execute(eq("getVacacionesEmpleadoPorNombre"), any(), any(), eq(true)))
+                .thenReturn("""
+                        {"empleado":"Sofía Martínez","totalSolicitudes":1,"aprobadas":1,"pendientes":0,
+                         "rechazadas":0,"canceladas":0,
+                         "detalle":[{"tipo":"VACACIONES","estado":"APROBADA","fechaInicio":"2026-08-03","fechaFin":"2026-08-09","motivo":""}]}
+                        """);
+        when(llmClient.sendFunctionResponse(any(), any(), any(), any(), any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult("Sofía Martínez tiene vacaciones aprobadas del 2026-08-03 al 2026-08-09.", null, null, "modelo"));
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("Sofia por ejemplo, ha seleccionado vacaciones?"), adminUser);
+
+        assertTrue(respuesta.getReply().contains("Sofía Martínez tiene vacaciones aprobadas"));
+        assertTrue(respuesta.getReply().contains("2026-08-03"));
+        verify(functionExecutor).execute(eq("getVacacionesEmpleadoPorNombre"), any(), any(), eq(true));
+    }
+
+    @Test
+    @DisplayName("Admin consulta si algun empleado tiene vacaciones mediante function calling")
+    void chat_vacacionesEquipo_functionCalling() {
+        when(llmClient.generateContent(any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult(null, "getVacacionesEmpleados", null, "modelo"));
+        when(functionExecutor.execute(eq("getVacacionesEmpleados"), any(), any(), eq(true)))
+                .thenReturn("""
+                        {"totalEmpleados":3,"empleadosConSolicitudes":1,
+                         "empleados":[{"empleado":"Sofía Martínez","totalSolicitudes":2,"aprobadas":1,"pendientes":1,"rechazadas":0,"canceladas":0,"detalle":[]}]}
+                        """);
+        when(llmClient.sendFunctionResponse(any(), any(), any(), any(), any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult("Sí. Sofía Martínez tiene vacaciones o ausencias registradas.", null, null, "modelo"));
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("algun empleado ha seleccionado ya sus vacaciones?"), adminUser);
+
+        assertTrue(respuesta.getReply().contains("Sí."));
+        assertTrue(respuesta.getReply().contains("Sofía Martínez"));
+        verify(functionExecutor).execute(eq("getVacacionesEmpleados"), any(), any(), eq(true));
+    }
+
+    @Test
+    @DisplayName("Admin consulta economia mediante function calling")
+    void chat_economiaAdmin_functionCalling() {
+        when(llmClient.generateContent(any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult(null, "getResultados", null, "modelo"));
+        when(functionExecutor.execute(eq("getResultados"), any(), any(), eq(true)))
+                .thenReturn("""
+                        {"periodo":"mes","ingresosPeriodo":1200.0,"ticketMedio":40.0,
+                         "citasCompletadas":30,"tasaCancelacion":5.0,"variacionMes":10.0,
+                         "topServicios":[],"topEmpleados":[]}
+                        """);
+        when(llmClient.sendFunctionResponse(any(), any(), any(), any(), any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult("Este mes llevamos 1200,00 € y 30 citas completadas.", null, null, "modelo"));
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("cuanto hemos ganado este mes"), adminUser);
+
+        assertTrue(respuesta.getReply().contains("1200,00 €"));
+        assertTrue(respuesta.getReply().contains("30 citas completadas"));
+        verify(functionExecutor).execute(eq("getResultados"), any(), any(), eq(true));
+    }
+
+    @Test
+    @DisplayName("Empleado no recibe tools de economia y el bloqueo lo responde el modelo")
+    void chat_economiaEmpleado_bloqueadoPorToolsYPrompt() {
+        when(llmClient.generateContent(any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult("Solo el administrador puede consultar datos económicos del negocio.", null, null, "modelo"));
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("cuanto hemos ganado este mes"), empleadoUser);
+
+        assertTrue(respuesta.getReply().contains("Solo el administrador"));
+        verify(functionExecutor, never()).execute(eq("getResultados"), any(), any(), anyBoolean());
+        verify(llmClient).generateContent(any(), any(), any(),
+                argThat((List<Map<String, Object>> tools) -> tools.stream()
+                        .noneMatch(tool -> "getResultados".equals(tool.get("name")))));
+    }
+
+    @Test
+    @DisplayName("Empleado solo recibe tools propias sin tools de admin ni empleados")
     void chat_empleado_pasaSoloToolsPropias() {
         when(llmClient.generateContent(any(), any(), any(),
                 argThat((List<Map<String, Object>> tools) -> tools != null && tools.size() == 3)))
@@ -161,7 +283,49 @@ class ResponderConsultasGestionTest {
         ResponderConsultasGestion.chat(peticionConMensaje("test"), empleadoUser);
 
         verify(llmClient).generateContent(any(), any(), any(),
-                argThat((List<Map<String, Object>> tools) -> tools != null && tools.size() == 3));
+                argThat((List<Map<String, Object>> tools) -> tools != null
+                        && tools.size() == 3
+                        && tools.stream().noneMatch(tool -> "getEmpleados".equals(tool.get("name")))));
+    }
+
+    @Test
+    @DisplayName("Empleado no recibe tools para consultar otros empleados")
+    void chat_empleadoPreguntaOtrosEmpleados_sinToolsAdmin() {
+        when(llmClient.generateContent(any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult("Solo el administrador puede consultar datos de otros empleados.", null, null, "modelo"));
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("Sofia tiene vacaciones?"), empleadoUser);
+
+        assertTrue(respuesta.getReply().contains("Solo el administrador"));
+        verify(functionExecutor, never()).execute(eq("getVacacionesEmpleadoPorNombre"), any(), any(), anyBoolean());
+        verify(llmClient).generateContent(any(), any(), any(),
+                argThat((List<Map<String, Object>> tools) -> tools.stream()
+                        .noneMatch(tool -> "getVacacionesEmpleadoPorNombre".equals(tool.get("name")))));
+    }
+
+    @Test
+    @DisplayName("Empleado recibe contexto sin equipo ni productos de inventario")
+    void chat_empleado_contextoSinDatosAdmin() {
+        when(contextLoader.getContext()).thenReturn("""
+                {"negocio":{"nombre":"Peluquería Isabella"},
+                 "equipo":[{"nombre":"Sofía Martínez"}],
+                 "totalEmpleados":3,
+                 "productos":[{"nombre":"Champú","stock":10}],
+                 "servicios":[{"nombre":"Corte"}]}
+                """);
+        when(llmClient.generateContent(any(), any(), any(), anyList()))
+                .thenReturn(new LlmResult("ok", null, null, "modelo"));
+
+        ResponderConsultasGestion.chat(peticionConMensaje("que servicios hay"), empleadoUser);
+
+        verify(llmClient).generateContent(
+                argThat(system -> system != null
+                        && !system.substring(system.indexOf("Rol del usuario: EMPLEADO.")).contains("Sofía Martínez")
+                        && !system.substring(system.indexOf("Rol del usuario: EMPLEADO.")).contains("totalEmpleados")
+                        && !system.substring(system.indexOf("Rol del usuario: EMPLEADO.")).contains("Champú")
+                        && system.contains("Corte")),
+                any(), any(), anyList());
     }
 
     @Test
