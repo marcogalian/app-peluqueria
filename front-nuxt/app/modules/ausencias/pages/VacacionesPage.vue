@@ -21,8 +21,6 @@ import { addDays, differenceInDays, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useToast } from '~/modules/shared/composables/useToast'
 
-definePageMeta({ middleware: 'auth' })
-
 const toast = useToast()
 
 // ── Tipos ─────────────────────────────────────────────────

@@ -18,7 +18,6 @@ import {
   LayoutDashboard, Calendar, Users, Scissors,
   Package, UserCog, BarChart3, LogOut, X,
   MessageCircle, Palmtree, ShoppingBag, Sparkles,
-  ClipboardList,
 } from 'lucide-vue-next'
 import { useSidebarCollapsed } from '~/modules/shared/composables/useSidebarCollapsed'
 
@@ -71,13 +70,14 @@ const grupos: GrupoMenu[] = [
     titulo: 'Análisis',
     items: [
       { path: '/admin/resultados', label: 'Resultados',  icon: BarChart3, visiblePara: ['admin'] },
-      { path: '/admin/auditoria',  label: 'Auditoría',   icon: ClipboardList, visiblePara: ['admin'] },
       { path: '/chat-ia',          label: 'Asistente gestión', icon: Sparkles, visiblePara: ['admin', 'empleado'] },
     ],
   },
 ]
 
 const gruposVisibles = computed<GrupoMenu[]>(() => {
+  if (!authStore.usuario) return []
+
   const rol: Rol = authStore.isAdmin ? 'admin' : 'empleado'
   return grupos
     .map((grupo) => ({

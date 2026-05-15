@@ -18,8 +18,6 @@ import { calendarioService } from '~/modules/calendario/services/calendarioServi
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-definePageMeta({ middleware: 'auth' })
-
 // ── Estado ────────────────────────────────────────────────
 const resumenMes     = ref<ResumenDia[]>([])
 const cargando       = ref(false)

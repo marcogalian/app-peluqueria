@@ -11,8 +11,6 @@ import {
   Title, Tooltip, Legend, Filler,
 } from 'chart.js'
 
-definePageMeta({ middleware: ['auth', 'admin'] })
-
 ChartJS.register(CategoryScale, LinearScale, ArcElement, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler)
 
 // ── Tipos ─────────────────────────────────────────────────

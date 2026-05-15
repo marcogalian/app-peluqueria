@@ -9,6 +9,8 @@ interface RegistroActividad {
   rol: string
   accion: 'CREACION' | 'MODIFICACION' | 'ELIMINACION' | string
   modulo: string
+  detalle?: string | null
+  entidadId?: string | null
   metodoHttp: string
   ruta: string
   estadoHttp: number
@@ -140,13 +142,16 @@ onMounted(cargarAuditoria)
                 {{ rolVisible(registro.rol) }} · {{ registro.modulo }}
               </span>
             </div>
-            <p class="mt-1 truncate text-xs text-on-surface-variant">
+            <p class="mt-1 text-sm font-semibold text-on-surface">
+              {{ registro.detalle || `${registro.modulo} actualizado` }}
+            </p>
+            <p class="mt-1 truncate text-[11px] text-on-surface-variant">
               {{ registro.metodoHttp }} {{ registro.ruta }}
             </p>
           </div>
 
-          <span class="w-fit rounded-full bg-surface-container px-2.5 py-1 text-xs font-bold text-on-surface-variant">
-            {{ registro.estadoHttp }}
+          <span class="w-fit rounded-full bg-surface-container px-2.5 py-1 text-[11px] font-bold text-on-surface-variant">
+            {{ registro.modulo }}
           </span>
         </article>
       </div>
