@@ -10,6 +10,7 @@ public interface GestionarOferta {
     List<Oferta> listarOfertas();
     List<Oferta> listarOfertasActivas();
     DiaEspecial crearDia(DiaEspecial dia);
+    DiaEspecial actualizarDia(UUID id, DiaEspecial dia);
     List<DiaEspecial> listarDias();
     void eliminarDia(UUID id);
 }

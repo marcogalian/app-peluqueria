@@ -67,8 +67,7 @@ public class OfertaController {
     @ApiResponse(responseCode = "200", description = "Dia actualizado")
     @PutMapping("/api/v1/dias-especiales/{id}")
     public ResponseEntity<DiaEspecial> actualizarDia(@PathVariable UUID id, @RequestBody DiaEspecial diaEspecial) {
-        diaEspecial.setId(id);
-        return ResponseEntity.ok(useCase.crearDia(diaEspecial));
+        return ResponseEntity.ok(useCase.actualizarDia(id, diaEspecial));
     }
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
