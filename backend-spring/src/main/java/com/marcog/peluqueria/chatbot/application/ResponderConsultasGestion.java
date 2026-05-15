@@ -179,10 +179,13 @@ public class ResponderConsultasGestion implements ConversarConAsistente, Regener
             return "Puede consultar datos globales del negocio, empleados, clientes y economia.\n\n";
         }
         return """
-                No es administrador. No puede consultar datos economicos, clientes, inventario/stock, ventas globales,
-                empleados del equipo, vacaciones de otros empleados, bajas de otros empleados, citas de otros empleados
-                ni metricas globales. Solo puede consultar sus propias citas y sus propias vacaciones, ademas de
-                informacion publica del negocio como servicios, precios, politicas, horario y ofertas.
+                El usuario es un empleado, no administrador. No tiene acceso a datos economicos, clientes, \
+                inventario/stock, ventas globales, informacion de otros empleados del equipo, \
+                vacaciones o bajas de otros empleados, citas de otros empleados ni metricas globales.
+                Solo puede consultar sus propias citas y sus propias vacaciones, ademas de \
+                informacion publica del negocio: servicios, precios, politicas, horario y ofertas.
+                Cuando le expliques sus limitaciones, dirigete al usuario en segunda persona: \
+                "solo puedes consultar tus propias citas y vacaciones", nunca uses primera persona.
 
                 """;
     }
