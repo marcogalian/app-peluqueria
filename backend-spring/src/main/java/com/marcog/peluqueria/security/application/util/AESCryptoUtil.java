@@ -71,7 +71,7 @@ public class AESCryptoUtil {
         try {
             byte[] payload = Base64.getDecoder().decode(payloadBase64);
             if (payload.length <= LONGITUD_IV_BYTES) {
-                log.error("Payload AES demasiado corto");
+                log.warn("Payload AES demasiado corto");
                 return null;
             }
 
@@ -83,7 +83,7 @@ public class AESCryptoUtil {
             byte[] textoPlano = cipher.doFinal(textoCifrado);
             return new String(textoPlano, StandardCharsets.UTF_8);
         } catch (Exception ex) {
-            log.error("Error al desencriptar: {}", ex.getMessage());
+            log.warn("Payload AES invalido: {}", ex.getMessage());
             return null;
         }
     }

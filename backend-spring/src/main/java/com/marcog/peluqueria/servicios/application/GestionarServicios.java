@@ -44,6 +44,7 @@ public class GestionarServicios implements CrearServicio {
             existente.setDescripcion(detalles.getDescripcion());
         if (detalles.getPrecio() != null)
             existente.setPrecio(detalles.getPrecio());
+        existente.setPrecioDescuento(detalles.getPrecioDescuento());
         if (detalles.getDuracionMinutos() != null)
             existente.setDuracionMinutos(detalles.getDuracionMinutos());
         if (detalles.getGenero() != null)

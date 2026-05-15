@@ -37,6 +37,9 @@ public class ConfiguracionController {
                 .politicaFotos(request.getPoliticaFotos())
                 .horarioApertura(request.getHorarioApertura())
                 .horarioCierre(request.getHorarioCierre())
+                .horarioPausaInicio(request.getHorarioPausaInicio())
+                .horarioPausaFin(request.getHorarioPausaFin())
+                .horarioAperturaSabado(request.getHorarioAperturaSabado())
                 .horarioCierreSabado(request.getHorarioCierreSabado())
                 .abreSabado(Boolean.TRUE.equals(request.getAbreSabado()))
                 .abreDomingo(Boolean.TRUE.equals(request.getAbreDomingo()))
@@ -64,6 +67,9 @@ public class ConfiguracionController {
         // Horario laboral del salon
         private String horarioApertura;
         private String horarioCierre;
+        private String horarioPausaInicio;
+        private String horarioPausaFin;
+        private String horarioAperturaSabado;
         private String horarioCierreSabado;
         private Boolean abreSabado;
         private Boolean abreDomingo;

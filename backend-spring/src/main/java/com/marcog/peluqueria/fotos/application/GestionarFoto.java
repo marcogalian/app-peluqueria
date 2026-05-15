@@ -6,4 +6,5 @@ public interface GestionarFoto {
     FotoCliente subir(UUID clienteId, UUID peluqueroId, MultipartFile file, String descripcion);
     List<FotoCliente> listarPorCliente(UUID clienteId);
     void eliminar(UUID fotoId);
+    FotoCliente actualizarDescripcion(UUID fotoId, String descripcion);
 }

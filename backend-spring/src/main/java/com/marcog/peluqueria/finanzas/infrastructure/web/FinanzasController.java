@@ -22,7 +22,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequiredArgsConstructor
 public class FinanzasController {
 
-    private final GestionarGastos GestionarGastos;
+    private final GestionarGastos gestionarGastos;
     private final ConsultarPanelFinanciero dashboardService;
 
     // ----- Endpoints de Gastos -----
@@ -35,9 +35,9 @@ public class FinanzasController {
             @RequestParam(required = false) Integer mes,
             @RequestParam(required = false) Integer anio) {
         if (mes != null && anio != null) {
-            return ResponseEntity.ok(GestionarGastos.getGastosByMesAndAnio(mes, anio));
+            return ResponseEntity.ok(gestionarGastos.getGastosByMesAndAnio(mes, anio));
         }
-        return ResponseEntity.ok(GestionarGastos.getAllGastos());
+        return ResponseEntity.ok(gestionarGastos.getAllGastos());
     }
 
     @Operation(summary = "Registrar gasto", description = "Crea un nuevo gasto")
@@ -45,7 +45,7 @@ public class FinanzasController {
     @PostMapping("/gastos")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Gasto> addGasto(@RequestBody Gasto gasto) {
-        return ResponseEntity.ok(GestionarGastos.createGasto(gasto));
+        return ResponseEntity.ok(gestionarGastos.createGasto(gasto));
     }
 
     @Operation(summary = "Eliminar gasto", description = "Elimina un gasto")
@@ -53,7 +53,7 @@ public class FinanzasController {
     @DeleteMapping("/gastos/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> deleteGasto(@PathVariable UUID id) {
-        GestionarGastos.deleteGasto(id);
+        gestionarGastos.deleteGasto(id);
         return ResponseEntity.noContent().build();
     }
 

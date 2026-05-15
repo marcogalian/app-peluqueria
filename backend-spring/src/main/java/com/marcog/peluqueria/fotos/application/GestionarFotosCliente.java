@@ -81,6 +81,14 @@ public class GestionarFotosCliente implements GestionarFoto {
         });
     }
 
+    @Override
+    public FotoCliente actualizarDescripcion(UUID fotoId, String descripcion) {
+        FotoCliente foto = repository.findById(fotoId)
+                .orElseThrow(() -> new IllegalArgumentException("Foto no encontrada: " + fotoId));
+        foto.setDescripcion(descripcion);
+        return repository.guardar(foto);
+    }
+
     // ── Validacion / helpers ────────────────────────────────────────
 
     private void validarArchivo(MultipartFile file) {

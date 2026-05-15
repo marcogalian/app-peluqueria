@@ -19,6 +19,8 @@ public class RegistroActividad {
     private String rol;
     private String accion;
     private String modulo;
+    private String detalle;
+    private String entidadId;
     private String metodoHttp;
     private String ruta;
     private Integer estadoHttp;

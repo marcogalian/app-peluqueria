@@ -49,6 +49,15 @@ public class ConfiguracionEntity {
     @Column(name = "horario_cierre", length = 5)
     private String horarioCierre;
 
+    @Column(name = "horario_pausa_inicio", length = 5)
+    private String horarioPausaInicio;
+
+    @Column(name = "horario_pausa_fin", length = 5)
+    private String horarioPausaFin;
+
+    @Column(name = "horario_apertura_sabado", length = 5)
+    private String horarioAperturaSabado;
+
     @Column(name = "horario_cierre_sabado", length = 5)
     private String horarioCierreSabado;
 

@@ -44,6 +44,12 @@ public class RegistroActividadEntity {
     @Column(name = "modulo", nullable = false, length = 80)
     private String modulo;
 
+    @Column(name = "detalle", length = 300)
+    private String detalle;
+
+    @Column(name = "entidad_id", length = 80)
+    private String entidadId;
+
     @Column(name = "metodo_http", nullable = false, length = 10)
     private String metodoHttp;
 

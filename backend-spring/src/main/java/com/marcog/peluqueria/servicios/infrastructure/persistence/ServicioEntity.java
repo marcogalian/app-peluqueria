@@ -33,6 +33,9 @@ public class ServicioEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal precio;
 
+    @Column(name = "precio_descuento", precision = 10, scale = 2)
+    private BigDecimal precioDescuento;
+
     @Column(name = "duracion_minutos", nullable = false)
     private Integer duracionMinutos;
 

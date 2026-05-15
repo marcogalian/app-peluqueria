@@ -17,6 +17,7 @@ public class Servicio {
     private String nombre;
     private String descripcion;
     private BigDecimal precio;
+    private BigDecimal precioDescuento;
     private Integer duracionMinutos;
     private TipoGenero genero;
     private CategoriaServicio categoria;

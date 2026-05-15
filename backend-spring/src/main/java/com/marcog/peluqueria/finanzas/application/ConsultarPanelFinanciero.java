@@ -71,7 +71,7 @@ public class ConsultarPanelFinanciero {
                 .filter(cita -> EstadoCita.COMPLETADO.equals(cita.getEstado()))
                 .filter(cita -> cita.getServicios() != null)
                 .flatMap(cita -> cita.getServicios().stream())
-                .map(Servicio::getPrecio)
+                .map(this::precioVentaServicio)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal ingresosProductos = sumarIngresosVentas(ventasProductosDelMes);
         BigDecimal totalIngresos = ingresosServicios.add(ingresosProductos);
@@ -83,7 +83,7 @@ public class ConsultarPanelFinanciero {
                         cita -> cita.getFechaHora().getDayOfMonth(),
                         Collectors.mapping(
                             cita -> cita.getServicios().stream()
-                                .map(Servicio::getPrecio)
+                                .map(this::precioVentaServicio)
                                 .reduce(BigDecimal.ZERO, BigDecimal::add),
                             Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)
                         )
@@ -314,7 +314,7 @@ public class ConsultarPanelFinanciero {
             for (Servicio servicio : cita.getServicios()) {
                 serviciosAcum.computeIfAbsent(servicio.getNombre(), k -> new double[]{0, 0});
                 double[] valores = serviciosAcum.get(servicio.getNombre());
-                valores[0] += servicio.getPrecio() != null ? servicio.getPrecio().doubleValue() : 0;
+                valores[0] += precioVentaServicio(servicio).doubleValue();
                 valores[1]++;
             }
         }
@@ -338,7 +338,7 @@ public class ConsultarPanelFinanciero {
             valores[0]++;
             if (cita.getServicios() != null) {
                 valores[1] += cita.getServicios().stream()
-                        .mapToDouble(s -> s.getPrecio() != null ? s.getPrecio().doubleValue() : 0)
+                        .mapToDouble(s -> precioVentaServicio(s).doubleValue())
                         .sum();
             }
         }
@@ -380,8 +380,15 @@ public class ConsultarPanelFinanciero {
         return citas.stream()
                 .filter(c -> c.getServicios() != null)
                 .flatMap(c -> c.getServicios().stream())
-                .mapToDouble(s -> s.getPrecio() != null ? s.getPrecio().doubleValue() : 0)
+                .mapToDouble(s -> precioVentaServicio(s).doubleValue())
                 .sum();
+    }
+
+    private BigDecimal precioVentaServicio(Servicio servicio) {
+        if (servicio.getPrecioDescuento() != null && servicio.getPrecioDescuento().compareTo(BigDecimal.ZERO) > 0) {
+            return servicio.getPrecioDescuento();
+        }
+        return servicio.getPrecio() != null ? servicio.getPrecio() : BigDecimal.ZERO;
     }
 
     private BigDecimal sumarIngresosVentas(List<VentaProductoEntity> ventas) {

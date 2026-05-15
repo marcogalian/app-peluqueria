@@ -30,6 +30,9 @@ public class GestionarConfiguracion {
         // Horario laboral
         actual.setHorarioApertura(valorOrFallback(cambios.getHorarioApertura(), actual.getHorarioApertura()));
         actual.setHorarioCierre(valorOrFallback(cambios.getHorarioCierre(), actual.getHorarioCierre()));
+        actual.setHorarioPausaInicio(valorHoraOpcional(cambios.getHorarioPausaInicio()));
+        actual.setHorarioPausaFin(valorHoraOpcional(cambios.getHorarioPausaFin()));
+        actual.setHorarioAperturaSabado(valorOrFallback(cambios.getHorarioAperturaSabado(), actual.getHorarioAperturaSabado()));
         actual.setHorarioCierreSabado(valorOrFallback(cambios.getHorarioCierreSabado(), actual.getHorarioCierreSabado()));
         actual.setAbreSabado(cambios.isAbreSabado());
         actual.setAbreDomingo(cambios.isAbreDomingo());
@@ -53,6 +56,9 @@ public class GestionarConfiguracion {
         // Defaults para datos viejos sin horario configurado todavia.
         String apertura = actual.getHorarioApertura() != null ? actual.getHorarioApertura() : "09:00";
         String cierre = actual.getHorarioCierre() != null ? actual.getHorarioCierre() : "21:00";
+        String pausaInicio = actual.getHorarioPausaInicio() != null ? actual.getHorarioPausaInicio() : "";
+        String pausaFin = actual.getHorarioPausaFin() != null ? actual.getHorarioPausaFin() : "";
+        String aperturaSabado = actual.getHorarioAperturaSabado() != null ? actual.getHorarioAperturaSabado() : apertura;
         String cierreSabado = actual.getHorarioCierreSabado() != null ? actual.getHorarioCierreSabado() : "14:00";
 
         Map<String, Object> centro = new java.util.HashMap<>();
@@ -63,6 +69,9 @@ public class GestionarConfiguracion {
         centro.put("politicaFotos", actual.getPoliticaFotos());
         centro.put("horarioApertura", apertura);
         centro.put("horarioCierre", cierre);
+        centro.put("horarioPausaInicio", pausaInicio);
+        centro.put("horarioPausaFin", pausaFin);
+        centro.put("horarioAperturaSabado", aperturaSabado);
         centro.put("horarioCierreSabado", cierreSabado);
         centro.put("abreSabado", actual.isAbreSabado());
         centro.put("abreDomingo", actual.isAbreDomingo());
@@ -88,6 +97,9 @@ public class GestionarConfiguracion {
                 .horasAntelacionRecordatorio(24)
                 .horarioApertura("09:00")
                 .horarioCierre("21:00")
+                .horarioPausaInicio(null)
+                .horarioPausaFin(null)
+                .horarioAperturaSabado("09:00")
                 .horarioCierreSabado("14:00")
                 .abreSabado(true)
                 .abreDomingo(false)
@@ -101,5 +113,13 @@ public class GestionarConfiguracion {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? fallback : trimmed;
+    }
+
+    private String valorHoraOpcional(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }
