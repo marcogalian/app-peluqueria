@@ -7,7 +7,7 @@ import com.marcog.peluqueria.ofertas.domain.DiaEspecialRepository;
 import com.marcog.peluqueria.ofertas.domain.OfertaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import java.util.List; import java.util.UUID;
+import java.util.List; import java.util.NoSuchElementException; import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +40,18 @@ public class GestionarOfertas implements GestionarOferta {
     @Override public List<Oferta> listarOfertas() { return ofertaRepo.findAll(); }
     @Override public List<Oferta> listarOfertasActivas() { return ofertaRepo.findActivas(); }
     @Override public DiaEspecial crearDia(DiaEspecial dia) { return diaRepo.guardar(dia); }
+
+    @Override
+    public DiaEspecial actualizarDia(UUID id, DiaEspecial detalles) {
+        DiaEspecial existente = diaRepo.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Día especial no encontrado: " + id));
+        if (detalles.getNombre() != null)             existente.setNombre(detalles.getNombre());
+        if (detalles.getDescripcion() != null)        existente.setDescripcion(detalles.getDescripcion());
+        if (detalles.getFecha() != null)              existente.setFecha(detalles.getFecha());
+        if (detalles.getMultiplicadorPrecio() != null) existente.setMultiplicadorPrecio(detalles.getMultiplicadorPrecio());
+        return diaRepo.guardar(existente);
+    }
+
     @Override public List<DiaEspecial> listarDias() { return diaRepo.findAll(); }
     @Override public void eliminarDia(UUID id) { diaRepo.deleteById(id); }
 }
