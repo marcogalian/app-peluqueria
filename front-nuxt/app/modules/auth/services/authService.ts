@@ -3,7 +3,7 @@
  * Encapsula las llamadas HTTP al backend — los componentes no saben que existe Axios (D de SOLID).
  */
 import { api } from '~/infrastructure/http/api'
-import type { LoginRequest, AuthResponse } from '../types/auth.types'
+import type { LoginRequest, AuthResponse, CambiarPasswordEmpleadoRequest } from '../types/auth.types'
 
 export const authService = {
   /**
@@ -29,9 +29,9 @@ export const authService = {
   },
 
   /**
-   * Admin cambia la contraseña de un empleado por su ID de peluquero.
+   * Cambia la contraseña de un empleado desde el panel de administración.
    */
-  async cambiarPasswordEmpleado(peluqueroId: string, nuevaPassword: string): Promise<void> {
-    await api.post(`/credenciales/empleado/${peluqueroId}/contrasena`, { nuevaPassword })
+  async cambiarPasswordEmpleado(peluqueroId: string, request: CambiarPasswordEmpleadoRequest): Promise<void> {
+    await api.post('/peluqueros/clave-empleado', request, { params: { peluqueroId } })
   },
 }

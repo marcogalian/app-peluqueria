@@ -57,6 +57,14 @@ describe('useAuthStore', () => {
     expect(store.isEmpleado).toBe(false)
   })
 
+  it('isAdmin es true con claim role singular', () => {
+    const store = useAuthStore()
+    store.guardarSesion(makeToken({ sub: 'admin', role: 'ROLE_ADMIN', exp: futureExp }))
+
+    expect(store.isAdmin).toBe(true)
+    expect(store.isEmpleado).toBe(false)
+  })
+
   it('isEmpleado es true con ROLE_HAIRDRESSER', () => {
     const store = useAuthStore()
     store.guardarSesion(makeToken({ sub: 'juan', roles: ['ROLE_HAIRDRESSER'], exp: futureExp }))
@@ -68,12 +76,19 @@ describe('useAuthStore', () => {
   it('cerrarSesion() limpia estado y localStorage', () => {
     const store = useAuthStore()
     store.guardarSesion(makeToken({ sub: 'u', exp: futureExp }))
+    localStorage.setItem('auth_user', JSON.stringify({
+      id: 'u',
+      username: 'u',
+      email: '',
+      rol: 'ROLE_ADMIN',
+    }))
 
     store.cerrarSesion()
 
     expect(store.accessToken).toBeNull()
     expect(store.usuario).toBeNull()
     expect(localStorage.getItem('access_token')).toBeNull()
+    expect(localStorage.getItem('auth_user')).toBeNull()
   })
 
   it('restaurarSesion() recupera sesión válida de localStorage', () => {
@@ -85,6 +100,42 @@ describe('useAuthStore', () => {
 
     expect(store.accessToken).toBe(token)
     expect(store.usuario?.username).toBe('maria')
+  })
+
+  it('restaurarSesion() usa usuario persistido si el token antiguo no trae rol', () => {
+    const token = makeToken({ sub: 'admin', exp: futureExp })
+    localStorage.setItem('access_token', token)
+    localStorage.setItem('auth_user', JSON.stringify({
+      id: 'admin',
+      username: 'admin',
+      email: 'admin@test.com',
+      rol: 'ROLE_ADMIN',
+    }))
+    const store = useAuthStore()
+
+    store.restaurarSesion()
+
+    expect(store.usuario?.username).toBe('admin')
+    expect(store.usuario?.rol).toBe('ROLE_ADMIN')
+    expect(store.isAdmin).toBe(true)
+  })
+
+  it('guardarSesion() recupera admin legacy si el token antiguo no trae rol', () => {
+    const store = useAuthStore()
+    store.guardarSesion(makeToken({ sub: 'admin', exp: futureExp }))
+
+    expect(store.usuario?.rol).toBe('ROLE_ADMIN')
+    expect(store.isAdmin).toBe(true)
+    expect(store.isEmpleado).toBe(false)
+  })
+
+  it('guardarSesion() no degrada a empleado si un token no-admin no trae rol', () => {
+    const store = useAuthStore()
+    store.guardarSesion(makeToken({ sub: 'sinrol', exp: futureExp }))
+
+    expect(store.usuario).toBeNull()
+    expect(store.isAdmin).toBe(false)
+    expect(store.isEmpleado).toBe(false)
   })
 
   it('restaurarSesion() limpia sesión si token expirado', () => {

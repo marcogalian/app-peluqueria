@@ -1,0 +1,25 @@
+package com.marcog.peluqueria.servicios.domain;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class Servicio {
+    private UUID id;
+    private String nombre;
+    private String descripcion;
+    private BigDecimal precio;
+    private BigDecimal precioDescuento;
+    private Integer duracionMinutos;
+    private TipoGenero genero;
+    private CategoriaServicio categoria;
+    private String imageUrl;
+}

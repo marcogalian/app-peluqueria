@@ -4,6 +4,8 @@
  */
 export default defineNuxtRouteMiddleware(() => {
   const authStore = useAuthStore()
+  authStore.restaurarSesion()
+
   if (!authStore.isAdmin) {
     return navigateTo('/agenda')
   }

@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import ToastContainer from '~/modules/shared/components/ToastContainer.vue'
+</script>
+
 <template>
   <!--
     Layout de autenticación — solo para la página de login.
@@ -6,4 +10,5 @@
   <div class="min-h-screen bg-surface-muted">
     <slot />
   </div>
+  <ToastContainer />
 </template>

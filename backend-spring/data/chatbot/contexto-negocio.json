@@ -1,0 +1,308 @@
+{
+  "negocio" : {
+    "nombre" : "Peluquería Isabella",
+    "direccion" : "C/ del Reno, 45, 30402, Cartagena, Murcia",
+    "telefono" : "669852761",
+    "email" : "isabella@correo.com",
+    "horario" : {
+      "lunesViernes" : "09:30 - 13:30 y 17:00 - 21:00",
+      "sabado" : "10:00 - 13:00",
+      "domingo" : "Cerrado"
+    }
+  },
+  "politicas" : {
+    "cancelacion" : "Se puede cancelar hasta 24 horas antes sin coste. Cancelaciones tardías pueden suponer un cargo del 50%.",
+    "reservas" : "Las citas se pueden reservar por teléfono o a través de la aplicación.",
+    "vacacionesEmpleados" : "22 días laborables al año, solicitar con 15 días de antelación mínimo.",
+    "descuentoVip" : "Los clientes VIP tienen descuento personalizado según su historial.",
+    "formasPago" : "Efectivo, tarjeta de crédito/débito y transferencia bancaria."
+  },
+  "equipo" : [ {
+    "nombre" : "Sofía Martínez",
+    "especialidad" : "Colorimetría y mechas",
+    "horario" : "",
+    "disponible" : true
+  }, {
+    "nombre" : "Carmen López",
+    "especialidad" : "Corte femenino y alisados",
+    "horario" : "",
+    "disponible" : true
+  }, {
+    "nombre" : "Lucía Fernández",
+    "especialidad" : "Tratamientos capilares",
+    "horario" : "",
+    "disponible" : false
+  } ],
+  "totalEmpleados" : 3,
+  "servicios" : [ {
+    "nombre" : "Corte de cabello mujer",
+    "precio" : 25.0,
+    "duracionMinutos" : 45,
+    "genero" : "FEMENINO",
+    "categoria" : "SENORA",
+    "descripcion" : "Corte personalizado con acabado profesional"
+  }, {
+    "nombre" : "Corte de cabello hombre",
+    "precio" : 15.0,
+    "duracionMinutos" : 30,
+    "genero" : "MASCULINO",
+    "categoria" : "CABALLERO",
+    "descripcion" : "Corte clásico o moderno con lavado incluido"
+  }, {
+    "nombre" : "Mechas californianas",
+    "precio" : 75.0,
+    "duracionMinutos" : 120,
+    "genero" : "FEMENINO",
+    "categoria" : "SENORA",
+    "descripcion" : "Técnica de iluminación degradada sin raíz marcada"
+  }, {
+    "nombre" : "Tinte de barba",
+    "precio" : 20.0,
+    "duracionMinutos" : 30,
+    "genero" : "MASCULINO",
+    "categoria" : "CABALLERO",
+    "descripcion" : "Coloración y perfilado profesional de barba"
+  }, {
+    "nombre" : "Permanente",
+    "precio" : 60.0,
+    "duracionMinutos" : 120,
+    "genero" : "FEMENINO",
+    "categoria" : "SENORA",
+    "descripcion" : "Ondulación duradera con fijación en frío o calor"
+  }, {
+    "nombre" : "Coloración completa",
+    "precio" : 55.0,
+    "duracionMinutos" : 90,
+    "genero" : "FEMENINO",
+    "categoria" : "SENORA",
+    "descripcion" : "Tinte de raíz a puntas con fórmula personalizada"
+  }, {
+    "nombre" : "Balayage",
+    "precio" : 85.0,
+    "duracionMinutos" : 150,
+    "genero" : "FEMENINO",
+    "categoria" : "SENORA",
+    "descripcion" : "Coloración a mano alzada para efecto natural"
+  }, {
+    "nombre" : "Alisado brasileño",
+    "precio" : 90.0,
+    "duracionMinutos" : 180,
+    "genero" : "FEMENINO",
+    "categoria" : "SENORA",
+    "descripcion" : "Tratamiento de alisado duradero con keratina"
+  }, {
+    "nombre" : "Tratamiento hidratación",
+    "precio" : 35.0,
+    "duracionMinutos" : 60,
+    "genero" : "MASCULINO",
+    "categoria" : "CABALLERO",
+    "descripcion" : "Mascarilla nutritiva profesional con vapor"
+  }, {
+    "nombre" : "Peinado de novia",
+    "precio" : 80.0,
+    "duracionMinutos" : 90,
+    "genero" : "FEMENINO",
+    "categoria" : "SENORA",
+    "descripcion" : "Recogido o semirecogido para eventos especiales"
+  }, {
+    "nombre" : "Lavado y secado",
+    "precio" : 18.0,
+    "duracionMinutos" : 30,
+    "genero" : "FEMENINO",
+    "categoria" : "SENORA",
+    "descripcion" : "Lavado con champú profesional y secado con moldeado"
+  }, {
+    "nombre" : "Depilación facial",
+    "precio" : 12.0,
+    "duracionMinutos" : 20,
+    "genero" : "MASCULINO",
+    "categoria" : "CABALLERO",
+    "descripcion" : "Perfilado de cejas, orejas o pómulos con acabado limpio"
+  }, {
+    "nombre" : "Corte degradado premium",
+    "precio" : 19.0,
+    "duracionMinutos" : 35,
+    "genero" : "MASCULINO",
+    "categoria" : "CABALLERO",
+    "descripcion" : "Fade con contornos definidos y acabado de precisión"
+  }, {
+    "nombre" : "Arreglo de barba",
+    "precio" : 14.0,
+    "duracionMinutos" : 25,
+    "genero" : "MASCULINO",
+    "categoria" : "CABALLERO",
+    "descripcion" : "Diseño, perfilado y acabado con toalla caliente"
+  }, {
+    "nombre" : "Lavado detox hombre",
+    "precio" : 16.0,
+    "duracionMinutos" : 20,
+    "genero" : "MASCULINO",
+    "categoria" : "CABALLERO",
+    "descripcion" : "Lavado profundo con masaje capilar y producto detox"
+  }, {
+    "nombre" : "Cobertura de canas",
+    "precio" : 24.0,
+    "duracionMinutos" : 35,
+    "genero" : "MASCULINO",
+    "categoria" : "CABALLERO",
+    "descripcion" : "Aplicación express de color para cubrir canas"
+  }, {
+    "nombre" : "Corte Pompadour moderno",
+    "precio" : 16.0,
+    "duracionMinutos" : 30,
+    "genero" : "MASCULINO",
+    "categoria" : "CABALLERO"
+  } ],
+  "productos" : [ {
+    "nombre" : "Champú equilibrante Unisex",
+    "precio" : 10.0,
+    "stock" : 25,
+    "stockMinimo" : 5,
+    "stockBajo" : false,
+    "categoria" : "CHAMPU",
+    "genero" : "UNISEX"
+  }, {
+    "nombre" : "Acondicionador nutritivo L'Oréal",
+    "precio" : 14.0,
+    "stock" : 25,
+    "stockMinimo" : 5,
+    "stockBajo" : false,
+    "categoria" : "ACONDICIONADOR",
+    "genero" : "FEMENINO"
+  }, {
+    "nombre" : "Mascarilla reparadora Redken",
+    "precio" : 22.0,
+    "stock" : 15,
+    "stockMinimo" : 3,
+    "stockBajo" : false,
+    "categoria" : "ACONDICIONADOR",
+    "genero" : "UNISEX"
+  }, {
+    "nombre" : "Tinte rubio miel Schwarzkopf",
+    "precio" : 9.5,
+    "stock" : 40,
+    "stockMinimo" : 8,
+    "stockBajo" : false,
+    "categoria" : "COLORACION",
+    "genero" : "FEMENINO"
+  }, {
+    "nombre" : "Decolorante en polvo Wella",
+    "precio" : 11.0,
+    "stock" : 20,
+    "stockMinimo" : 5,
+    "stockBajo" : false,
+    "categoria" : "COLORACION",
+    "genero" : "UNISEX"
+  }, {
+    "nombre" : "Cera modeladora Gatsby",
+    "precio" : 8.0,
+    "stock" : 30,
+    "stockMinimo" : 6,
+    "stockBajo" : false,
+    "categoria" : "CERA",
+    "genero" : "MASCULINO"
+  }, {
+    "nombre" : "Pomada acabado brillo American Crew",
+    "precio" : 11.5,
+    "stock" : 20,
+    "stockMinimo" : 4,
+    "stockBajo" : false,
+    "categoria" : "CERA",
+    "genero" : "MASCULINO"
+  }, {
+    "nombre" : "Laca fijadora Elnett",
+    "precio" : 7.5,
+    "stock" : 35,
+    "stockMinimo" : 7,
+    "stockBajo" : false,
+    "categoria" : "OTRO",
+    "genero" : "FEMENINO"
+  }, {
+    "nombre" : "Plancha cerámica Babyliss",
+    "precio" : 89.0,
+    "stock" : 5,
+    "stockMinimo" : 1,
+    "stockBajo" : false,
+    "categoria" : "HERRAMIENTA",
+    "genero" : "UNISEX"
+  }, {
+    "nombre" : "Rizador automático Remington",
+    "precio" : 65.0,
+    "stock" : 4,
+    "stockMinimo" : 1,
+    "stockBajo" : false,
+    "categoria" : "HERRAMIENTA",
+    "genero" : "FEMENINO"
+  }, {
+    "nombre" : "Sérum antifrizz Moroccanoil",
+    "precio" : 28.0,
+    "stock" : 18,
+    "stockMinimo" : 4,
+    "stockBajo" : false,
+    "categoria" : "OTRO",
+    "genero" : "UNISEX"
+  }, {
+    "nombre" : "Spray termoprotector Tresemmé",
+    "precio" : 9.0,
+    "stock" : 25,
+    "stockMinimo" : 5,
+    "stockBajo" : false,
+    "categoria" : "OTRO",
+    "genero" : "UNISEX"
+  }, {
+    "nombre" : "Champú anticaída Kerastase",
+    "precio" : 18.0,
+    "stock" : 19,
+    "stockMinimo" : 4,
+    "stockBajo" : false,
+    "categoria" : "CHAMPU",
+    "genero" : "MASCULINO"
+  }, {
+    "nombre" : "Beter Brocha De Afeitar Mango Madera Pelo Sintético",
+    "precio" : 8.0,
+    "stock" : 10,
+    "stockMinimo" : 5,
+    "stockBajo" : false,
+    "categoria" : "HERRAMIENTA",
+    "genero" : "UNISEX"
+  }, {
+    "nombre" : "Tinte castaño oscuro L'Oréal",
+    "precio" : 9.0,
+    "stock" : 31,
+    "stockMinimo" : 8,
+    "stockBajo" : false,
+    "categoria" : "COLORACION",
+    "genero" : "UNISEX"
+  }, {
+    "nombre" : "Polvos texturizantes",
+    "precio" : 20.0,
+    "stock" : 8,
+    "stockMinimo" : 5,
+    "stockBajo" : false,
+    "categoria" : "HERRAMIENTA",
+    "genero" : "UNISEX"
+  }, {
+    "nombre" : "Champú hidratante Wella",
+    "precio" : 12.5,
+    "stock" : 9,
+    "stockMinimo" : 5,
+    "stockBajo" : false,
+    "categoria" : "CHAMPU",
+    "genero" : "FEMENINO"
+  } ],
+  "ofertas" : [ {
+    "nombre" : "Pack Primavera",
+    "descripcion" : "15% en cortes y tratamientos durante toda la primavera",
+    "descuentoPorcentaje" : 15,
+    "fechaInicio" : "2026-03-20",
+    "fechaFin" : "2026-06-20",
+    "tipo" : "SERVICIO"
+  }, {
+    "nombre" : "Descuento Fidelidad",
+    "descripcion" : "10% de descuento en productos para clientes habituales",
+    "descuentoPorcentaje" : 10,
+    "fechaInicio" : "2026-01-01",
+    "fechaFin" : "2026-12-31",
+    "tipo" : "PRODUCTO"
+  } ]
+}

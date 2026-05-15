@@ -1,4 +1,4 @@
-export type Genero = 'MASCULINO' | 'FEMENINO' | 'OTRO'
+export type Genero = 'MASCULINO' | 'FEMENINO'
 
 /** Cliente completo — solo el admin ve todos los campos */
 export interface Cliente {

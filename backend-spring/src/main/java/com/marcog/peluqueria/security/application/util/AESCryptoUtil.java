@@ -9,74 +9,88 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
 
 /**
- * Utilidad de Criptografía de Grado Empresarial (AES-256)
- * Basado en Advanced Encryption Standard (AES) en modo CBC con PKCS5Padding
+ * Utilidad de cifrado AES-256 en modo CBC con PKCS5Padding.
+ *
+ * El IV (vector de inicialización) se genera aleatorio en cada cifrado y se
+ * antepone al ciphertext. Asi mensajes idénticos producen ciphertexts distintos
+ * y no se pueden detectar patrones (CWE-329).
+ *
+ * Formato del payload base64: [16 bytes IV][N bytes ciphertext]
  */
 @Component
 @Slf4j
 public class AESCryptoUtil {
 
-    private final SecretKeySpec secretKey;
-    private final byte[] key;
+    private static final int LONGITUD_IV_BYTES = 16;
+    private static final String ALGORITMO = "AES/CBC/PKCS5Padding";
 
-    // Una clave privada configurada desde el archivo .env o application.properties
-    public AESCryptoUtil(@Value("${chat.aes.secret-key:mySuperSecretKey123!}") String myKey) {
-        MessageDigest sha = null;
+    private final SecretKeySpec claveSecreta;
+    private final SecureRandom generadorIv = new SecureRandom();
+
+    public AESCryptoUtil(@Value("${chat.aes.secret-key:}") String claveCruda) {
+        if (claveCruda == null || claveCruda.isBlank()) {
+            throw new IllegalStateException(
+                    "chat.aes.secret-key no configurada. Es obligatoria para el chat interno.");
+        }
         try {
-            key = myKey.getBytes(StandardCharsets.UTF_8);
-            sha = MessageDigest.getInstance("SHA-256");
-            byte[] hashedKey = sha.digest(key);
-            // Tomamos los primeros 16 bytes (128 bits) o 32 (256 bits) para la clave
-            // secreta
-            this.secretKey = new SecretKeySpec(Arrays.copyOf(hashedKey, 32), "AES");
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(claveCruda.getBytes(StandardCharsets.UTF_8));
+            this.claveSecreta = new SecretKeySpec(Arrays.copyOf(hash, 32), "AES");
             log.info("Key AES inicializada correctamente para el chat interno.");
-        } catch (Exception e) {
-            log.error("Error inicializando AES Key: {}", e.getMessage());
-            throw new RuntimeException("Fallo criptográfico crítico", e);
+        } catch (Exception ex) {
+            log.error("Error inicializando AES Key: {}", ex.getMessage());
+            throw new RuntimeException("Fallo criptográfico crítico", ex);
         }
     }
 
-    /**
-     * Encripta un mensaje de texto plano y devuelve Base64
-     */
-    public String encrypt(String strToEncrypt) {
+    public String encrypt(String textoPlano) {
         try {
-            // El Vector de Inicialización (IV) hace que el mismo mensaje cifrado dos veces
-            // dé distintos hashes (Evita ataques de diccionario)
-            byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-            IvParameterSpec ivspec = new IvParameterSpec(iv);
+            byte[] iv = generarIvAleatorio();
+            Cipher cipher = Cipher.getInstance(ALGORITMO);
+            cipher.init(Cipher.ENCRYPT_MODE, claveSecreta, new IvParameterSpec(iv));
+            byte[] textoCifrado = cipher.doFinal(textoPlano.getBytes(StandardCharsets.UTF_8));
 
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivspec);
+            // Anteponer el IV al ciphertext para poder descifrar despues
+            byte[] payload = new byte[LONGITUD_IV_BYTES + textoCifrado.length];
+            System.arraycopy(iv, 0, payload, 0, LONGITUD_IV_BYTES);
+            System.arraycopy(textoCifrado, 0, payload, LONGITUD_IV_BYTES, textoCifrado.length);
 
-            byte[] cipherText = cipher.doFinal(strToEncrypt.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(cipherText);
-        } catch (Exception e) {
-            log.error("Error al encriptar: {}", e.getMessage());
+            return Base64.getEncoder().encodeToString(payload);
+        } catch (Exception ex) {
+            log.error("Error al encriptar: {}", ex.getMessage());
+            return null;
         }
-        return null;
     }
 
-    /**
-     * Desencripta un string en Base64 volviéndolo texto legible
-     */
-    public String decrypt(String strToDecrypt) {
+    public String decrypt(String payloadBase64) {
         try {
-            byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-            IvParameterSpec ivspec = new IvParameterSpec(iv);
+            byte[] payload = Base64.getDecoder().decode(payloadBase64);
+            if (payload.length <= LONGITUD_IV_BYTES) {
+                log.warn("Payload AES demasiado corto");
+                return null;
+            }
 
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, ivspec);
+            byte[] iv = Arrays.copyOfRange(payload, 0, LONGITUD_IV_BYTES);
+            byte[] textoCifrado = Arrays.copyOfRange(payload, LONGITUD_IV_BYTES, payload.length);
 
-            byte[] cipherText = cipher.doFinal(Base64.getDecoder().decode(strToDecrypt));
-            return new String(cipherText, StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            log.error("Error al desencriptar: {}", e.getMessage());
+            Cipher cipher = Cipher.getInstance(ALGORITMO);
+            cipher.init(Cipher.DECRYPT_MODE, claveSecreta, new IvParameterSpec(iv));
+            byte[] textoPlano = cipher.doFinal(textoCifrado);
+            return new String(textoPlano, StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            log.warn("Payload AES invalido: {}", ex.getMessage());
+            return null;
         }
-        return null;
+    }
+
+    private byte[] generarIvAleatorio() {
+        byte[] iv = new byte[LONGITUD_IV_BYTES];
+        generadorIv.nextBytes(iv);
+        return iv;
     }
 }

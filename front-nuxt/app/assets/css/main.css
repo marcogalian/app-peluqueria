@@ -11,13 +11,22 @@
 /* ── Fuente y base ───────────────────────────────────────── */
 @layer base {
   html {
+    height: 100%;
+    overflow: hidden;
     font-family: 'Manrope', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   body {
+    height: 100%;
+    overflow: hidden;
     background-color: #faf9fd;
     color: #1a1c1e;
+  }
+
+  #__nuxt {
+    height: 100%;
+    overflow: hidden;
   }
 
   :focus-visible {
@@ -126,45 +135,45 @@
 
   /* ── Cards ───────────────────────────────────────────── */
   .card {
-    @apply bg-surface-container-lowest rounded-2xl shadow-card border border-outline-variant/20
-           transition-all duration-300
-           hover:shadow-card-md;
+    @apply bg-surface-container-lowest rounded-2xl shadow-card border border-outline-variant/20;
   }
 
-  /* Card de KPI — fondo gris claro, blanco al hover */
+  /* Card de KPI — fondo gris claro */
   .card-kpi {
     @apply bg-surface-container-low rounded-2xl p-6
-           border border-outline-variant/10
-           transition-all duration-300
-           hover:bg-white hover:shadow-card-md hover:-translate-y-0.5;
+           border border-outline-variant/10;
   }
 
   /* ── Inputs ──────────────────────────────────────────── */
   .input {
-    @apply w-full px-4 py-2.5 rounded-xl
-           border border-outline-variant/40 bg-surface-container-highest
+    @apply w-full min-h-10 px-4 py-2.5 rounded
+           border border-outline-variant/50 bg-white
            text-on-surface text-sm font-medium
            placeholder:text-on-surface-variant/50
            transition-all duration-200
            focus:outline-none focus:ring-2 focus:ring-primary-container/20
            focus:border-primary-container focus:bg-white
            disabled:opacity-60 disabled:cursor-not-allowed;
+    border-radius: 0.375rem;
+    box-shadow: inset 0 0 0 1px rgb(104 111 122 / 0.12);
   }
 
   .select-field {
-    @apply w-full min-h-11 rounded-xl
-           border border-outline-variant/40 bg-surface-container-highest
+    @apply w-full min-h-10 rounded
+           border border-outline-variant/50 bg-white
            text-on-surface text-sm font-medium
            transition-all duration-200
            focus:outline-none focus:ring-2 focus:ring-primary-container/20
            focus:border-primary-container focus:bg-white
            disabled:opacity-60 disabled:cursor-not-allowed;
     appearance: none;
-    padding: 0.75rem 3.25rem 0.75rem 1rem;
+    padding: 0.625rem 2.75rem 0.625rem 0.875rem;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23686f7a' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    background-position: right 1.125rem center;
+    background-position: right 1rem center;
     background-repeat: no-repeat;
     background-size: 1rem;
+    border-radius: 0.375rem;
+    box-shadow: inset 0 0 0 1px rgb(104 111 122 / 0.12);
   }
 
   .label {

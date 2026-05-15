@@ -3,6 +3,7 @@
  * Orquesta authService + authStore para que los componentes
  * no dependan directamente de ninguno de los dos.
  */
+import axios from 'axios'
 import { authService } from '../services/authService'
 import type { LoginRequest } from '../types/auth.types'
 
@@ -21,8 +22,9 @@ export function useAuth() {
       store.guardarSesion(respuesta.token, respuesta.refreshToken)
       // Redirige según rol
       await router.push(store.isAdmin ? '/admin/dashboard' : '/agenda')
-    } catch (e: any) {
-      error.value = e.response?.status === 401
+    } catch (e: unknown) {
+      const es401 = axios.isAxiosError(e) && e.response?.status === 401
+      error.value = es401
         ? 'Usuario o contraseña incorrectos.'
         : 'No se pudo conectar con el servidor.'
     } finally {

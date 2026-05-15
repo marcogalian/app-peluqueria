@@ -21,3 +21,8 @@ export interface AuthResponse {
   token: string        // el backend usa "token", no "accessToken"
   refreshToken?: string
 }
+
+export interface CambiarPasswordEmpleadoRequest {
+  nuevaPassword: string
+  repetirPassword: string
+}

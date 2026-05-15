@@ -1,6 +1,6 @@
 package com.marcog.peluqueria.productos.application.dto;
 
-import com.marcog.peluqueria.productos.domain.model.MetodoPago;
+import com.marcog.peluqueria.productos.domain.MetodoPago;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;

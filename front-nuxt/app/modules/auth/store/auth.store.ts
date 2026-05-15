@@ -12,6 +12,7 @@ interface JwtPayload {
   email?: string
   roles?: string[]     // ['ROLE_ADMIN'] o ['ROLE_HAIRDRESSER']
   role?: string        // alternativa singular del backend
+  authorities?: Array<string | { authority?: string }>
   exp: number
 }
 
@@ -42,6 +43,43 @@ export const useAuthStore = defineStore('auth', () => {
 
   // ── Acciones ──────────────────────────────────────────────
 
+  function normalizarRol(valor?: string): Rol | null {
+    if (valor === 'ROLE_ADMIN' || valor === 'ADMIN') return 'ROLE_ADMIN'
+    if (valor === 'ROLE_HAIRDRESSER' || valor === 'HAIRDRESSER') return 'ROLE_HAIRDRESSER'
+    return null
+  }
+
+  function extraerRol(payload: JwtPayload): Rol | null {
+    const candidates = [
+      ...(payload.roles ?? []),
+      payload.role,
+      ...(payload.authorities ?? []).map((authority) =>
+        typeof authority === 'string' ? authority : authority.authority,
+      ),
+    ]
+
+    return candidates.map(normalizarRol).find((rol): rol is Rol => Boolean(rol)) ?? null
+  }
+
+  function resolverRolLegacy(payload: JwtPayload, usuarioPersistido: Usuario | null): Rol | null {
+    const rolPersistido = usuarioPersistido?.username === payload.sub ? usuarioPersistido.rol : null
+    if (rolPersistido) return rolPersistido
+
+    return payload.sub === 'admin' ? 'ROLE_ADMIN' : null
+  }
+
+  function leerUsuarioPersistido(): Usuario | null {
+    if (!import.meta.client) return null
+    try {
+      const raw = localStorage.getItem('auth_user')
+      if (!raw) return null
+      const parsed = JSON.parse(raw) as Usuario
+      return normalizarRol(parsed.rol) ? parsed : null
+    } catch {
+      return null
+    }
+  }
+
   /**
    * Guarda el token en el store y en localStorage.
    * Decodifica el JWT para extraer los datos del usuario sin llamar al backend.
@@ -57,13 +95,21 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Extraemos los datos del usuario directamente del payload JWT
     const payload = jwtDecode<JwtPayload>(token)
-    const rol = (payload.roles?.[0] ?? payload.role ?? 'ROLE_HAIRDRESSER') as Rol
+    const usuarioPersistido = leerUsuarioPersistido()
+    const rol = extraerRol(payload) ?? resolverRolLegacy(payload, usuarioPersistido)
 
-    usuario.value = {
-      id: payload.sub,
-      username: payload.sub,
-      email: payload.email ?? '',
-      rol,
+    if (rol) {
+      usuario.value = {
+        id: payload.sub,
+        username: payload.sub,
+        email: payload.email ?? usuarioPersistido?.email ?? '',
+        rol,
+      }
+      if (import.meta.client) {
+        localStorage.setItem('auth_user', JSON.stringify(usuario.value))
+      }
+    } else {
+      usuario.value = null
     }
   }
 
@@ -97,6 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (import.meta.client) {
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
+      localStorage.removeItem('auth_user')
     }
   }
 

@@ -1,6 +1,6 @@
 package com.marcog.peluqueria.security.infrastructure.config;
 
-import com.marcog.peluqueria.security.infrastructure.out.persistence.JpaUserRepository;
+import com.marcog.peluqueria.security.infrastructure.persistence.JpaUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +22,7 @@ public class ApplicationConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> repository.findByUsername(username)
+                .or(() -> repository.findByEmail(username))
                 .map(CustomUserDetails::new)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }

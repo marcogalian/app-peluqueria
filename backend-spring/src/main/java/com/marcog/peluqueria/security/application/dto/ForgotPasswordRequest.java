@@ -1,3 +1,12 @@
 package com.marcog.peluqueria.security.application.dto;
 
-public record ForgotPasswordRequest(String email) {}
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class ForgotPasswordRequest {
+    @NotBlank
+    @Email
+    private String email;
+}

@@ -1,41 +1,38 @@
 package com.marcog.peluqueria.chat.infrastructure.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 /**
- * Configuración de Servidor de WebSockets (Chat Interno Multihilo)
- * 
- * Implementación "Enterprise" utilizando STOMP (Simple Text Oriented Message
- * Protocol)
- * sobre WebSockets. Esto delega la gestión de hilos (Thread Pools) y sesiones
- * abiertas
- * a Spring Boot automáticamente en lugar de gestionar ciclos "while"
- * rudimentarios.
+ * Configuracion del servidor WebSocket (chat interno multihilo).
+ *
+ * Implementa STOMP sobre WebSockets. Spring gestiona los thread pools y
+ * sesiones abiertas (no hay loops manuales).
+ *
+ * Seguridad: StompJwtInterceptor valida el JWT en cada CONNECT.
  */
 @Configuration
 @EnableWebSocketMessageBroker
+@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final StompJwtInterceptor stompJwtInterceptor;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        // Habilitar un 'broker' de memoria simple para llevar los mensajes del servidor
-        // a los clientes subscritos a un canal
+        // Broker en memoria para mensajes servidor -> clientes suscritos a /topic
         config.enableSimpleBroker("/topic");
-
-        // Prefijo para enviar mensajes DESDE los clientes HACIA el servidor
+        // Prefijo para mensajes cliente -> servidor
         config.setApplicationDestinationPrefixes("/app");
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Exponemos el túnel oficial, la conexión base en
-        // ws://localhost:8080/chat-websocket
-        // Se permite SockJS como un Fallback brutal si el navegador del cliente no
-        // soporta WebSockets estándar
         registry.addEndpoint("/chat-websocket")
                 .setAllowedOrigins(
                         "http://localhost:5173",
@@ -43,5 +40,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         "http://localhost:4000"
                 )
                 .withSockJS();
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        // Validar JWT en cada frame CONNECT antes de aceptar la conexion
+        registration.interceptors(stompJwtInterceptor);
     }
 }

@@ -1,25 +1,25 @@
 package com.marcog.peluqueria;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.marcog.peluqueria.clientes.domain.model.Genero;
-import com.marcog.peluqueria.clientes.infrastructure.out.persistence.ClienteEntity;
-import com.marcog.peluqueria.clientes.infrastructure.out.persistence.JpaClienteRepository;
-import com.marcog.peluqueria.ofertas.domain.model.TipoOferta;
-import com.marcog.peluqueria.ofertas.infrastructure.out.persistence.JpaOfertaRepository;
-import com.marcog.peluqueria.ofertas.infrastructure.out.persistence.OfertaEntity;
-import com.marcog.peluqueria.peluqueros.infrastructure.out.persistence.JpaPeluqueroRepository;
-import com.marcog.peluqueria.peluqueros.infrastructure.out.persistence.PeluqueroEntity;
-import com.marcog.peluqueria.productos.domain.model.CategoriaProducto;
-import com.marcog.peluqueria.productos.domain.model.GeneroProducto;
-import com.marcog.peluqueria.productos.infrastructure.out.persistence.JpaProductoRepository;
-import com.marcog.peluqueria.productos.infrastructure.out.persistence.ProductoEntity;
-import com.marcog.peluqueria.security.domain.model.Role;
-import com.marcog.peluqueria.security.infrastructure.out.persistence.JpaUserRepository;
-import com.marcog.peluqueria.security.infrastructure.out.persistence.UserEntity;
-import com.marcog.peluqueria.servicios.domain.model.CategoriaServicio;
-import com.marcog.peluqueria.servicios.domain.model.TipoGenero;
-import com.marcog.peluqueria.servicios.infrastructure.out.persistence.JpaServicioRepository;
-import com.marcog.peluqueria.servicios.infrastructure.out.persistence.ServicioEntity;
+import com.marcog.peluqueria.clientes.domain.Genero;
+import com.marcog.peluqueria.clientes.infrastructure.persistence.ClienteEntity;
+import com.marcog.peluqueria.clientes.infrastructure.persistence.JpaClienteRepository;
+import com.marcog.peluqueria.ofertas.domain.TipoOferta;
+import com.marcog.peluqueria.ofertas.infrastructure.persistence.JpaOfertaRepository;
+import com.marcog.peluqueria.ofertas.infrastructure.persistence.OfertaEntity;
+import com.marcog.peluqueria.peluqueros.infrastructure.persistence.JpaPeluqueroRepository;
+import com.marcog.peluqueria.peluqueros.infrastructure.persistence.PeluqueroEntity;
+import com.marcog.peluqueria.productos.domain.CategoriaProducto;
+import com.marcog.peluqueria.productos.domain.GeneroProducto;
+import com.marcog.peluqueria.productos.infrastructure.persistence.JpaProductoRepository;
+import com.marcog.peluqueria.productos.infrastructure.persistence.ProductoEntity;
+import com.marcog.peluqueria.security.domain.Role;
+import com.marcog.peluqueria.security.infrastructure.persistence.JpaUserRepository;
+import com.marcog.peluqueria.security.infrastructure.persistence.UserEntity;
+import com.marcog.peluqueria.servicios.domain.CategoriaServicio;
+import com.marcog.peluqueria.servicios.domain.TipoGenero;
+import com.marcog.peluqueria.servicios.infrastructure.persistence.JpaServicioRepository;
+import com.marcog.peluqueria.servicios.infrastructure.persistence.ServicioEntity;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +38,8 @@ import java.util.List;
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
 
+    private static final String ADMIN_EMAIL = "admin@email.com";
+
     private final JpaUserRepository      userRepository;
     private final JpaPeluqueroRepository peluqueroRepository;
     private final JpaClienteRepository   clienteRepository;
@@ -47,10 +49,13 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder        passwordEncoder;
     @Value("${app.seed.remote-clients.enabled:true}")
     private boolean remoteClientsEnabled;
+    @Value("${app.seed.demo-password:}")
+    private String demoPassword;
 
     @Override
     public void run(String... args) {
         crearAdminSiNoExiste();
+        sincronizarEmailsDemo();
         if (peluqueroRepository.count() == 0) {
             crearPeluqueros();
         }
@@ -67,19 +72,52 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void crearAdminSiNoExiste() {
-        if (userRepository.findByUsername("admin").isPresent()) {
+        var adminExistente = userRepository.findByUsername("admin");
+        if (adminExistente.isPresent()) {
+            UserEntity admin = adminExistente.get();
+            if (!ADMIN_EMAIL.equalsIgnoreCase(admin.getEmail())) {
+                admin.setEmail(ADMIN_EMAIL);
+                userRepository.save(admin);
+                log.info("DataInitializer: email del administrador demo sincronizado.");
+            }
             return;
         }
 
         userRepository.save(UserEntity.builder()
                 .username("admin")
-                .password(passwordEncoder.encode("1234"))
+                .password(passwordEncoder.encode(requireDemoPassword()))
                 .role(Role.ROLE_ADMIN)
-                .email("admin@email.com")
+                .email(ADMIN_EMAIL)
                 .active(true)
                 .build());
 
         log.info("DataInitializer: usuario administrador demo creado.");
+    }
+
+    private void sincronizarEmailsDemo() {
+        record UsuarioDemo(String username, String email) {}
+
+        List<UsuarioDemo> usuarios = List.of(
+                new UsuarioDemo("sofia", "sofia@email.com"),
+                new UsuarioDemo("carmen", "carmen@email.com"),
+                new UsuarioDemo("lucia", "lucia@email.com"),
+                new UsuarioDemo("maria", "maria@email.com")
+        );
+
+        int actualizados = 0;
+        for (UsuarioDemo usuarioDemo : usuarios) {
+            var usuario = userRepository.findByUsername(usuarioDemo.username());
+            if (usuario.isPresent() && !usuarioDemo.email().equalsIgnoreCase(usuario.get().getEmail())) {
+                UserEntity user = usuario.get();
+                user.setEmail(usuarioDemo.email());
+                userRepository.save(user);
+                actualizados++;
+            }
+        }
+
+        if (actualizados > 0) {
+            log.info("DataInitializer: {} emails de empleados demo sincronizados.", actualizados);
+        }
     }
 
     private void crearPeluqueros() {
@@ -94,7 +132,7 @@ public class DataInitializer implements CommandLineRunner {
         for (P p : datos) {
             UserEntity u = userRepository.save(UserEntity.builder()
                     .username(p.user())
-                    .password(passwordEncoder.encode("1234"))
+                    .password(passwordEncoder.encode(requireDemoPassword()))
                     .role(Role.ROLE_HAIRDRESSER)
                     .email(p.user() + "@email.com")
                     .active(true)
@@ -112,6 +150,14 @@ public class DataInitializer implements CommandLineRunner {
                     .build());
         }
         log.info("DataInitializer: 3 peluqueras demo creadas.");
+    }
+
+    private String requireDemoPassword() {
+        if (demoPassword == null || demoPassword.isBlank()) {
+            throw new IllegalStateException(
+                    "APP_DEMO_PASSWORD debe estar configurada para crear usuarios demo.");
+        }
+        return demoPassword;
     }
 
     private void crearServicios() {

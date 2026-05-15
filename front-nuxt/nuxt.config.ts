@@ -66,12 +66,15 @@ export default defineNuxtConfig({
   // el bug de "pantalla en blanco" al navegar entre layouts en Nuxt
   app: {
     head: {
-      title: 'Atelier Sapphire — Gestión',
+      title: 'Peluquería Isabella',
       meta: [
         { name: 'description', content: 'Sistema de gestión de peluquería' },
         { name: 'viewport',    content: 'width=device-width, initial-scale=1' },
       ],
       link: [
+        { rel: 'icon', type: 'image/png', href: '/logotipo.png?v=4' },
+        { rel: 'shortcut icon', type: 'image/png', href: '/logotipo.png?v=4' },
+        { rel: 'apple-touch-icon', href: '/logotipo.png?v=4' },
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         {

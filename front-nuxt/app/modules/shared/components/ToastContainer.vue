@@ -14,7 +14,7 @@ const colors = {
 
 <template>
   <Teleport to="body">
-    <div class="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+    <div class="fixed left-4 right-4 top-4 z-[100] flex flex-col gap-2 pointer-events-none sm:left-auto">
       <TransitionGroup
         enter-active-class="transition-all duration-300 ease-out"
         leave-active-class="transition-all duration-200 ease-in"
@@ -25,7 +25,7 @@ const colors = {
           v-for="toast in toasts"
           :key="toast.id"
           :class="colors[toast.type]"
-          class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg min-w-[280px] max-w-[400px]"
+          class="pointer-events-auto flex w-full items-center gap-3 rounded-xl border px-4 py-3 shadow-lg sm:w-auto sm:min-w-[280px] sm:max-w-[400px]"
           role="alert"
         >
           <component :is="icon[toast.type]" class="w-5 h-5 flex-shrink-0" />

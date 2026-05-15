@@ -26,12 +26,21 @@ create_modules.py
 task.md.resolved
 implementation_plan.md.resolved
 stitch/
+.backups/
+nul
+
+# ── Salida de herramientas de análisis (generado, no subir) ─
+backend-spring/graphify-out/
+
+# ── Notas de sesión internas ────────────────────────────────
+docs/sesion-*.md
 
 # ── Claude Code (configuración local del IDE AI) ───────────
 .claude/
 
 # ── Documentación interna / TFG (no subir al repo público) ─
 documentacion-no-github/
+entrega-profesor/
 MEMORANDUM_DEFENSA_TFG.md
 MEMORANDUM_DEFENSA_TFG.pdf
 MEMORANDUM_FRONTEND_TFG.md
