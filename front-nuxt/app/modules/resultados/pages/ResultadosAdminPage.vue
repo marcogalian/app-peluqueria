@@ -20,6 +20,8 @@ type Periodo = 'semana' | 'mes' | 'trimestre' | 'anio'
 interface ResultadosData {
   kpis: {
     ingresosPeriodo: number
+    ingresosServicios: number
+    ingresosProductos: number
     ingresosDia: number
     ingresosSemana: number
     ingresosMes: number
@@ -84,6 +86,31 @@ const datosGraficaTarta = computed(() => ({
     hoverOffset: 0,
   }],
 }))
+
+const datosGraficaFuente = computed(() => ({
+  labels: ['Servicios', 'Productos'],
+  datasets: [{
+    data: [
+      datos.value?.kpis.ingresosServicios ?? 0,
+      datos.value?.kpis.ingresosProductos ?? 0,
+    ],
+    backgroundColor: ['#1a365d', '#2f855a'],
+    borderColor: '#ffffff',
+    borderWidth: 4,
+    hoverOffset: 0,
+  }],
+}))
+
+const opcionesFuente = {
+  responsive: true,
+  cutout: '58%',
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+      labels: { boxWidth: 10, usePointStyle: true },
+    },
+  },
+}
 
 const topServicio = computed(() => datos.value?.topServicios[0] ?? null)
 const topEmpleado = computed(() => datos.value?.topEmpleados[0] ?? null)
@@ -244,6 +271,24 @@ function formatPct(n: number): string {
           <p class="text-xs text-on-surface-variant mt-2">Objetivo: &lt; 15%</p>
         </div>
 
+      </div>
+
+      <!-- ── Origen de ingresos ───────────────────────── -->
+      <div v-if="datos.kpis.ingresosPeriodo > 0" class="card resultados-panel-card p-6 xl:col-span-1">
+        <h5 class="text-base font-bold text-primary mb-4">Origen de ingresos</h5>
+        <div class="max-w-xs mx-auto">
+          <Doughnut :data="datosGraficaFuente" :options="opcionesFuente" />
+        </div>
+        <div class="grid grid-cols-2 gap-3 mt-5 text-center">
+          <div class="rounded-lg bg-surface-container p-3">
+            <p class="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant mb-1">Servicios</p>
+            <p class="text-sm font-extrabold text-primary">{{ formatEur(datos.kpis.ingresosServicios) }}</p>
+          </div>
+          <div class="rounded-lg bg-surface-container p-3">
+            <p class="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant mb-1">Productos</p>
+            <p class="text-sm font-extrabold" style="color:#2f855a">{{ formatEur(datos.kpis.ingresosProductos) }}</p>
+          </div>
+        </div>
       </div>
 
       <!-- ── Gráfica evolución + Top servicios ─────────── -->

@@ -365,6 +365,8 @@ public class ConsultarPanelFinanciero {
         return ResultadosDTO.builder()
                 .kpis(ResultadosDTO.Kpis.builder()
                         .ingresosPeriodo(ingresosPeriodo)
+                        .ingresosServicios(ingresosServiciosPeriodo)
+                        .ingresosProductos(ingresosPeriodo - ingresosServiciosPeriodo)
                         .ingresosDia(ingresosDia)
                         .ingresosSemana(ingresosSemana)
                         .ingresosMes(ingresosMes)
