@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.marcog.peluqueria.clientes.domain.Genero;
 import com.marcog.peluqueria.clientes.infrastructure.persistence.ClienteEntity;
 import com.marcog.peluqueria.clientes.infrastructure.persistence.JpaClienteRepository;
+import com.marcog.peluqueria.finanzas.domain.CategoriaGasto;
+import com.marcog.peluqueria.finanzas.domain.Gasto;
+import com.marcog.peluqueria.finanzas.domain.GastoRepository;
 import com.marcog.peluqueria.ofertas.domain.TipoOferta;
 import com.marcog.peluqueria.ofertas.infrastructure.persistence.JpaOfertaRepository;
 import com.marcog.peluqueria.ofertas.infrastructure.persistence.OfertaEntity;
@@ -46,6 +49,7 @@ public class DataInitializer implements CommandLineRunner {
     private final JpaServicioRepository  servicioRepository;
     private final JpaProductoRepository  productoRepository;
     private final JpaOfertaRepository    ofertaRepository;
+    private final GastoRepository        gastoRepository;
     private final PasswordEncoder        passwordEncoder;
     @Value("${app.seed.remote-clients.enabled:true}")
     private boolean remoteClientsEnabled;
@@ -72,6 +76,50 @@ public class DataInitializer implements CommandLineRunner {
         }
         if (ofertaRepository.count() == 0) {
             crearOfertas();
+        }
+        crearGastosDemoSiNoExisten();
+    }
+
+    /**
+     * Carga los gastos demo (nominas y gastos fijos) si no existen ya.
+     * Idempotente: solo crea el gasto cuyo concepto no este presente, asi
+     * una BD nueva queda igual que la de desarrollo y el asistente puede
+     * leer la nomina bruta de cada empleado desde la tabla de gastos.
+     * La fecha es el dia 1 del mes actual para que las consultas "este mes"
+     * funcionen en cualquier momento de la demo.
+     */
+    private void crearGastosDemoSiNoExisten() {
+        record GastoDemo(String concepto, String importe, CategoriaGasto categoria) {}
+
+        List<GastoDemo> datos = List.of(
+                new GastoDemo("Nómina bruta Sofía Martínez",  "1800.00", CategoriaGasto.SALARIOS),
+                new GastoDemo("Nómina bruta Carmen López",    "1700.00", CategoriaGasto.SALARIOS),
+                new GastoDemo("Nómina bruta Lucía Fernández", "1550.00", CategoriaGasto.SALARIOS),
+                new GastoDemo("Alquiler Local",               "875.00",  CategoriaGasto.ALQUILER),
+                new GastoDemo("Iberdrola",                    "250.00",  CategoriaGasto.LUZ),
+                new GastoDemo("Aguas De Cartagena",           "96.60",   CategoriaGasto.AGUA)
+        );
+
+        var existentes = gastoRepository.findAll().stream()
+                .map(Gasto::getConcepto)
+                .filter(c -> c != null)
+                .map(String::trim)
+                .toList();
+
+        LocalDate fecha = LocalDate.now().withDayOfMonth(1);
+        int creados = 0;
+        for (GastoDemo g : datos) {
+            if (existentes.contains(g.concepto())) continue;
+            gastoRepository.save(Gasto.builder()
+                    .concepto(g.concepto())
+                    .importe(new BigDecimal(g.importe()))
+                    .fecha(fecha)
+                    .categoria(g.categoria())
+                    .build());
+            creados++;
+        }
+        if (creados > 0) {
+            log.info("DataInitializer: {} gastos demo creados.", creados);
         }
     }
 
