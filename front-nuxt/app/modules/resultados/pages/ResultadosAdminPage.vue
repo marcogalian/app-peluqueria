@@ -203,7 +203,7 @@ function formatPct(n: number): string {
       <Loader2 class="w-8 h-8 animate-spin text-primary" />
     </div>
 
-    <template v-else-if="datos">
+    <template v-if="!cargando && datos">
 
       <!-- ── KPI Cards ──────────────────────────────────── -->
       <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
