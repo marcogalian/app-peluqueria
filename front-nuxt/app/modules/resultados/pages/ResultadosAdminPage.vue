@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
  * Resultados — análisis financiero completo.
- * KPIs de ingresos + gráfica de tendencias (Chart.js) + top servicios + top empleados.
+ * KPIs de ingresos + gráfica de tendencias (Chart.js) + top servicios + top empleados + gastos.
  */
 import { TrendingUp, TrendingDown, Loader2 } from 'lucide-vue-next'
+import GastosPanel from '../components/GastosPanel.vue'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
@@ -34,9 +35,10 @@ interface ResultadosData {
 }
 
 // ── Estado ────────────────────────────────────────────────
-const cargando = ref(true)
-const periodo  = ref<Periodo>('mes')
-const datos    = ref<ResultadosData | null>(null)
+const cargando  = ref(true)
+const periodo   = ref<Periodo>('mes')
+const datos     = ref<ResultadosData | null>(null)
+const vistaActiva = ref<'rendimiento' | 'gastos'>('rendimiento')
 
 const periodos: { key: Periodo; label: string }[] = [
   { key: 'semana', label: 'Esta semana' },
@@ -144,12 +146,43 @@ function formatPct(n: number): string {
 <template>
   <div class="space-y-8">
 
-    <!-- ── Cabecera + selector de período ────────────────── -->
+    <!-- ── Cabecera + tabs ───────────────────────────────── -->
     <div class="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-0 sm:justify-between">
       <div>
-        <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Rendimiento Comercial</h2>
-        <p class="text-on-surface-variant text-sm">Análisis detallado de Peluquería Isabella</p>
+        <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Resultados</h2>
+        <p class="text-on-surface-variant text-sm">Análisis financiero de Peluquería Isabella</p>
       </div>
+      <!-- Tabs Rendimiento / Gastos -->
+      <div class="flex gap-1 bg-surface-container rounded-xl p-1">
+        <button
+          class="px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors"
+          :class="vistaActiva === 'rendimiento'
+            ? 'bg-white text-primary shadow-sm'
+            : 'text-on-surface-variant hover:text-on-surface'"
+          @click="vistaActiva = 'rendimiento'"
+        >
+          Rendimiento
+        </button>
+        <button
+          class="px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors"
+          :class="vistaActiva === 'gastos'
+            ? 'bg-white text-primary shadow-sm'
+            : 'text-on-surface-variant hover:text-on-surface'"
+          @click="vistaActiva = 'gastos'"
+        >
+          Gastos
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Vista Gastos ──────────────────────────────────── -->
+    <GastosPanel v-if="vistaActiva === 'gastos'" />
+
+    <!-- ── Vista Rendimiento ─────────────────────────────── -->
+    <template v-if="vistaActiva === 'rendimiento'">
+
+    <!-- Selector de período -->
+    <div class="flex justify-end">
       <div class="w-full sm:w-52">
         <label for="resultados-periodo" class="sr-only">Seleccionar período de análisis</label>
         <select
@@ -318,6 +351,9 @@ function formatPct(n: number): string {
       </div>
 
     </template>
+
+    </template> <!-- fin v-if rendimiento -->
+
   </div>
 </template>
 

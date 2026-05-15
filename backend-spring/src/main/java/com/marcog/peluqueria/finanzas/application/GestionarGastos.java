@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Service
@@ -28,6 +29,16 @@ public class GestionarGastos {
 
     public Gasto getGastoById(UUID id) {
         return repository.findById(id).orElseThrow(() -> new RuntimeException("Gasto not found"));
+    }
+
+    public Gasto updateGasto(UUID id, Gasto detalles) {
+        Gasto existente = repository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Gasto no encontrado: " + id));
+        if (detalles.getConcepto() != null)   existente.setConcepto(detalles.getConcepto());
+        if (detalles.getImporte() != null)    existente.setImporte(detalles.getImporte());
+        if (detalles.getFecha() != null)      existente.setFecha(detalles.getFecha());
+        if (detalles.getCategoria() != null)  existente.setCategoria(detalles.getCategoria());
+        return repository.save(existente);
     }
 
     public void deleteGasto(UUID id) {

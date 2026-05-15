@@ -48,6 +48,14 @@ public class FinanzasController {
         return ResponseEntity.ok(gestionarGastos.createGasto(gasto));
     }
 
+    @Operation(summary = "Actualizar gasto", description = "Actualiza un gasto existente")
+    @ApiResponse(responseCode = "200", description = "Gasto actualizado")
+    @PutMapping("/gastos/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Gasto> updateGasto(@PathVariable UUID id, @RequestBody Gasto gasto) {
+        return ResponseEntity.ok(gestionarGastos.updateGasto(id, gasto));
+    }
+
     @Operation(summary = "Eliminar gasto", description = "Elimina un gasto")
     @ApiResponse(responseCode = "204", description = "Gasto eliminado")
     @DeleteMapping("/gastos/{id}")
