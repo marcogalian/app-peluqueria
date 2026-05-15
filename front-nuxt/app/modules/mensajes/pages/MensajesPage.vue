@@ -5,8 +5,6 @@
 import { Send, Loader2, MessageSquare, Mail, CheckCircle2, Archive, Trash2, Clock3 } from 'lucide-vue-next'
 import { useToast } from '~/modules/shared/composables/useToast'
 
-definePageMeta({ middleware: 'auth' })
-
 interface Mensaje {
   id: string
   emisorId: string
@@ -171,9 +169,9 @@ async function eliminarMensaje(mensajeId: string) {
 </script>
 
 <template>
-  <div class="flex min-h-full flex-col items-stretch gap-5 pb-6">
-    <aside class="card flex w-full flex-col overflow-hidden" aria-label="Contactos">
-      <div class="border-b border-surface-container p-5 sm:flex sm:items-center sm:justify-between">
+  <div class="flex min-h-full flex-col items-stretch gap-4 pb-4 sm:gap-5 sm:pb-6">
+    <aside class="card flex w-full flex-col overflow-hidden rounded-2xl" aria-label="Contactos">
+      <div class="border-b border-surface-container px-4 py-4 sm:flex sm:items-center sm:justify-between sm:p-5">
         <h3 class="font-bold text-primary text-sm">Mensajes</h3>
         <div class="flex items-center gap-2 mt-1">
           <Mail class="w-3.5 h-3.5 text-on-surface-variant" aria-hidden="true" />
@@ -185,23 +183,23 @@ async function eliminarMensaje(mensajeId: string) {
         <Loader2 class="w-5 h-5 animate-spin text-primary" aria-hidden="true" />
       </div>
 
-      <ul v-else class="flex gap-2 overflow-x-auto p-3 lg:flex-wrap" role="list" aria-label="Lista de contactos">
-        <li v-for="c in contactos" :key="c.id" class="min-w-[13rem] lg:min-w-0 lg:flex-1">
+      <ul v-else class="grid gap-2 px-3 py-3 sm:grid-cols-2 sm:px-4 lg:flex lg:flex-wrap" role="list" aria-label="Lista de contactos">
+        <li v-for="c in contactos" :key="c.id" class="min-w-0 lg:flex-1">
         <button
-          class="w-full flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-surface-container-low transition-colors text-left"
+          class="w-full flex items-center gap-3 rounded-2xl px-3 py-3 hover:bg-surface-container-low transition-colors text-left sm:px-4"
           :class="contactoActivo?.id === c.id ? 'bg-surface-container-low ring-2 ring-primary-container/20' : ''"
           :aria-label="`${c.nombre}, ${c.rol === 'ROLE_ADMIN' ? 'Administrador' : 'Peluquero/a'}${c.online ? ', en línea' : ''}`"
           :aria-pressed="contactoActivo?.id === c.id"
           @click="seleccionarContacto(c)"
         >
           <div class="relative flex-shrink-0">
-            <div class="w-9 h-9 rounded-full bg-primary-container text-white flex items-center justify-center text-xs font-bold">
+            <div class="w-8 h-8 rounded-full bg-primary-container text-white flex items-center justify-center text-[11px] font-bold sm:h-9 sm:w-9 sm:text-xs">
               {{ c.iniciales }}
             </div>
             <div v-if="c.online" class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
           </div>
           <div class="min-w-0">
-            <p class="font-bold text-on-surface text-sm truncate">{{ c.nombre }}</p>
+            <p class="font-bold text-on-surface text-[13px] truncate sm:text-sm">{{ c.nombre }}</p>
             <p class="text-[10px] text-on-surface-variant">{{ c.rol === 'ROLE_ADMIN' ? 'Administrador' : 'Peluquero/a' }}</p>
           </div>
         </button>
@@ -213,14 +211,14 @@ async function eliminarMensaje(mensajeId: string) {
       </ul>
     </aside>
 
-    <section class="card flex w-full min-w-0 flex-1 flex-col overflow-hidden">
+    <section class="card flex w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl">
       <div v-if="!contactoActivo" class="flex-1 flex flex-col items-center justify-center text-on-surface-variant gap-3">
         <MessageSquare class="w-10 h-10 opacity-20" />
         <p class="text-sm">Selecciona un contacto para escribirle</p>
       </div>
 
       <template v-else>
-        <div class="flex flex-shrink-0 flex-col gap-3 border-b border-surface-container px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div class="flex flex-shrink-0 flex-col gap-3 border-b border-surface-container px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
           <div class="flex min-w-0 items-center gap-3">
             <div class="w-9 h-9 rounded-full bg-primary-container text-white flex items-center justify-center text-xs font-bold">
               {{ contactoActivo.iniciales }}
@@ -237,9 +235,9 @@ async function eliminarMensaje(mensajeId: string) {
           </div>
         </div>
 
-        <div class="flex-shrink-0 bg-surface-container-low/40 px-4 pt-4 pb-8 sm:px-6 sm:pt-5 sm:pb-10">
-          <div class="space-y-4">
-            <div class="rounded-2xl bg-white border border-surface-container px-4 pt-5 pb-5 shadow-sm sm:px-6 sm:pt-6 sm:pb-6">
+        <div class="flex-shrink-0 bg-surface-container-low/30 px-3 py-3 sm:px-6 sm:py-5">
+          <div class="space-y-3 sm:space-y-4">
+            <div class="rounded-2xl border border-surface-container bg-white px-4 py-4 shadow-sm sm:px-6 sm:py-6">
             <div class="flex items-center gap-2 mb-4">
               <Mail class="w-4 h-4 text-primary-container" />
               <h4 class="font-bold text-primary text-sm">Redactar correo</h4>
@@ -258,16 +256,16 @@ async function eliminarMensaje(mensajeId: string) {
                 <label class="label">Mensaje</label>
                 <textarea
                   v-model="emailForm.cuerpo"
-                  rows="5"
+                  rows="4"
                   maxlength="4000"
-                  class="input resize-none"
+                  class="input min-h-[7rem] resize-none"
                   placeholder="Escribe el correo que quieres enviar..."
                 />
               </div>
 
-              <div class="mt-2 flex rounded-2xl bg-surface-container-low/70 px-4 py-4 sm:justify-end">
+              <div class="mt-1 flex sm:justify-end">
                 <button
-                  class="flex w-full items-center justify-center gap-2 rounded-full bg-primary-container px-4 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto sm:min-w-36"
+                  class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-container px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto sm:min-w-36"
                   :disabled="enviandoEmail"
                   @click="enviarEmailManual"
                 >
@@ -294,7 +292,7 @@ async function eliminarMensaje(mensajeId: string) {
             </div>
             </div>
 
-            <div class="rounded-2xl bg-white border border-surface-container px-4 py-5 shadow-sm space-y-3 sm:px-6">
+            <div class="rounded-2xl border border-surface-container bg-white px-4 py-4 shadow-sm space-y-3 sm:px-6 sm:py-5">
               <div class="flex flex-col gap-3 border-b border-surface-container pb-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h5 class="text-sm font-bold text-primary">Mensajes para {{ contactoActivo.nombre }}</h5>

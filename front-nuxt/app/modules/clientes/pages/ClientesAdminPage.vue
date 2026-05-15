@@ -15,6 +15,7 @@ import {
   Upload, X, ZoomIn, Trash2, CalendarDays, Scissors,
 } from 'lucide-vue-next'
 import { useToast } from '~/modules/shared/composables/useToast'
+import { useAuthStore } from '~/modules/auth/store/auth.store'
 import type {
   Cliente,
   FotoCliente,
@@ -22,10 +23,9 @@ import type {
   HistorialCliente,
 } from '~/modules/clientes/types/cliente.types'
 
-definePageMeta({ middleware: ['auth', 'admin'] })
-
 const config = useRuntimeConfig()
 const toast = useToast()
+const authStore = useAuthStore()
 
 // ── Estado ────────────────────────────────────────────────
 const clientes    = ref<Cliente[]>([])
@@ -43,8 +43,13 @@ const tabActiva           = ref<'info' | 'fotos'>('info')
 const fotos            = ref<FotoCliente[]>([])
 const cargandoFotos    = ref(false)
 const fotoAmpliada     = ref<FotoCliente | null>(null)
+const editandoDesc     = ref(false)
+const descEditando     = ref('')
+const fotoAEliminar    = ref<FotoCliente | null>(null)
 const subiendo         = ref(false)
 const descripcionFoto  = ref('')
+const arrastrando      = ref(false)
+const inputFoto        = ref<HTMLInputElement | null>(null)
 const historialCliente = ref<HistorialCliente | null>(null)
 const cargandoHistorial = ref(false)
 const periodoActividad = ref<'mes' | 'anio'>('mes')
@@ -228,16 +233,14 @@ async function registrarConsentimiento() {
 }
 
 /** Sube una foto al servidor (multipart/form-data) */
-async function subirFoto(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file  = input.files?.[0]
-  if (!file || !clienteSeleccionado.value) return
+async function subirFoto(file: File) {
+  if (!clienteSeleccionado.value) return
 
   subiendo.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
     const formData = new FormData()
-    formData.append('foto', file)
+    formData.append('file', file)
     formData.append('descripcion', descripcionFoto.value)
     await api.post(
       `/v1/clientes/${clienteSeleccionado.value.id}/fotos`,
@@ -248,11 +251,29 @@ async function subirFoto(event: Event) {
     await cargarFotos()
   } finally {
     subiendo.value = false
-    input.value    = ''  // reseteamos el input para poder subir la misma foto
+    if (inputFoto.value) inputFoto.value.value = ''
   }
 }
 
-async function eliminarFoto(foto: FotoCliente) {
+function onFileChange(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (file) subirFoto(file)
+}
+
+function onDrop(event: DragEvent) {
+  arrastrando.value = false
+  const file = event.dataTransfer?.files?.[0]
+  if (file) subirFoto(file)
+}
+
+function confirmarEliminarFoto(foto: FotoCliente) {
+  fotoAEliminar.value = foto
+}
+
+async function eliminarFoto() {
+  const foto = fotoAEliminar.value
+  if (!foto) return
+  fotoAEliminar.value = null
   try {
     const { api } = await import('~/infrastructure/http/api')
     await api.delete(`/v1/fotos/${foto.id}`)
@@ -261,6 +282,30 @@ async function eliminarFoto(foto: FotoCliente) {
   } catch {
     // La foto permanece en la lista si falla
   }
+}
+
+async function actualizarDescripcionFoto() {
+  if (!fotoAmpliada.value) return
+  try {
+    const { api } = await import('~/infrastructure/http/api')
+    const { data } = await api.patch<FotoCliente>(
+      `/v1/fotos/${fotoAmpliada.value.id}/descripcion`,
+      null,
+      { params: { descripcion: descEditando.value } },
+    )
+    fotoAmpliada.value = data
+    const idx = fotos.value.findIndex(f => f.id === data.id)
+    if (idx !== -1) fotos.value[idx] = data
+    editandoDesc.value = false
+  } catch {
+    // No cambiar nada si falla
+  }
+}
+
+function empezarEditarDesc() {
+  if (!fotoAmpliada.value) return
+  descEditando.value = fotoAmpliada.value.descripcion || ''
+  editandoDesc.value = true
 }
 
 /** Construye la URL completa de una foto */
@@ -701,30 +746,39 @@ async function guardarCliente() {
                 aria-label="Fotos del historial de peinados"
                 class="p-4 space-y-4"
               >
-                <div class="border-2 border-dashed border-surface-border rounded-lg p-4 text-center bg-white">
-                  <label class="cursor-pointer block">
-                    <Upload class="w-6 h-6 text-text-muted mx-auto mb-2" />
-                    <p class="text-sm text-text-secondary mb-2">
-                      {{ subiendo ? 'Subiendo...' : 'Subir foto del peinado' }}
-                    </p>
-                    <input
-                      type="text"
-                      v-model="descripcionFoto"
-                      placeholder="Descripción (opcional)"
-                      class="input mb-2 text-sm"
-                      @click.stop
-                    />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      class="hidden"
-                      :disabled="subiendo"
-                      @change="subirFoto"
-                    />
-                    <span class="btn-secondary text-sm py-1.5 px-3">
-                      <Loader2 v-if="subiendo" class="w-4 h-4 animate-spin" />
-                      <span v-else>Seleccionar foto</span>
-                    </span>
+                <div
+                  class="border-2 border-dashed rounded-lg p-4 text-center bg-white transition-colors"
+                  :class="arrastrando ? 'border-primary bg-primary/5' : 'border-surface-border'"
+                  @dragover.prevent="arrastrando = true"
+                  @dragleave.prevent="arrastrando = false"
+                  @drop.prevent="onDrop"
+                >
+                  <Upload class="w-6 h-6 text-text-muted mx-auto mb-2" />
+                  <p class="text-sm text-text-secondary mb-2">
+                    {{ subiendo ? 'Subiendo...' : 'Arrastra aquí o selecciona una foto' }}
+                  </p>
+                  <input
+                    type="text"
+                    v-model="descripcionFoto"
+                    placeholder="Descripción (opcional)"
+                    class="input mb-2 text-sm"
+                  />
+                  <input
+                    id="foto-upload-input"
+                    ref="inputFoto"
+                    type="file"
+                    accept="image/*"
+                    class="hidden"
+                    :disabled="subiendo"
+                    @change="onFileChange"
+                  />
+                  <label
+                    for="foto-upload-input"
+                    class="btn-secondary text-sm py-1.5 px-3 cursor-pointer inline-flex items-center gap-1"
+                    :class="{ 'opacity-50 pointer-events-none': subiendo }"
+                  >
+                    <Loader2 v-if="subiendo" class="w-4 h-4 animate-spin" />
+                    <span v-else>Seleccionar foto</span>
                   </label>
                 </div>
 
@@ -761,7 +815,7 @@ async function guardarCliente() {
                         type="button"
                         class="w-8 h-8 rounded-full bg-red-500/90 flex items-center justify-center text-white hover:bg-red-600 transition-colors"
                         :aria-label="`Eliminar foto: ${foto.descripcion || 'peinado'}`"
-                        @click="eliminarFoto(foto)"
+                        @click="confirmarEliminarFoto(foto)"
                       >
                         <Trash2 class="w-4 h-4" aria-hidden="true" />
                       </button>
@@ -863,11 +917,11 @@ async function guardarCliente() {
         class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
         @click.self="fotoAmpliada = null"
       >
-        <div class="relative max-w-2xl w-full animate-fade-scale-in">
+        <div class="relative max-w-2xl w-full animate-fade-scale-in flex flex-col items-center">
           <img
             :src="urlFoto(fotoAmpliada.rutaArchivo)"
             :alt="fotoAmpliada.descripcion"
-            class="w-full rounded-card"
+            class="w-full rounded-card max-h-[75vh] object-contain"
           />
           <button
             class="absolute top-3 right-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-text-primary hover:bg-white"
@@ -875,9 +929,26 @@ async function guardarCliente() {
           >
             <X class="w-4 h-4" />
           </button>
-          <div v-if="fotoAmpliada.descripcion" class="mt-2 text-center">
-            <p class="text-white text-sm">{{ fotoAmpliada.descripcion }}</p>
-            <p class="text-white/50 text-xs mt-1">Subida por {{ fotoAmpliada.subidaPorNombre }}</p>
+          <div class="mt-2 text-center">
+            <div v-if="editandoDesc" class="flex items-center justify-center gap-2">
+              <input
+                v-model="descEditando"
+                type="text"
+                class="px-2 py-1 rounded text-sm text-text-primary w-64"
+                placeholder="Descripción..."
+                @keydown.enter="actualizarDescripcionFoto"
+              />
+              <button class="text-white/80 hover:text-white text-sm" @click="actualizarDescripcionFoto">✓</button>
+              <button class="text-white/50 hover:text-white text-sm" @click="editandoDesc = false">✕</button>
+            </div>
+            <p v-else-if="fotoAmpliada.descripcion" class="text-white text-sm">{{ fotoAmpliada.descripcion }}</p>
+            <p v-else class="text-white/50 text-sm italic">Sin descripción</p>
+            <div class="flex items-center justify-center gap-2 mt-1">
+              <p class="text-white/50 text-xs">Subida por {{ fotoAmpliada.subidaPorNombre }}</p>
+              <button class="text-white/50 hover:text-white text-xs underline" @click="empezarEditarDesc">
+                {{ fotoAmpliada.descripcion ? 'Editar' : 'Añadir descripción' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -914,6 +985,54 @@ async function guardarCliente() {
             </button>
             <button class="btn-primary flex-1" @click="registrarConsentimiento">
               El cliente acepta
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
+  <Teleport to="body">
+    <Transition name="modal-overlay">
+      <div
+        v-if="fotoAEliminar"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-foto-confirm-title"
+        @click.self="fotoAEliminar = null"
+      >
+        <div class="w-full max-w-sm rounded-xl border border-outline-variant/30 bg-white p-6 shadow-card-lg">
+          <div class="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p id="delete-foto-confirm-title" class="text-lg font-extrabold text-primary">
+                Eliminar foto
+              </p>
+              <p class="mt-2 text-sm leading-relaxed text-on-surface-variant">
+                ¿Seguro que quieres eliminar esta foto{{ fotoAEliminar?.descripcion ? ` ("${fotoAEliminar.descripcion}")` : '' }}? Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <button
+              class="rounded-md p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low"
+              aria-label="Cancelar eliminar foto"
+              @click="fotoAEliminar = null"
+            >
+              <X class="h-4 w-4" />
+            </button>
+          </div>
+
+          <div class="flex justify-end gap-3">
+            <button
+              class="rounded-md border border-outline-variant/50 bg-white px-4 py-2 text-sm font-bold text-on-surface transition-colors hover:bg-surface-container-low"
+              @click="fotoAEliminar = null"
+            >
+              Cancelar
+            </button>
+            <button
+              class="rounded-md bg-error px-4 py-2 text-sm font-bold text-white transition-colors hover:brightness-95"
+              @click="eliminarFoto"
+            >
+              Sí, eliminar
             </button>
           </div>
         </div>

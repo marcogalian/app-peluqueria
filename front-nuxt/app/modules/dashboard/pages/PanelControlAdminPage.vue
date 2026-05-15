@@ -7,6 +7,7 @@ import {
   TrendingUp, TrendingDown, Wallet, Calendar, Loader2,
   Users, UserCheck, Scissors, AlertTriangle, Package,
   Trophy, ArrowDown, User, Star, Activity, BadgeCheck,
+  ClipboardList,
 } from 'lucide-vue-next'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
 import {
@@ -16,8 +17,6 @@ import {
 } from 'chart.js'
 
 ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, Filler, ArcElement, BarElement)
-
-definePageMeta({ middleware: ['auth', 'admin'] })
 
 const cargando = ref(true)
 
@@ -120,13 +119,16 @@ const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
-    legend: { position: 'top' as const },
+    legend: { display: false },
     tooltip: { mode: 'index' as const, intersect: false }
   },
   interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false },
   scales: { 
     y: { beginAtZero: true, border: { display: false } },
-    x: { grid: { display: false } }
+    x: {
+      grid: { display: false },
+      ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 6 },
+    }
   },
 }
 
@@ -164,15 +166,7 @@ const doughnutOptions = {
   maintainAspectRatio: false,
   cutout: '68%',
   plugins: {
-    legend: {
-      position: 'bottom' as const,
-      labels: {
-        usePointStyle: true,
-        boxWidth: 8,
-        padding: 14,
-        font: { size: 11, weight: '600' as const },
-      },
-    },
+    legend: { display: false },
     tooltip: {
       callbacks: {
         label: (ctx: any) => `${ctx.label}: ${ctx.parsed}`,
@@ -215,7 +209,13 @@ const horizontalBarOptions = {
     y: {
       border: { display: false },
       grid: { display: false },
-      ticks: { font: { size: 11, weight: '600' as const } },
+      ticks: {
+        font: { size: 10, weight: '600' as const },
+        callback(value: string | number) {
+          const label = this.getLabelForValue(Number(value))
+          return label.length > 18 ? `${label.slice(0, 18)}…` : label
+        },
+      },
     },
   },
 }
@@ -351,24 +351,43 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
     <!-- ══════════════════════════════════════════════════════
          FILTROS SUPERIORES
          ════════════════════════════════════════════════════ -->
-    <div class="dashboard-panel-card p-5 flex flex-col md:flex-row items-center justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+    <div class="dashboard-panel-card p-4 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
           <Activity class="w-5 h-5 text-primary" />
         </div>
-        <div>
-          <h1 class="text-xl font-bold text-text-primary">Panel de Control</h1>
-          <p class="text-sm text-text-secondary">Finanzas · Personal · Inventario</p>
+        <div class="min-w-0">
+          <h1 class="text-lg sm:text-xl font-bold text-text-primary">Panel de Control</h1>
+          <p class="text-xs sm:text-sm text-text-secondary">Finanzas · Personal · Inventario</p>
         </div>
       </div>
-      <div class="flex items-center gap-3 w-full md:w-auto">
-        <input type="date" v-model="fechaFiltro" class="input dashboard-filter-field w-full md:w-44" />
-        <select v-model="agrupacion" class="select-field dashboard-filter-field w-full md:w-44 cursor-pointer">
+      <div class="grid grid-cols-2 gap-2 w-full md:flex md:items-center md:gap-3 md:w-auto">
+        <input type="date" v-model="fechaFiltro" class="input dashboard-filter-field min-w-0 w-full md:w-44" />
+        <select v-model="agrupacion" class="select-field dashboard-filter-field min-w-0 w-full md:w-44 cursor-pointer">
           <option value="DIA">Ver datos del día</option>
           <option value="MES">Ver datos del mes</option>
         </select>
       </div>
     </div>
+
+    <NuxtLink
+      to="/admin/auditoria"
+      class="dashboard-panel-card block p-4 sm:p-5 transition-colors hover:bg-surface-container-low"
+      aria-label="Abrir auditoría"
+    >
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <ClipboardList class="w-5 h-5 text-blue-600" />
+          </div>
+          <div class="min-w-0">
+            <h2 class="text-base font-bold text-text-primary">Auditoría</h2>
+            <p class="text-sm text-text-secondary">Revisa cambios en clientes, productos, citas y configuración.</p>
+          </div>
+        </div>
+        <span class="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-primary flex-shrink-0">Abrir</span>
+      </div>
+    </NuxtLink>
 
     <!-- LOADER -->
     <div v-if="cargando" class="min-h-[300px] flex items-center justify-center">
@@ -383,13 +402,13 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
       <div class="flex flex-col gap-6">
 
         <!-- Gráfica principal -->
-        <div class="dashboard-panel-card p-6 w-full flex flex-col min-h-[360px]">
-          <div class="flex items-center justify-between mb-4">
+        <div class="dashboard-panel-card p-4 sm:p-6 w-full flex flex-col min-h-[390px] sm:min-h-[360px]">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div>
               <h3 class="text-base font-bold text-text-primary">Evolución mensual</h3>
               <p class="text-xs text-text-secondary mt-0.5">Ingresos vs gastos diarios — {{ selectedYear }}</p>
             </div>
-            <div class="flex items-center gap-3 text-xs">
+            <div class="flex items-center gap-3 text-[11px] sm:text-xs">
               <span class="flex items-center gap-1.5 text-text-secondary">
                 <span class="w-3 h-1 rounded-full bg-emerald-500 block" /> Ingresos
               </span>
@@ -398,29 +417,29 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
               </span>
             </div>
           </div>
-          <div class="flex-1 relative">
+          <div class="min-h-[190px] flex-1 relative">
             <Line :data="chartData" :options="chartOptions" />
           </div>
 
           <!-- Insights bajo la gráfica -->
-          <div class="grid grid-cols-4 gap-3 mt-5 pt-4 border-t border-outline-variant/20">
-            <div class="text-center">
-              <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Días activos</p>
-              <p class="text-xl font-black text-text-primary">{{ insightsFinancieros.diasConVentas }}</p>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-5 pt-4 border-t border-outline-variant/20">
+            <div class="rounded-xl bg-surface-container-low/60 px-2 py-2 text-center sm:bg-transparent sm:px-0 sm:py-0">
+              <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest text-text-muted mb-1">Días activos</p>
+              <p class="text-lg sm:text-xl font-black text-text-primary">{{ insightsFinancieros.diasConVentas }}</p>
             </div>
-            <div class="text-center border-l border-outline-variant/20">
-              <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Mejor día</p>
-              <p class="text-xl font-black text-text-primary">
+            <div class="rounded-xl bg-surface-container-low/60 px-2 py-2 text-center sm:border-l sm:border-outline-variant/20 sm:bg-transparent sm:px-0 sm:py-0">
+              <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest text-text-muted mb-1">Mejor día</p>
+              <p class="text-lg sm:text-xl font-black text-text-primary">
                 {{ insightsFinancieros.mejorDia !== '0' ? `Día ${insightsFinancieros.mejorDia}` : '—' }}
               </p>
             </div>
-            <div class="text-center border-l border-outline-variant/20">
-              <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Citas facturadas</p>
-              <p class="text-xl font-black text-text-primary">{{ insightsFinancieros.citasCompletadas }}</p>
+            <div class="rounded-xl bg-surface-container-low/60 px-2 py-2 text-center sm:border-l sm:border-outline-variant/20 sm:bg-transparent sm:px-0 sm:py-0">
+              <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest text-text-muted mb-1">Citas fact.</p>
+              <p class="text-lg sm:text-xl font-black text-text-primary">{{ insightsFinancieros.citasCompletadas }}</p>
             </div>
-            <div class="text-center border-l border-outline-variant/20">
-              <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Ticket medio</p>
-              <p class="text-xl font-black text-text-primary">{{ formatEur(insightsFinancieros.ticketMedio) }}</p>
+            <div class="rounded-xl bg-surface-container-low/60 px-2 py-2 text-center sm:border-l sm:border-outline-variant/20 sm:bg-transparent sm:px-0 sm:py-0">
+              <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest text-text-muted mb-1">Ticket medio</p>
+              <p class="text-lg sm:text-xl font-black text-text-primary">{{ formatEur(insightsFinancieros.ticketMedio) }}</p>
             </div>
           </div>
         </div>
@@ -429,33 +448,33 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
 
           <!-- Ingresos -->
-          <div class="dashboard-panel-kpi flex items-center gap-4">
-            <div class="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+          <div class="dashboard-panel-kpi flex items-center gap-3 sm:gap-4">
+            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
               <TrendingUp class="w-5 h-5 text-emerald-600" />
             </div>
             <div class="min-w-0">
               <p class="text-xs text-text-secondary font-medium truncate">
                 Ingresos {{ agrupacion === 'DIA' ? fechaFormateada : 'del mes' }}
               </p>
-              <p class="text-2xl font-black text-emerald-600">{{ formatEur(kpis.ingresos) }}</p>
+              <p class="text-xl sm:text-2xl font-black text-emerald-600">{{ formatEur(kpis.ingresos) }}</p>
             </div>
           </div>
 
           <!-- Gastos -->
-          <div class="dashboard-panel-kpi flex items-center gap-4">
-            <div class="w-11 h-11 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+          <div class="dashboard-panel-kpi flex items-center gap-3 sm:gap-4">
+            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
               <TrendingDown class="w-5 h-5 text-red-500" />
             </div>
             <div class="min-w-0">
               <p class="text-xs text-text-secondary font-medium truncate">
                 Gastos {{ agrupacion === 'DIA' ? fechaFormateada : 'del mes' }}
               </p>
-              <p class="text-2xl font-black text-red-500">{{ formatEur(kpis.gastos) }}</p>
+              <p class="text-xl sm:text-2xl font-black text-red-500">{{ formatEur(kpis.gastos) }}</p>
             </div>
           </div>
 
           <!-- Balance neto — card destacada -->
-          <div class="flex-1 dashboard-panel-card p-5 flex flex-col justify-between">
+          <div class="flex-1 dashboard-panel-card p-4 sm:p-5 flex flex-col justify-between">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Wallet class="w-5 h-5 text-primary" />
@@ -465,7 +484,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
               </p>
             </div>
             <div>
-              <p class="text-4xl font-black text-text-primary mt-3 mb-2">{{ formatEur(kpis.balance) }}</p>
+              <p class="text-3xl sm:text-4xl font-black text-text-primary mt-3 mb-2">{{ formatEur(kpis.balance) }}</p>
               <span
                 class="text-xs px-2.5 py-1 rounded-full font-semibold"
                 :class="kpis.balance > 0
@@ -483,69 +502,85 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
       </div>
 
       <!-- Lectura rápida de proporciones -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="dashboard-panel-card p-6 min-h-[280px]">
-          <div class="flex items-center justify-between gap-4 mb-4">
-            <div>
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div class="dashboard-panel-card p-4 sm:p-6">
+          <div class="flex items-start justify-between gap-3 mb-4">
+            <div class="min-w-0">
               <h3 class="text-base font-bold text-text-primary">Estado del equipo</h3>
               <p class="text-xs text-text-secondary mt-0.5">Disponibilidad real del personal</p>
             </div>
-            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
+            <span class="text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary whitespace-nowrap">
               {{ resumenEquipo.total }} personas
             </span>
           </div>
 
-          <div v-if="totalEquipoChart > 0" class="relative h-44">
-            <Doughnut :data="equipoChartData" :options="doughnutOptions" />
-            <div class="absolute inset-0 flex items-center justify-center pointer-events-none pb-10">
-              <div class="text-center">
-                <p class="text-2xl font-black text-text-primary">{{ resumenEquipo.activos }}</p>
-                <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">En turno</p>
+          <div v-if="totalEquipoChart > 0">
+            <div class="relative h-40">
+              <Doughnut :data="equipoChartData" :options="doughnutOptions" />
+              <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="text-center">
+                  <p class="text-2xl font-black text-text-primary">{{ resumenEquipo.activos }}</p>
+                  <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">En turno</p>
+                </div>
               </div>
             </div>
+            <div class="flex flex-wrap justify-center gap-x-3 gap-y-1.5 mt-3">
+              <span v-for="(label, i) in equipoChartData.labels" :key="label" class="flex items-center gap-1.5 text-[11px] text-text-secondary">
+                <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ background: equipoChartData.datasets[0].backgroundColor[i] }"></span>
+                {{ label }}
+              </span>
+            </div>
           </div>
-          <div v-else class="h-44 flex items-center justify-center text-center">
+          <div v-else class="h-40 flex items-center justify-center text-center">
             <p class="text-sm text-text-muted">Sin datos de equipo</p>
           </div>
         </div>
 
-        <div class="dashboard-panel-card p-6 min-h-[280px]">
-          <div class="flex items-center justify-between gap-4 mb-4">
-            <div>
+        <div class="dashboard-panel-card p-4 sm:p-6">
+          <div class="flex items-start justify-between gap-3 mb-4">
+            <div class="min-w-0">
               <h3 class="text-base font-bold text-text-primary">Gastos por categoría</h3>
               <p class="text-xs text-text-secondary mt-0.5">Dónde se va el dinero del mes</p>
             </div>
-            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+            <span class="text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600 whitespace-nowrap">
               {{ formatEur(stats.gastosTotales || 0) }}
             </span>
           </div>
 
-          <div v-if="totalGastosChart > 0" class="relative h-44">
-            <Doughnut :data="gastosChartData" :options="doughnutMoneyOptions" />
-            <div class="absolute inset-0 flex items-center justify-center pointer-events-none pb-10">
-              <div class="text-center">
-                <p class="text-xl font-black text-text-primary">{{ formatEur(totalGastosChart) }}</p>
-                <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">Total</p>
+          <div v-if="totalGastosChart > 0">
+            <div class="relative h-40">
+              <Doughnut :data="gastosChartData" :options="doughnutMoneyOptions" />
+              <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="text-center">
+                  <p class="text-xl font-black text-text-primary">{{ formatEur(totalGastosChart) }}</p>
+                  <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">Total</p>
+                </div>
               </div>
             </div>
+            <div class="flex flex-wrap justify-center gap-x-3 gap-y-1.5 mt-3">
+              <span v-for="(label, i) in gastosChartData.labels" :key="label" class="flex items-center gap-1.5 text-[11px] text-text-secondary">
+                <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ background: (gastosChartData.datasets[0].backgroundColor as string[])[i] }"></span>
+                {{ label }}
+              </span>
+            </div>
           </div>
-          <div v-else class="h-44 flex items-center justify-center text-center">
+          <div v-else class="h-40 flex items-center justify-center text-center">
             <p class="text-sm text-text-muted">Sin gastos registrados</p>
           </div>
         </div>
 
-        <div class="dashboard-panel-card p-6 min-h-[280px]">
-          <div class="flex items-center justify-between gap-4 mb-4">
-            <div>
+        <div class="dashboard-panel-card p-4 sm:p-6 min-h-[280px]">
+          <div class="flex items-start justify-between gap-3 mb-4">
+            <div class="min-w-0">
               <h3 class="text-base font-bold text-text-primary">Top productos</h3>
               <p class="text-xs text-text-secondary mt-0.5">Unidades vendidas este mes</p>
             </div>
-            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+            <span class="text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 whitespace-nowrap">
               Top 5
             </span>
           </div>
 
-          <div v-if="hayTopProductos" class="h-44">
+          <div v-if="hayTopProductos" class="h-52 sm:h-44">
             <Bar :data="topProductosChartData" :options="horizontalBarOptions" />
           </div>
           <div v-else class="h-44 flex items-center justify-center text-center">
@@ -571,41 +606,41 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
            ════════════════════════════════════════════════════ -->
 
       <!-- Pills de resumen rápido -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <div class="dashboard-panel-kpi flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
             <Users class="w-4.5 h-4.5 text-primary" />
           </div>
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">Total equipo</p>
-            <p class="text-2xl font-black text-text-primary">{{ resumenEquipo.total }}</p>
+          <div class="min-w-0">
+            <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide sm:tracking-wider text-text-muted">Total equipo</p>
+            <p class="text-xl sm:text-2xl font-black text-text-primary">{{ resumenEquipo.total }}</p>
           </div>
         </div>
         <div class="dashboard-panel-kpi flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
             <UserCheck class="w-4.5 h-4.5 text-green-600" />
           </div>
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">Activos ahora</p>
-            <p class="text-2xl font-black text-green-600">{{ resumenEquipo.activos }}</p>
+          <div class="min-w-0">
+            <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide sm:tracking-wider text-text-muted">Activos ahora</p>
+            <p class="text-xl sm:text-2xl font-black text-green-600">{{ resumenEquipo.activos }}</p>
           </div>
         </div>
         <div class="dashboard-panel-kpi flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
             <Calendar class="w-4.5 h-4.5 text-purple-600" />
           </div>
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">En vacaciones</p>
-            <p class="text-2xl font-black text-purple-600">{{ resumenEquipo.enVacaciones }}</p>
+          <div class="min-w-0">
+            <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide sm:tracking-wider text-text-muted">Vacaciones</p>
+            <p class="text-xl sm:text-2xl font-black text-purple-600">{{ resumenEquipo.enVacaciones }}</p>
           </div>
         </div>
         <div class="dashboard-panel-kpi flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
             <AlertTriangle class="w-4.5 h-4.5 text-red-500" />
           </div>
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">En baja</p>
-            <p class="text-2xl font-black text-red-500">{{ resumenEquipo.enBaja }}</p>
+          <div class="min-w-0">
+            <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide sm:tracking-wider text-text-muted">En baja</p>
+            <p class="text-xl sm:text-2xl font-black text-red-500">{{ resumenEquipo.enBaja }}</p>
           </div>
         </div>
       </div>
@@ -614,27 +649,27 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 pb-2">
 
         <!-- Tabla de ausencias -->
-        <div class="dashboard-panel-card p-6 xl:col-span-2">
+        <div class="dashboard-panel-card p-4 sm:p-6 xl:col-span-2">
           <div class="flex items-center gap-3 mb-5">
-            <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
               <Users class="w-5 h-5 text-blue-600" />
             </div>
-            <div>
+            <div class="min-w-0">
               <h3 class="text-base font-bold text-text-primary">Ausencias y Vacaciones</h3>
               <p class="text-xs text-text-secondary">Control de días por empleado este mes</p>
             </div>
           </div>
           <div class="overflow-x-auto rounded-xl border border-outline-variant/20">
-            <table class="w-full text-left border-collapse bg-white" aria-label="Ausencias y vacaciones del equipo">
+            <table class="min-w-[640px] w-full text-left border-collapse bg-white" aria-label="Ausencias y vacaciones del equipo">
               <caption class="sr-only">Control de días de ausencia por empleado este mes</caption>
               <thead class="bg-surface-container-low">
                 <tr class="border-b border-outline-variant/20">
-                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider">Empleado</th>
-                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Citas mes</th>
-                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Vacaciones</th>
-                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Pendientes</th>
-                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">A. Propios</th>
-                  <th scope="col" class="py-3 px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center">Baja</th>
+                  <th scope="col" class="py-3 px-3 sm:px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wide whitespace-nowrap">Empleado</th>
+                  <th scope="col" class="py-3 px-3 sm:px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wide whitespace-nowrap text-center">Citas mes</th>
+                  <th scope="col" class="py-3 px-3 sm:px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wide whitespace-nowrap text-center">Vacaciones</th>
+                  <th scope="col" class="py-3 px-3 sm:px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wide whitespace-nowrap text-center">Pendientes</th>
+                  <th scope="col" class="py-3 px-3 sm:px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wide whitespace-nowrap text-center">A. propios</th>
+                  <th scope="col" class="py-3 px-3 sm:px-4 text-[10px] font-bold text-text-secondary uppercase tracking-wide whitespace-nowrap text-center">Baja</th>
                 </tr>
               </thead>
               <tbody class="text-sm divide-y divide-outline-variant/10">
@@ -642,38 +677,38 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
                   v-for="(emp, i) in stats.empleadosStats" :key="emp.nombre"
                   :class="[i % 2 === 0 ? 'bg-white' : 'bg-surface-container-lowest']"
                 >
-                  <td class="py-3 px-4">
+                  <td class="py-3 px-3 sm:px-4">
                     <div class="flex items-center gap-2.5">
                       <div class="w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">
                         {{ emp.nombre.charAt(0).toUpperCase() }}
                       </div>
-                      <span class="font-semibold text-text-primary">{{ emp.nombre }}</span>
+                      <span class="font-semibold text-text-primary whitespace-nowrap">{{ emp.nombre }}</span>
                     </div>
                   </td>
-                  <td class="py-3 px-4 text-center">
+                  <td class="py-3 px-3 sm:px-4 text-center">
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
                           :class="emp.citasMes > 0 ? 'bg-primary/10 text-primary' : 'text-text-muted/50'">
                       {{ emp.citasMes > 0 ? emp.citasMes : '—' }}
                     </span>
                   </td>
-                  <td class="py-3 px-4 text-center">
+                  <td class="py-3 px-3 sm:px-4 text-center">
                     <span v-if="emp.vacacionesEsteMes > 0" class="badge-vacaciones">{{ emp.vacacionesEsteMes }}d</span>
                     <span v-else class="text-text-muted/50">—</span>
                   </td>
-                  <td class="py-3 px-4 text-center">
+                  <td class="py-3 px-3 sm:px-4 text-center">
                     <span
                       :class="emp.vacacionesPendientes < 5
                         ? 'px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700'
                         : 'text-text-secondary text-xs font-medium'"
                     >{{ emp.vacacionesPendientes }}d</span>
                   </td>
-                  <td class="py-3 px-4 text-center">
+                  <td class="py-3 px-3 sm:px-4 text-center">
                     <span v-if="emp.asuntosPropios > 0" class="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
                       {{ emp.asuntosPropios }}d
                     </span>
                     <span v-else class="text-text-muted/50">—</span>
                   </td>
-                  <td class="py-3 px-4 text-center">
+                  <td class="py-3 px-3 sm:px-4 text-center">
                     <span v-if="emp.diasBaja > 0" class="badge-baja">{{ emp.diasBaja }}d</span>
                     <span v-else class="text-text-muted/50">—</span>
                   </td>
@@ -690,7 +725,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
         </div>
 
         <!-- Activos en este momento -->
-        <div class="dashboard-panel-card p-6 flex flex-col">
+        <div class="dashboard-panel-card p-4 sm:p-6 flex flex-col">
           <div class="flex items-center gap-3 mb-5">
             <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
               <UserCheck class="w-5 h-5 text-green-600" />
@@ -750,45 +785,45 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
       <div v-if="stats.productosStats" class="grid grid-cols-1 xl:grid-cols-3 gap-6 pb-8">
 
         <!-- ── Ranking de productos con pestañas (2 cols) ─── -->
-        <div class="dashboard-panel-card p-6 xl:col-span-2 flex flex-col">
+        <div class="dashboard-panel-card p-4 sm:p-6 xl:col-span-2 flex flex-col">
 
           <!-- Cabecera + totales de ganancia por género -->
-          <div class="flex items-start justify-between mb-4 gap-4">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+          <div class="flex flex-col gap-4 mb-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex min-w-0 items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
                 <Trophy class="w-5 h-5 text-amber-600" />
               </div>
-              <div>
+              <div class="min-w-0">
                 <h3 class="text-base font-bold text-text-primary">Ranking de Productos</h3>
                 <p class="text-xs text-text-secondary">Consumo estimado · ganancia neta por producto</p>
               </div>
             </div>
             <!-- Totales ganancia hombres / mujeres -->
-            <div class="flex gap-3 flex-shrink-0">
-              <div class="text-center px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-100">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-blue-600">♂ Hombres</p>
-                <p class="text-sm font-black text-blue-700">{{ formatEur(stats.productosStats.gananciasHombres || 0) }}</p>
+            <div class="grid grid-cols-2 gap-2 sm:flex sm:gap-3 sm:flex-shrink-0">
+              <div class="min-w-0 text-center px-2 sm:px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-100">
+                <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide sm:tracking-wider text-blue-600">Hombres</p>
+                <p class="text-xs sm:text-sm font-black text-blue-700 truncate">{{ formatEur(stats.productosStats.gananciasHombres || 0) }}</p>
               </div>
-              <div class="text-center px-3 py-1.5 rounded-xl bg-pink-50 border border-pink-100">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-pink-600">♀ Mujeres</p>
-                <p class="text-sm font-black text-pink-700">{{ formatEur(stats.productosStats.gananciasMujeres || 0) }}</p>
+              <div class="min-w-0 text-center px-2 sm:px-3 py-1.5 rounded-xl bg-pink-50 border border-pink-100">
+                <p class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide sm:tracking-wider text-pink-600">Mujeres</p>
+                <p class="text-xs sm:text-sm font-black text-pink-700 truncate">{{ formatEur(stats.productosStats.gananciasMujeres || 0) }}</p>
               </div>
             </div>
           </div>
 
           <!-- Pestañas Todos / Hombres / Mujeres -->
-          <div class="flex gap-1 mb-4 bg-surface-container-low p-1 rounded-xl w-fit">
+          <div class="grid grid-cols-3 gap-1 mb-4 bg-surface-container-low p-1 rounded-xl w-full sm:flex sm:w-fit">
             <button
               v-for="tab in [{ key: 'todos', label: 'Todos' }, { key: 'hombres', label: '♂ Hombres' }, { key: 'mujeres', label: '♀ Mujeres' }]"
               :key="tab.key"
-              class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
+              class="min-w-0 px-2 sm:px-4 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all"
               :class="tabProductos === tab.key
                 ? 'bg-white shadow-sm text-primary'
                 : 'text-text-muted hover:text-text-secondary'"
               @click="tabProductos = tab.key as any"
             >
               {{ tab.label }}
-              <span class="ml-1 opacity-60">
+              <span class="ml-0.5 sm:ml-1 opacity-60">
                 ({{ tab.key === 'todos'
                   ? stats.productosStats.rankingProductos?.length || 0
                   : tab.key === 'hombres'
@@ -805,7 +840,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
           </div>
 
           <!-- Tabla de ranking -->
-          <div v-else class="overflow-y-auto max-h-[380px] pr-1">
+          <div v-else class="overflow-y-auto max-h-[420px] sm:max-h-[380px] sm:pr-1">
             <!-- Cabecera de columnas -->
             <div class="hidden grid-cols-[28px_1fr_80px_90px] gap-3 px-3 mb-2 sm:grid">
               <span />
@@ -831,13 +866,13 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
                 <!-- Nombre + barra + badges -->
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5 flex-wrap mb-1">
-                    <p class="text-sm font-semibold text-text-primary truncate">{{ prod.nombre }}</p>
-                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" :class="badgeCategoria(prod.categoria)">
+                    <p class="min-w-0 text-sm font-semibold text-text-primary break-words sm:truncate">{{ prod.nombre }}</p>
+                    <span class="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded" :class="badgeCategoria(prod.categoria)">
                       {{ prod.categoria }}
                     </span>
-                    <span v-if="prod.bajoMinimo" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700">Stock bajo</span>
+                    <span v-if="prod.bajoMinimo" class="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700">Stock bajo</span>
                   </div>
-                  <div class="flex items-center gap-1.5">
+                  <div class="flex flex-col gap-1.5 sm:flex-row sm:items-center">
                     <div class="flex-1 h-1 rounded-full bg-surface-container">
                       <div
                         class="h-full rounded-full transition-all duration-500"
@@ -852,15 +887,17 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
                 </div>
 
                 <!-- Consumidos -->
-                <div class="col-start-2 text-left sm:col-start-auto sm:text-right">
+                <div class="col-start-2 flex items-center justify-between rounded-lg bg-surface-container-low/60 px-2 py-1 text-left sm:col-start-auto sm:block sm:bg-transparent sm:px-0 sm:py-0 sm:text-right">
+                  <p class="text-[10px] font-bold uppercase tracking-wide text-text-muted sm:hidden">Consumidos</p>
                   <p class="text-sm font-black text-text-primary">{{ prod.consumidos }}</p>
-                  <p class="text-[10px] text-text-muted">uds.</p>
+                  <p class="hidden text-[10px] text-text-muted sm:block">uds.</p>
                 </div>
 
                 <!-- Ganancia estimada -->
-                <div class="col-start-2 text-left sm:col-start-auto sm:text-right">
+                <div class="col-start-2 flex items-center justify-between rounded-lg bg-surface-container-low/60 px-2 py-1 text-left sm:col-start-auto sm:block sm:bg-transparent sm:px-0 sm:py-0 sm:text-right">
+                  <p class="text-[10px] font-bold uppercase tracking-wide text-text-muted sm:hidden">Ganancia</p>
                   <p class="text-sm font-bold text-emerald-600">{{ formatEur(prod.gananciaEstimada || 0) }}</p>
-                  <p class="text-[10px] text-text-muted">estimado</p>
+                  <p class="hidden text-[10px] text-text-muted sm:block">estimado</p>
                 </div>
               </div>
             </div>
@@ -868,7 +905,7 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
         </div>
 
         <!-- ── Alertas de stock ────────────────────────────── -->
-        <div class="dashboard-panel-card p-6 flex flex-col">
+        <div class="dashboard-panel-card p-4 sm:p-6 flex flex-col">
           <div class="flex items-center gap-3 mb-5">
             <div class="w-10 h-10 rounded-xl flex items-center justify-center"
                  :class="stats.productosStats.pocoStock?.length ? 'bg-red-100' : 'bg-green-100'">

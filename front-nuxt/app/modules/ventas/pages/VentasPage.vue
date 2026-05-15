@@ -1,6 +1,4 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'auth' })
-
 import { ShoppingCart, X, Loader2, Search, Plus, Minus, Trash2 } from 'lucide-vue-next'
 import { useToast } from '~/modules/shared/composables/useToast'
 

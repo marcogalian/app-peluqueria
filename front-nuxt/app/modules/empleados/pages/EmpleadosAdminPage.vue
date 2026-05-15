@@ -14,8 +14,6 @@ const toast = useToast()
 import { es } from 'date-fns/locale'
 import { useAuthStore } from '~/modules/auth/store/auth.store'
 
-definePageMeta({ middleware: ['auth', 'admin'] })
-
 const authStore = useAuthStore()
 
 // ── Tipos ─────────────────────────────────────────────────
@@ -236,16 +234,16 @@ function abrirEmail(empleado: Empleado) {
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-5 sm:space-y-8">
 
     <!-- ── Cabecera ──────────────────────────────────────── -->
-    <div class="flex items-end justify-between">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Gestión de Personal</h2>
+        <h2 class="text-2xl font-extrabold tracking-tight text-primary mb-1 sm:text-3xl">Gestión de Personal</h2>
         <p class="text-on-surface-variant text-sm">Supervisa y coordina los talentos de Atelier Sapphire</p>
       </div>
       <button
-        class="flex items-center gap-2 bg-primary-container text-white px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all"
+        class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-container px-6 py-3 text-sm font-bold text-white transition-all hover:opacity-90 sm:w-auto sm:rounded-full sm:py-2.5"
         @click="modalNuevo = true"
       >
         <Plus class="w-4 h-4" />
@@ -254,29 +252,29 @@ function abrirEmail(empleado: Empleado) {
     </div>
 
     <!-- ── KPI bento ─────────────────────────────────────── -->
-    <div class="grid grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
       <div class="card-kpi empleados-kpi-card !shadow-card !transition-none hover:!translate-y-0 hover:!bg-surface-container-low hover:!shadow-card">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-1">Total Empleados</p>
-        <p class="text-3xl font-bold text-primary-container">{{ empleados.length }}</p>
+        <p class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-1 sm:text-[10px]">Total</p>
+        <p class="text-2xl font-bold text-primary-container sm:text-3xl">{{ empleados.length }}</p>
       </div>
       <div class="card-kpi empleados-kpi-card empleados-kpi-card-primary !bg-primary-container !shadow-card !transition-none hover:!translate-y-0 hover:!bg-primary-container hover:!shadow-card">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-1">En Turno Hoy</p>
-        <p class="text-3xl font-bold text-white">{{ enTurnoHoy }}</p>
+        <p class="text-[9px] font-bold uppercase tracking-widest text-white/70 mb-1 sm:text-[10px]">En turno</p>
+        <p class="text-2xl font-bold text-white sm:text-3xl">{{ enTurnoHoy }}</p>
       </div>
       <div class="card-kpi empleados-kpi-card !shadow-card !transition-none hover:!translate-y-0 hover:!bg-surface-container-low hover:!shadow-card">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-1">De Baja</p>
-        <p class="text-3xl font-bold text-red-500">{{ enBaja }}</p>
+        <p class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-1 sm:text-[10px]">Baja</p>
+        <p class="text-2xl font-bold text-red-500 sm:text-3xl">{{ enBaja }}</p>
       </div>
       <div class="card-kpi empleados-kpi-card !shadow-card !transition-none hover:!translate-y-0 hover:!bg-surface-container-low hover:!shadow-card">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-1">De Vacaciones</p>
-        <p class="text-3xl font-bold text-blue-500">{{ enVacaciones }}</p>
+        <p class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/70 mb-1 sm:text-[10px]">Vacaciones</p>
+        <p class="text-2xl font-bold text-blue-500 sm:text-3xl">{{ enVacaciones }}</p>
       </div>
     </div>
 
     <!-- ── Lista con detalle desplegable ─────────────────── -->
     <div>
       <div class="card empleados-panel-card overflow-hidden">
-        <div class="p-6 border-b border-surface-container">
+        <div class="border-b border-surface-container p-4 sm:p-6">
           <h3 class="font-bold text-primary-container">Lista de Empleados</h3>
         </div>
 
@@ -290,20 +288,20 @@ function abrirEmail(empleado: Empleado) {
           <div v-for="e in empleados" :key="e.id">
             <button
               type="button"
-              class="flex w-full items-center gap-4 px-6 py-4 text-left hover:bg-surface-container-low transition-colors"
+              class="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-4 py-4 text-left transition-colors hover:bg-surface-container-low sm:flex sm:gap-4 sm:px-6"
               :class="empleadoSeleccionado?.id === e.id ? 'bg-white' : ''"
               @click="abrirEmpleado(e)"
             >
               <!-- Avatar -->
               <div
-                class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                class="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white"
                 :class="e.enBaja ? 'bg-red-400' : e.enVacaciones ? 'bg-blue-400' : 'bg-primary-container'"
               >
                 {{ e.iniciales || (e.nombre[0] + e.apellidos[0]).toUpperCase() }}
               </div>
 
               <!-- Nombre + especialidad -->
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0 sm:flex-1">
                 <p class="font-bold text-on-surface text-sm truncate">{{ e.nombre }} {{ e.apellidos }}</p>
                 <p class="text-xs text-on-surface-variant truncate">{{ e.especialidades || 'Sin especialidad definida' }}</p>
               </div>
@@ -314,7 +312,7 @@ function abrirEmail(empleado: Empleado) {
               </p>
 
               <!-- Badge estado -->
-              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0" :class="badgeEstado(e)">
+              <span class="col-span-2 w-fit max-w-full truncate rounded-full px-2.5 py-1 text-[10px] font-bold sm:col-span-1 sm:flex-shrink-0" :class="badgeEstado(e)">
                 {{ estadoEmpleado(e) }}
               </span>
             </button>
@@ -322,26 +320,26 @@ function abrirEmail(empleado: Empleado) {
             <Transition name="fade-slide">
               <div
                 v-if="empleadoSeleccionado?.id === e.id"
-                class="border-t border-surface-container bg-white px-6 py-6"
+                class="border-t border-surface-container bg-white px-4 py-5 sm:px-6 sm:py-6"
               >
                 <div class="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
                   <div class="space-y-5">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div class="flex items-center gap-4">
+                      <div class="flex min-w-0 items-center gap-3 sm:gap-4">
                         <div
-                          class="relative w-16 h-16 rounded-full flex-shrink-0"
+                          class="relative h-14 w-14 flex-shrink-0 rounded-full sm:h-16 sm:w-16"
                           :class="authStore.isAdmin ? 'cursor-pointer group' : ''"
                           @click.stop="authStore.isAdmin && inputFoto?.click()"
                         >
                           <img
                             v-if="empleadoSeleccionado.fotoUrl"
                             :src="`${$config.public.uploadsBase}/${empleadoSeleccionado.fotoUrl}`"
-                            class="w-16 h-16 rounded-full object-cover"
+                            class="h-14 w-14 rounded-full object-cover sm:h-16 sm:w-16"
                             alt="Foto empleado"
                           />
                           <div
                             v-else
-                            class="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-bold"
+                            class="h-14 w-14 rounded-full flex items-center justify-center text-lg font-bold text-white sm:h-16 sm:w-16 sm:text-xl"
                             :class="empleadoSeleccionado.enBaja ? 'bg-red-400' : 'bg-primary-container'"
                           >
                             {{ (empleadoSeleccionado.nombre[0] + (empleadoSeleccionado.apellidos[0] || '')).toUpperCase() }}
@@ -351,14 +349,14 @@ function abrirEmail(empleado: Empleado) {
                           </div>
                         </div>
                         <input ref="inputFoto" type="file" accept="image/*" class="hidden" @change="subirFoto" />
-                        <div>
-                          <h3 class="text-lg font-bold text-on-surface">{{ empleadoSeleccionado.nombre }} {{ empleadoSeleccionado.apellidos }}</h3>
-                          <p class="text-sm text-on-surface-variant">{{ empleadoSeleccionado.especialidades || 'Sin especialidad' }}</p>
+                        <div class="min-w-0">
+                          <h3 class="truncate text-base font-bold text-on-surface sm:text-lg">{{ empleadoSeleccionado.nombre }} {{ empleadoSeleccionado.apellidos }}</h3>
+                          <p class="truncate text-sm text-on-surface-variant">{{ empleadoSeleccionado.especialidades || 'Sin especialidad' }}</p>
                         </div>
                       </div>
 
                       <button
-                        class="inline-flex items-center justify-center gap-2 rounded-md border border-outline-variant/50 bg-white px-4 py-2 text-sm font-bold text-on-surface shadow-sm transition-colors hover:bg-surface-container-low"
+                        class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-outline-variant/50 bg-white px-4 py-2 text-sm font-bold text-on-surface shadow-sm transition-colors hover:bg-surface-container-low sm:w-auto"
                         @click.stop="abrirEmail(empleadoSeleccionado)"
                       >
                         <Mail class="w-4 h-4 text-primary-container" />
@@ -366,7 +364,7 @@ function abrirEmail(empleado: Empleado) {
                       </button>
                     </div>
 
-                    <div class="grid gap-4 md:grid-cols-2">
+                    <div class="grid gap-4 lg:grid-cols-2">
                       <div>
                         <label class="label">Nombre completo</label>
                         <input v-model="formEditar.nombre" type="text" class="input" />
@@ -396,9 +394,9 @@ function abrirEmail(empleado: Empleado) {
                       </div>
                     </div>
 
-                    <div v-if="authStore.isAdmin" class="flex flex-wrap gap-3">
+                    <div v-if="authStore.isAdmin" class="grid gap-3 sm:grid-cols-2 xl:flex xl:flex-wrap">
                       <button
-                        class="btn-primary min-w-40"
+                        class="btn-primary w-full xl:min-w-40 xl:w-auto"
                         :disabled="guardando"
                         @click.stop="guardarEdicion"
                       >
@@ -407,14 +405,14 @@ function abrirEmail(empleado: Empleado) {
                       </button>
                       <button
                         v-if="!empleadoSeleccionado.enBaja"
-                        class="btn-danger min-w-40"
+                        class="btn-danger w-full xl:min-w-40 xl:w-auto"
                         @click.stop="modalBaja = true"
                       >
                         Registrar baja médica
                       </button>
                       <button
                         v-else
-                        class="btn-secondary min-w-40"
+                        class="btn-secondary w-full xl:min-w-40 xl:w-auto"
                         :disabled="guardando"
                         @click.stop="reactivarEmpleado(empleadoSeleccionado)"
                       >
@@ -422,7 +420,7 @@ function abrirEmail(empleado: Empleado) {
                       </button>
                       <NuxtLink
                         :to="`/admin/calendario-laboral?empleado=${empleadoSeleccionado.id}`"
-                        class="btn-secondary min-w-40 text-center"
+                        class="btn-secondary w-full text-center xl:min-w-40 xl:w-auto"
                         @click.stop
                       >
                         Ver calendario laboral
@@ -430,7 +428,7 @@ function abrirEmail(empleado: Empleado) {
                     </div>
                   </div>
 
-                  <div class="rounded-md border border-outline-variant/40 bg-surface-container-low/40 p-4">
+                  <div class="rounded-md border border-outline-variant/40 bg-surface-container-low/40 p-3 sm:p-4">
                     <div class="flex items-center justify-between mb-3">
                       <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">{{ textoMesCalendario }}</p>
                       <div class="flex gap-1">
@@ -463,7 +461,7 @@ function abrirEmail(empleado: Empleado) {
               </div>
             </Transition>
           </div>
-          <div v-if="empleados.length === 0" class="px-6 py-12 text-center text-sm text-on-surface-variant">
+          <div v-if="empleados.length === 0" class="px-4 py-12 text-center text-sm text-on-surface-variant sm:px-6">
             No hay empleados registrados
           </div>
         </div>
@@ -485,7 +483,7 @@ function abrirEmail(empleado: Empleado) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-baja-titulo"
-          class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
+          class="max-h-[calc(100vh-2rem)] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-5 shadow-card-lg animate-fade-scale-in sm:rounded-card sm:p-6"
         >
           <div class="flex items-center justify-between mb-4">
             <h3 id="modal-baja-titulo" class="text-lg font-bold text-primary">Registrar Baja Médica</h3>
@@ -513,7 +511,7 @@ function abrirEmail(empleado: Empleado) {
             </div>
           </div>
 
-          <div class="flex gap-3 mt-5">
+          <div class="mt-5 grid gap-3 sm:grid-cols-2">
             <button class="btn-secondary flex-1" @click="modalBaja = false">Cancelar</button>
             <button class="btn-danger flex-1" :disabled="guardando" @click="registrarBaja">
               <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" />
@@ -535,7 +533,7 @@ function abrirEmail(empleado: Empleado) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-nuevo-empleado-titulo"
-          class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
+          class="max-h-[calc(100vh-2rem)] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-5 shadow-card-lg animate-fade-scale-in sm:rounded-card sm:p-6"
         >
           <div class="flex items-center justify-between mb-5">
             <h3 id="modal-nuevo-empleado-titulo" class="text-lg font-bold text-primary">Nuevo Empleado</h3>
@@ -545,7 +543,7 @@ function abrirEmail(empleado: Empleado) {
           </div>
 
           <div class="space-y-4">
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid gap-3 sm:grid-cols-2">
               <div>
                 <label class="label">Nombre</label>
                 <input v-model="formNuevo.nombre" type="text" class="input" />
@@ -569,7 +567,7 @@ function abrirEmail(empleado: Empleado) {
             </div>
           </div>
 
-          <div class="flex gap-3 mt-5">
+          <div class="mt-5 grid gap-3 sm:grid-cols-2">
             <button class="btn-secondary flex-1" @click="modalNuevo = false">Cancelar</button>
             <button class="btn-primary flex-1" :disabled="guardando" @click="crearEmpleado">
               <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" />
@@ -590,7 +588,7 @@ function abrirEmail(empleado: Empleado) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-editar-empleado-titulo"
-          class="bg-white rounded-card shadow-card-lg w-full max-w-sm p-6 animate-fade-scale-in"
+          class="max-h-[calc(100vh-2rem)] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-5 shadow-card-lg animate-fade-scale-in sm:rounded-card sm:p-6"
         >
           <div class="flex items-center justify-between mb-5">
             <h3 id="modal-editar-empleado-titulo" class="text-lg font-bold text-primary">Editar Empleado</h3>
@@ -622,7 +620,7 @@ function abrirEmail(empleado: Empleado) {
             </div>
           </div>
 
-          <div class="flex gap-3 mt-5">
+          <div class="mt-5 grid gap-3 sm:grid-cols-2">
             <button class="btn-secondary flex-1" @click="modalEditar = false">Cancelar</button>
             <button class="btn-primary flex-1" :disabled="guardando" @click="guardarEdicion">
               <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" />

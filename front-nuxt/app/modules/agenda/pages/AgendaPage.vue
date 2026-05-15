@@ -23,8 +23,6 @@ import { isAxiosError } from 'axios'
 import { api } from '~/infrastructure/http/api'
 import { useToast } from '~/modules/shared/composables/useToast'
 
-definePageMeta({ middleware: 'auth' })
-
 type EstadoCita = 'PENDIENTE' | 'EN_CURSO' | 'COMPLETADA' | 'CANCELADO'
 type GeneroCliente = 'FEMENINO' | 'MASCULINO'
 

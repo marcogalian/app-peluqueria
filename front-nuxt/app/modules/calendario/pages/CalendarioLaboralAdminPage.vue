@@ -18,8 +18,6 @@ import {
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-definePageMeta({ middleware: ['auth', 'admin'] })
-
 type EstadoAusencia = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'CANCELADA'
 type TipoAusencia = 'VACACIONES' | 'ASUNTO_PROPIO' | 'BAJA'
 
@@ -49,6 +47,7 @@ const empleadoId = computed(() => String(route.query.empleado ?? ''))
 const empleado = ref<Empleado | null>(null)
 const ausencias = ref<Ausencia[]>([])
 const cargando = ref(true)
+const errorCarga = ref('')
 const mesActual = ref(new Date())
 
 // ── Carga ──────────────────────────────────────────────────
@@ -62,16 +61,18 @@ onMounted(async () => {
 
 async function cargarDatos() {
   cargando.value = true
+  errorCarga.value = ''
   try {
     const { api } = await import('~/infrastructure/http/api')
     const [respEmpleado, respAusencias] = await Promise.all([
-      api.get(`/v1/peluqueros/${empleadoId.value}`),
+      api.get(`/peluqueros/${empleadoId.value}`),
       api.get(`/v1/ausencias`, { params: { peluqueroId: empleadoId.value } }),
     ])
     empleado.value = respEmpleado.data
     ausencias.value = respAusencias.data
   } catch (err) {
-    console.error('[CalendarioLaboral] Error:', err)
+    empleado.value = null
+    errorCarga.value = 'No se pudo cargar el calendario laboral de este empleado.'
   } finally {
     cargando.value = false
   }
@@ -112,7 +113,7 @@ function tipoDelDia(dia: Date): 'VACACIONES' | 'ASUNTO_PROPIO' | 'BAJA' | 'NO_LA
 
 function clasesCelda(dia: Date): string {
   const tipo = tipoDelDia(dia)
-  const base = 'aspect-square rounded-lg flex flex-col items-center justify-center text-sm font-semibold p-2 transition-colors'
+  const base = 'aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-semibold p-1 transition-colors sm:p-2 sm:text-sm'
   switch (tipo) {
     case 'VACACIONES':    return `${base} bg-green-100 text-green-700 ring-1 ring-green-200`
     case 'ASUNTO_PROPIO': return `${base} bg-yellow-100 text-yellow-700 ring-1 ring-yellow-200`
@@ -152,37 +153,45 @@ const resumen = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5 sm:space-y-6">
 
     <!-- Cabecera -->
-    <div class="flex items-center justify-between gap-4">
+    <div class="flex items-center justify-between gap-3">
       <button
-        class="flex items-center gap-2 text-sm font-bold text-primary hover:underline"
+        class="flex shrink-0 items-center gap-2 text-sm font-bold text-primary hover:underline"
         @click="router.back()"
       >
         <ArrowLeft class="w-4 h-4" />
         Volver
       </button>
-      <h1 class="text-xl font-bold text-on-surface flex items-center gap-2">
+      <h1 class="flex min-w-0 items-center gap-2 text-lg font-bold text-on-surface sm:text-xl">
         <CalIcon class="w-5 h-5 text-primary" />
-        Calendario laboral
+        <span class="leading-tight">Calendario laboral</span>
       </h1>
-      <div class="w-20"><!-- spacer --></div>
+      <div class="hidden w-20 sm:block"><!-- spacer --></div>
     </div>
 
     <div v-if="cargando" class="min-h-[300px] flex items-center justify-center">
       <Loader2 class="w-8 h-8 animate-spin text-primary" />
     </div>
 
+    <div v-else-if="errorCarga" class="card p-5 text-center sm:p-6">
+      <p class="font-bold text-primary">Calendario no disponible</p>
+      <p class="mt-2 text-sm text-on-surface-variant">{{ errorCarga }}</p>
+      <button class="btn-secondary mt-4 w-full sm:w-auto" @click="router.push('/admin/empleados')">
+        Volver a empleados
+      </button>
+    </div>
+
     <template v-else-if="empleado">
 
       <!-- Info del empleado -->
-      <div class="card p-5 flex items-center gap-4">
+      <div class="card flex items-center gap-3 p-4 sm:gap-4 sm:p-5">
         <div class="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold">
           {{ empleado.nombre.charAt(0).toUpperCase() }}
         </div>
         <div>
-          <p class="text-lg font-bold text-on-surface">{{ empleado.nombre }}</p>
+          <p class="text-base font-bold text-on-surface sm:text-lg">{{ empleado.nombre }}</p>
           <p class="text-sm text-on-surface-variant">
             {{ empleado.especialidad || 'Sin especialidad' }}
             <span v-if="empleado.horarioBase"> · {{ empleado.horarioBase }}</span>
@@ -191,7 +200,7 @@ const resumen = computed(() => {
       </div>
 
       <!-- Resumen del mes -->
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <div class="card p-3 text-center">
           <p class="text-xs text-on-surface-variant uppercase font-bold">Laborables</p>
           <p class="text-2xl font-extrabold text-blue-600">{{ resumen.laborables }}</p>
@@ -201,7 +210,7 @@ const resumen = computed(() => {
           <p class="text-2xl font-extrabold text-green-600">{{ resumen.vacaciones }}</p>
         </div>
         <div class="card p-3 text-center">
-          <p class="text-xs text-on-surface-variant uppercase font-bold">Asuntos propios</p>
+          <p class="text-xs text-on-surface-variant uppercase font-bold">Asuntos</p>
           <p class="text-2xl font-extrabold text-yellow-600">{{ resumen.asuntosPropios }}</p>
         </div>
         <div class="card p-3 text-center">
@@ -215,32 +224,32 @@ const resumen = computed(() => {
       </div>
 
       <!-- Calendario mensual -->
-      <div class="card p-5">
-        <div class="flex items-center justify-between mb-4">
-          <button class="px-3 py-1.5 rounded-lg hover:bg-surface-container text-sm font-bold" @click="mesAnterior">
-            ← Anterior
+      <div class="card p-4 sm:p-5">
+        <div class="mb-4 flex items-center justify-between gap-2">
+          <button class="rounded-lg px-2 py-1.5 text-xs font-bold hover:bg-surface-container sm:px-3 sm:text-sm" @click="mesAnterior">
+            Anterior
           </button>
-          <h2 class="text-lg font-bold text-on-surface capitalize">
+          <h2 class="min-w-0 text-center text-base font-bold capitalize text-on-surface sm:text-lg">
             {{ format(mesActual, 'MMMM yyyy', { locale: es }) }}
           </h2>
-          <button class="px-3 py-1.5 rounded-lg hover:bg-surface-container text-sm font-bold" @click="mesSiguiente">
-            Siguiente →
+          <button class="rounded-lg px-2 py-1.5 text-xs font-bold hover:bg-surface-container sm:px-3 sm:text-sm" @click="mesSiguiente">
+            Siguiente
           </button>
         </div>
 
         <!-- Cabecera dias semana -->
-        <div class="grid grid-cols-7 gap-2 mb-2">
+        <div class="mb-2 grid grid-cols-7 gap-1 sm:gap-2">
           <div
             v-for="dia in ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']"
             :key="dia"
-            class="text-center text-xs font-bold text-on-surface-variant uppercase"
+            class="text-center text-[10px] font-bold uppercase text-on-surface-variant sm:text-xs"
           >
             {{ dia }}
           </div>
         </div>
 
         <!-- Celdas del mes -->
-        <div class="grid grid-cols-7 gap-2">
+        <div class="grid grid-cols-7 gap-1 sm:gap-2">
           <div v-for="n in espaciosInicio" :key="`vacio-${n}`" class="aspect-square" />
           <div v-for="dia in diasMes" :key="dia.toISOString()" :class="clasesCelda(dia)">
             <span class="text-base">{{ format(dia, 'd') }}</span>

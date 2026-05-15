@@ -71,8 +71,13 @@ watch(() => route.path, (path) => {
 // Dropdown de notificaciones
 const dropdownAbierto = ref(false)
 const campanaRef      = ref<HTMLElement | null>(null)
+const dropdownRef     = ref<HTMLElement | null>(null)
 
-onClickOutside(campanaRef, () => { dropdownAbierto.value = false })
+onClickOutside(dropdownRef, (event) => {
+  const target = event.target as Node | null
+  if (target && campanaRef.value?.contains(target)) return
+  dropdownAbierto.value = false
+})
 
 function toggleDropdown() {
   dropdownAbierto.value = !dropdownAbierto.value
@@ -154,77 +159,81 @@ function irAConfiguracion() {
           </span>
         </button>
 
-        <!-- Dropdown de notificaciones -->
-        <Transition
-          enter-active-class="transition ease-out duration-150"
-          enter-from-class="opacity-0 scale-95 -translate-y-1"
-          enter-to-class="opacity-100 scale-100 translate-y-0"
-          leave-active-class="transition ease-in duration-100"
-          leave-from-class="opacity-100 scale-100 translate-y-0"
-          leave-to-class="opacity-0 scale-95 -translate-y-1"
-        >
-          <div
-            v-show="dropdownAbierto"
-            role="menu"
-            aria-label="Notificaciones"
-            class="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-72 bg-white rounded-xl shadow-lg
-                   border border-outline-variant/20 z-50 overflow-hidden"
+        <Teleport to="body">
+          <!-- Dropdown de notificaciones -->
+          <Transition
+            enter-active-class="transition ease-out duration-150"
+            enter-from-class="opacity-0 scale-95 -translate-y-1"
+            enter-to-class="opacity-100 scale-100 translate-y-0"
+            leave-active-class="transition ease-in duration-100"
+            leave-from-class="opacity-100 scale-100 translate-y-0"
+            leave-to-class="opacity-0 scale-95 -translate-y-1"
           >
-            <!-- Cabecera -->
-            <div class="px-4 py-3 border-b border-surface-container flex items-center justify-between">
-              <p class="text-sm font-bold text-on-surface">Notificaciones</p>
-              <button
-                v-if="conteo > 0"
-                class="text-[10px] text-primary-container hover:underline"
-                role="menuitem"
-                @click="marcarMensajesComoLeidos"
-              >
-                Marcar todo leído
-              </button>
-            </div>
+            <div
+              v-show="dropdownAbierto"
+              ref="dropdownRef"
+              role="menu"
+              aria-label="Notificaciones"
+              class="fixed left-1/2 top-16 z-50 w-[calc(100vw-2rem)] max-w-[360px] -translate-x-1/2
+                     overflow-hidden rounded-xl border border-outline-variant/20 bg-white shadow-lg
+                     sm:left-auto sm:right-6 sm:w-72 sm:translate-x-0 lg:right-8"
+            >
+              <!-- Cabecera -->
+              <div class="px-4 py-3 border-b border-surface-container flex items-center justify-between">
+                <p class="text-sm font-bold text-on-surface">Notificaciones</p>
+                <button
+                  v-if="conteo > 0"
+                  class="text-[10px] text-primary-container hover:underline"
+                  role="menuitem"
+                  @click="marcarMensajesComoLeidos"
+                >
+                  Marcar todo leído
+                </button>
+              </div>
 
-            <!-- Resumen de mensajes no leídos -->
-            <div v-if="conteo > 0" class="max-h-64 overflow-y-auto">
-              <button
-                class="w-full flex items-start gap-3 px-4 py-3
-                       hover:bg-surface-container-low transition-colors text-left"
-                role="menuitem"
-                :aria-label="`${conteo} mensajes internos sin leer`"
-                @click="irAMensajes"
-              >
-                <div class="w-8 h-8 rounded-full bg-primary-container text-white
-                            flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                     aria-hidden="true">
-                  {{ conteo > 9 ? '9+' : conteo }}
-                </div>
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-bold text-on-surface truncate">Mensajes internos pendientes</p>
-                  <p class="text-xs text-on-surface-variant">
-                    {{ conteo === 1 ? 'Tienes 1 mensaje sin leer' : `Tienes ${conteo} mensajes sin leer` }}
-                  </p>
-                </div>
-              </button>
-            </div>
+              <!-- Resumen de mensajes no leídos -->
+              <div v-if="conteo > 0" class="max-h-64 overflow-y-auto">
+                <button
+                  class="w-full flex items-start gap-3 px-4 py-3
+                         hover:bg-surface-container-low transition-colors text-left"
+                  role="menuitem"
+                  :aria-label="`${conteo} mensajes internos sin leer`"
+                  @click="irAMensajes"
+                >
+                  <div class="w-8 h-8 rounded-full bg-primary-container text-white
+                              flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                       aria-hidden="true">
+                    {{ conteo > 9 ? '9+' : conteo }}
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-bold text-on-surface truncate">Mensajes internos pendientes</p>
+                    <p class="text-xs text-on-surface-variant">
+                      {{ conteo === 1 ? 'Tienes 1 mensaje sin leer' : `Tienes ${conteo} mensajes sin leer` }}
+                    </p>
+                  </div>
+                </button>
+              </div>
 
-            <!-- Sin notificaciones -->
-            <div v-else class="px-4 py-8 text-center">
-              <Bell class="w-8 h-8 text-on-surface-variant/30 mx-auto mb-2" aria-hidden="true" />
-              <p class="text-sm text-on-surface-variant">Sin mensajes nuevos</p>
-            </div>
+              <!-- Sin notificaciones -->
+              <div v-else class="px-4 py-8 text-center">
+                <Bell class="w-8 h-8 text-on-surface-variant/30 mx-auto mb-2" aria-hidden="true" />
+                <p class="text-sm text-on-surface-variant">Sin mensajes nuevos</p>
+              </div>
 
-            <!-- Pie -->
-            <div class="px-4 py-3 border-t border-surface-container">
-              <button
-                class="w-full text-center text-xs font-bold text-primary-container
-                       hover:underline transition-colors"
-                role="menuitem"
-                @click="irAMensajes"
-              >
-                Ver todos los mensajes
-              </button>
+              <!-- Pie -->
+              <div class="px-4 py-3 border-t border-surface-container">
+                <button
+                  class="w-full text-center text-xs font-bold text-primary-container
+                         hover:underline transition-colors"
+                  role="menuitem"
+                  @click="irAMensajes"
+                >
+                  Ver todos los mensajes
+                </button>
+              </div>
             </div>
-          </div>
-        </Transition>
+          </Transition>
+        </Teleport>
       </div>
 
       <!-- Ajustes (solo admin) -->

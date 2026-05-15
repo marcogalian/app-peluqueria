@@ -6,8 +6,6 @@
 import { Plus, AlertTriangle, Package, Loader2, X, Save, ShoppingCart, Search } from 'lucide-vue-next'
 import { useToast } from '~/modules/shared/composables/useToast'
 
-definePageMeta({ middleware: ['auth', 'admin'] })
-
 const toast = useToast()
 
 // ── Tipos ─────────────────────────────────────────────────
@@ -253,27 +251,27 @@ function formatEur(n: number): string {
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-5 sm:space-y-8">
 
     <!-- ── Cabecera ──────────────────────────────────────── -->
     <div>
-      <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Inventario</h2>
+      <h2 class="text-2xl font-extrabold tracking-tight text-primary mb-1 sm:text-3xl">Inventario</h2>
       <p class="text-on-surface-variant text-sm">Control de stock y productos del atelier</p>
     </div>
 
     <!-- ── KPI Cards ─────────────────────────────────────── -->
-    <div class="grid grid-cols-2 xl:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
 
-      <div class="inventario-panel-highlight text-white p-6 rounded-2xl">
+      <div class="inventario-panel-highlight rounded-2xl p-5 text-white sm:p-6">
         <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-1">Valor del Inventario</p>
-        <h3 class="text-3xl font-extrabold">{{ formatEur(valorInventario) }}</h3>
+        <h3 class="text-2xl font-extrabold sm:text-3xl">{{ formatEur(valorInventario) }}</h3>
         <p class="text-xs text-white/60 mt-2">{{ productos.length }} productos en total</p>
       </div>
 
       <div class="inventario-panel-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Productos por reponer</p>
         <div class="flex items-end justify-between gap-3">
-          <h3 class="text-4xl font-extrabold text-primary">{{ stockBajo.length }}</h3>
+          <h3 class="text-3xl font-extrabold text-primary sm:text-4xl">{{ stockBajo.length }}</h3>
           <button
             v-if="stockBajo.length"
             class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-800 transition-colors hover:bg-amber-200"
@@ -297,32 +295,32 @@ function formatEur(n: number): string {
 
       <div class="inventario-panel-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Sin stock</p>
-        <h3 class="text-4xl font-extrabold text-primary">{{ sinStock.length }}</h3>
+        <h3 class="text-3xl font-extrabold text-primary sm:text-4xl">{{ sinStock.length }}</h3>
         <p class="text-xs text-on-surface-variant mt-2">Agotados actualmente</p>
       </div>
 
       <div class="inventario-panel-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ventas Semana</p>
-        <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(resumenVentas.ingresosSemana) }}</h3>
+        <h3 class="text-2xl font-extrabold text-primary sm:text-3xl">{{ formatEur(resumenVentas.ingresosSemana) }}</h3>
         <p class="text-xs text-on-surface-variant mt-2">{{ resumenVentas.unidadesSemana }} uds vendidas</p>
       </div>
 
       <div class="inventario-panel-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ventas Mes</p>
-        <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(resumenVentas.ingresosMes) }}</h3>
+        <h3 class="text-2xl font-extrabold text-primary sm:text-3xl">{{ formatEur(resumenVentas.ingresosMes) }}</h3>
         <p class="text-xs text-on-surface-variant mt-2">{{ resumenVentas.unidadesMes }} uds vendidas</p>
       </div>
 
       <div class="inventario-panel-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Ventas Año</p>
-        <h3 class="text-3xl font-extrabold text-primary">{{ formatEur(resumenVentas.ingresosAnio) }}</h3>
+        <h3 class="text-2xl font-extrabold text-primary sm:text-3xl">{{ formatEur(resumenVentas.ingresosAnio) }}</h3>
         <p class="text-xs text-on-surface-variant mt-2">{{ resumenVentas.unidadesAnio }} uds vendidas</p>
       </div>
 
     </div>
 
     <!-- ── Alertas de stock bajo ──────────────────────────── -->
-    <div v-if="stockBajo.length > 0" class="inventario-alert-card p-5">
+    <div v-if="stockBajo.length > 0" class="inventario-alert-card p-4 sm:p-5">
       <div class="flex items-center gap-2 mb-3">
         <AlertTriangle class="w-4 h-4 text-amber-600" />
         <p class="text-sm font-bold text-amber-800">
@@ -346,11 +344,11 @@ function formatEur(n: number): string {
     </div>
 
     <!-- ── Tabla principal ────────────────────────────────── -->
-    <div class="inventario-panel-card p-6">
+    <div class="inventario-panel-card p-4 sm:p-6">
 
       <!-- Filtros + acción -->
-      <div class="flex flex-col xl:flex-row xl:items-center gap-4 mb-8">
-        <div class="relative min-w-0 flex-1 sm:min-w-[18rem]">
+      <div class="mb-5 flex flex-col gap-3 sm:mb-8 xl:flex-row xl:items-center xl:gap-4">
+        <div class="relative min-w-0 flex-1">
           <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
           <label for="inventario-busqueda" class="sr-only">Buscar producto</label>
           <input
@@ -370,11 +368,11 @@ function formatEur(n: number): string {
             aria-label="Filtrar productos por categoría"
           />
         </div>
-        <div class="flex min-h-10 rounded-md border border-outline-variant/40 bg-white p-1">
+        <div class="grid min-h-10 grid-cols-3 rounded-md border border-outline-variant/40 bg-white p-1">
           <button
             v-for="opcion in filtrosStock"
             :key="opcion.id"
-            class="rounded px-4 py-1.5 text-xs font-bold transition-colors"
+            class="rounded px-2 py-2 text-[11px] font-bold transition-colors sm:px-4 sm:py-1.5 sm:text-xs"
             :class="filtroStock === opcion.id ? 'bg-surface-container-low text-primary' : 'text-on-surface-variant hover:bg-surface-container-lowest'"
             type="button"
             @click="filtroStock = opcion.id"
@@ -392,7 +390,7 @@ function formatEur(n: number): string {
         </button>
         <button
           type="button"
-          class="min-h-10 flex items-center justify-center gap-2 rounded-md bg-primary-container px-6 text-white font-bold text-sm hover:opacity-90 transition-all"
+          class="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary-container px-6 text-sm font-bold text-white transition-all hover:opacity-90 xl:min-h-10 xl:rounded-md"
           @click="abrirCrear"
         >
           <Plus class="w-4 h-4" />
@@ -405,9 +403,72 @@ function formatEur(n: number): string {
         <Loader2 class="w-6 h-6 animate-spin text-primary" />
       </div>
 
-      <!-- Tabla -->
-      <div v-else class="overflow-x-auto">
-        <table class="w-full text-left border-separate border-spacing-y-3" aria-label="Inventario de productos">
+      <template v-else>
+        <div class="grid gap-3 md:grid-cols-2 xl:hidden">
+          <article
+            v-for="p in productosFiltrados"
+            :key="p.id"
+            class="rounded-2xl border border-outline-variant/20 bg-white p-4 shadow-sm"
+            @click="abrirEditar(p)"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex min-w-0 items-center gap-2">
+                  <Package class="h-4 w-4 shrink-0 text-on-surface-variant/50" />
+                  <h3 class="truncate text-sm font-extrabold text-primary">{{ p.nombre }}</h3>
+                </div>
+                <p class="mt-1 text-[11px] text-on-surface-variant">{{ labelCat[p.categoria] ?? p.categoria }}</p>
+              </div>
+              <span class="shrink-0 rounded-full px-3 py-1 text-xs" :class="badgeStock(p)">
+                {{ p.stock }} uds
+              </span>
+            </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-3">
+              <div class="rounded-xl bg-surface-container-low px-3 py-2">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Precio</p>
+                <p class="mt-1 font-bold text-primary">{{ formatEur(precioVenta(p)) }}</p>
+                <p v-if="p.precioDescuento && p.precioDescuento < p.precio" class="text-[11px] text-on-surface-variant line-through">
+                  {{ formatEur(p.precio) }}
+                </p>
+              </div>
+              <div class="rounded-xl bg-surface-container-low px-3 py-2">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Mínimo</p>
+                <p class="mt-1 font-bold text-on-surface">{{ p.stockMinimo }} uds</p>
+              </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-3 gap-2" @click.stop>
+              <button
+                class="flex items-center justify-center rounded-xl bg-primary-container px-2 py-2.5 text-xs font-bold text-white disabled:opacity-40"
+                :disabled="p.stock === 0"
+                @click="abrirVenta(p)"
+              >
+                Vender
+              </button>
+              <button
+                class="flex items-center justify-center rounded-xl bg-surface-container-low px-2 py-2.5 text-xs font-bold text-primary"
+                @click="abrirEditar(p)"
+              >
+                Editar
+              </button>
+              <button
+                class="flex items-center justify-center rounded-xl bg-red-50 px-2 py-2.5 text-xs font-bold text-error"
+                @click="eliminar(p.id)"
+              >
+                Borrar
+              </button>
+            </div>
+          </article>
+
+          <div v-if="productosFiltrados.length === 0" class="rounded-2xl border border-dashed border-outline-variant/30 px-4 py-10 text-center text-sm text-on-surface-variant">
+            No hay productos con los filtros actuales
+          </div>
+        </div>
+
+        <!-- Tabla -->
+        <div class="hidden overflow-x-auto xl:block">
+          <table class="w-full text-left border-separate border-spacing-y-3" aria-label="Inventario de productos">
           <thead>
             <tr class="text-on-surface-variant/60 text-[10px] uppercase tracking-[0.15em] font-bold">
               <th scope="col" class="pb-4 px-4">Producto</th>
@@ -483,8 +544,9 @@ function formatEur(n: number): string {
               </td>
             </tr>
           </tbody>
-        </table>
-      </div>
+          </table>
+        </div>
+      </template>
     </div>
   </div>
 
@@ -498,10 +560,10 @@ function formatEur(n: number): string {
 
     <Transition name="slide-right">
       <div v-if="modalVentaAbierto" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-        <div class="w-full max-w-md rounded-[28px] bg-white shadow-2xl border border-outline-variant/10 p-8 space-y-6">
+        <div class="w-full max-w-md rounded-2xl border border-outline-variant/10 bg-white p-5 shadow-2xl sm:rounded-[28px] sm:p-8 space-y-5 sm:space-y-6">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h3 class="text-xl font-bold text-primary">Registrar venta</h3>
+              <h3 class="text-lg font-bold text-primary sm:text-xl">Registrar venta</h3>
               <p v-if="productoVenta" class="text-sm text-on-surface-variant mt-1">
                 {{ productoVenta.nombre }} · Stock actual: {{ productoVenta.stock }} uds
               </p>
@@ -560,11 +622,11 @@ function formatEur(n: number): string {
     </Transition>
 
     <Transition name="slide-right">
-      <aside v-if="drawerAbierto" class="fixed right-0 top-0 h-screen w-full max-w-md bg-white shadow-2xl border-l border-outline-variant/20 z-50 flex flex-col">
+      <aside v-if="drawerAbierto" class="fixed right-0 top-0 z-50 flex h-screen w-full max-w-md flex-col border-l border-outline-variant/20 bg-white shadow-2xl">
 
-        <div class="p-8 border-b border-outline-variant/10 flex items-center justify-between flex-shrink-0">
+        <div class="flex flex-shrink-0 items-center justify-between border-b border-outline-variant/10 p-5 sm:p-8">
           <div>
-            <h3 class="text-xl font-bold text-primary">{{ productoEditar.id ? 'Editar Producto' : 'Nuevo Producto' }}</h3>
+            <h3 class="text-lg font-bold text-primary sm:text-xl">{{ productoEditar.id ? 'Editar Producto' : 'Nuevo Producto' }}</h3>
             <p class="text-xs text-on-surface-variant">Gestión de inventario</p>
           </div>
           <button class="p-2 hover:bg-surface-container-low rounded-full text-on-surface-variant" @click="drawerAbierto = false">
@@ -572,7 +634,7 @@ function formatEur(n: number): string {
           </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-8 space-y-6">
+        <div class="flex-1 space-y-5 overflow-y-auto p-5 sm:space-y-6 sm:p-8">
 
           <div class="space-y-2">
             <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Nombre</label>
@@ -586,7 +648,7 @@ function formatEur(n: number): string {
             </select>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div class="space-y-2">
               <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Precio (€)</label>
               <input v-model.number="productoEditar.precio" type="number" min="0" step="0.01" class="input" />
@@ -597,7 +659,7 @@ function formatEur(n: number): string {
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div class="space-y-2">
               <label class="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant px-1">Stock actual</label>
               <input v-model.number="productoEditar.stock" type="number" min="0" class="input" />
@@ -610,9 +672,9 @@ function formatEur(n: number): string {
 
         </div>
 
-        <div class="p-8 border-t border-outline-variant/10 bg-surface-container-lowest flex-shrink-0">
+        <div class="flex-shrink-0 border-t border-outline-variant/10 bg-surface-container-lowest p-5 sm:p-8">
           <button
-            class="w-full bg-primary-container text-white py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-primary-container/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-container py-3.5 font-bold text-white transition-all hover:shadow-lg hover:shadow-primary-container/30 disabled:opacity-50 sm:py-4"
             :disabled="guardando"
             @click="guardar"
           >

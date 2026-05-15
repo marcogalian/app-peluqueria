@@ -6,8 +6,6 @@
 import { Plus, Save, X, Loader2 } from 'lucide-vue-next'
 import { useToast } from '~/modules/shared/composables/useToast'
 
-definePageMeta({ middleware: ['auth', 'admin'] })
-
 const toast = useToast()
 
 interface Servicio {
@@ -17,6 +15,7 @@ interface Servicio {
   categoria: 'CABALLERO' | 'SENORA' | 'TRATAMIENTO'
   duracionMinutos: number
   precio: number
+  precioDescuento: number | null
   descripcion: string
   activo?: boolean
 }
@@ -54,7 +53,7 @@ onMounted(async () => {
 })
 
 function abrirCrear() {
-  servicioEditar.value = { genero: 'FEMENINO', categoria: 'SENORA', duracionMinutos: 30, precio: 0, activo: true }
+  servicioEditar.value = { genero: 'FEMENINO', categoria: 'SENORA', duracionMinutos: 30, precio: 0, precioDescuento: null, activo: true }
   drawerAbierto.value = true
 }
 
@@ -64,6 +63,16 @@ function abrirEditar(s: Servicio) {
 }
 
 async function guardar() {
+  const precio = Number(servicioEditar.value.precio ?? 0)
+  const precioDescuento = Number(servicioEditar.value.precioDescuento ?? 0)
+
+  if (precioDescuento > 0 && precioDescuento >= precio) {
+    toast.error('El precio promo debe ser menor que el precio normal')
+    return
+  }
+
+  servicioEditar.value.precioDescuento = precioDescuento > 0 ? precioDescuento : null
+
   guardando.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
@@ -113,46 +122,51 @@ function labelGenero(genero: string): string {
 function formatEur(n: number): string {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n)
 }
+
+function precioServicio(s: Servicio): number {
+  if (s.precioDescuento && s.precioDescuento > 0) return s.precioDescuento
+  return s.precio
+}
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-5 sm:space-y-8">
 
     <!-- ── Cabecera ──────────────────────────────────────── -->
     <div>
-      <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">Gestión de Servicios</h2>
+      <h2 class="text-2xl font-extrabold tracking-tight text-primary mb-1 sm:text-3xl">Gestión de Servicios</h2>
       <p class="text-on-surface-variant text-sm">Catálogo de experiencias y tarifas del atelier</p>
     </div>
 
     <!-- ── KPI Cards ─────────────────────────────────────── -->
-    <div class="grid grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-6">
       <div class="servicio-panel-kpi flex items-center justify-between">
         <div>
-          <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">Total Servicios</p>
-          <h3 class="text-4xl font-extrabold text-primary">{{ servicios.length }}</h3>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1 sm:text-xs">Total Servicios</p>
+          <h3 class="text-3xl font-extrabold text-primary sm:text-4xl">{{ servicios.length }}</h3>
         </div>
-        <div class="p-3 bg-primary-fixed rounded-xl text-primary-container text-2xl font-bold">#</div>
+        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-fixed text-xl font-bold text-primary-container sm:h-auto sm:w-auto sm:p-3 sm:text-2xl">#</div>
       </div>
       <div class="servicio-panel-kpi flex items-center justify-between">
         <div>
-          <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">Servicios Hombre</p>
-          <h3 class="text-4xl font-extrabold text-primary">{{ totalHombre }}</h3>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1 sm:text-xs">Servicios Hombre</p>
+          <h3 class="text-3xl font-extrabold text-primary sm:text-4xl">{{ totalHombre }}</h3>
         </div>
-        <div class="p-3 bg-secondary-fixed rounded-xl text-on-secondary-fixed-variant text-2xl" aria-hidden="true">♂</div>
+        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary-fixed text-xl text-on-secondary-fixed-variant sm:h-auto sm:w-auto sm:p-3 sm:text-2xl" aria-hidden="true">♂</div>
       </div>
       <div class="servicio-panel-kpi flex items-center justify-between">
         <div>
-          <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">Servicios Mujer</p>
-          <h3 class="text-4xl font-extrabold text-primary">{{ totalMujer }}</h3>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1 sm:text-xs">Servicios Mujer</p>
+          <h3 class="text-3xl font-extrabold text-primary sm:text-4xl">{{ totalMujer }}</h3>
         </div>
-        <div class="p-3 bg-tertiary-fixed rounded-xl text-on-tertiary-fixed-variant text-2xl" aria-hidden="true">♀</div>
+        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-tertiary-fixed text-xl text-on-tertiary-fixed-variant sm:h-auto sm:w-auto sm:p-3 sm:text-2xl" aria-hidden="true">♀</div>
       </div>
     </div>
 
     <!-- ── Tabla ─────────────────────────────────────────── -->
-    <div class="servicio-panel-card p-6">
+    <div class="servicio-panel-card p-4 sm:p-6">
 
-      <div class="flex items-center justify-between gap-4 mb-8 flex-wrap">
+      <div class="mb-5 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div class="w-full sm:w-56">
           <label for="servicios-filtro-genero" class="sr-only">Filtrar servicios por público</label>
           <select
@@ -167,7 +181,7 @@ function formatEur(n: number): string {
           </select>
         </div>
         <button
-          class="flex items-center gap-2 bg-primary-container text-white px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all"
+          class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-container px-5 py-3 text-sm font-bold text-white transition-all hover:opacity-90 sm:w-auto sm:rounded-full sm:px-6 sm:py-2.5"
           aria-label="Crear nuevo servicio"
           @click="abrirCrear"
         >
@@ -180,8 +194,63 @@ function formatEur(n: number): string {
         <Loader2 class="w-6 h-6 animate-spin text-primary" />
       </div>
 
-      <div v-else class="overflow-x-auto">
-        <table class="w-full text-left border-separate border-spacing-y-3" aria-label="Catálogo de servicios">
+      <template v-else>
+        <div class="space-y-3 md:hidden">
+          <article
+            v-for="s in serviciosFiltrados"
+            :key="s.id"
+            class="rounded-2xl border border-outline-variant/20 bg-white p-4 shadow-sm"
+            @click="abrirEditar(s)"
+          >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h3 class="truncate text-sm font-extrabold text-primary">{{ s.nombre }}</h3>
+              <p class="mt-1 text-[11px] text-on-surface-variant">{{ labelCategoria(s.categoria) }}</p>
+            </div>
+            <span class="shrink-0 rounded-full px-3 py-1 text-[10px] font-bold" :class="badgeClase(s.genero)">
+              {{ labelGenero(s.genero) }}
+            </span>
+          </div>
+
+          <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div class="rounded-xl bg-surface-container-low px-3 py-2">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Duración</p>
+              <p class="mt-1 font-bold text-on-surface">{{ s.duracionMinutos }} min</p>
+            </div>
+            <div class="rounded-xl bg-surface-container-low px-3 py-2">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Precio</p>
+              <p class="mt-1 font-bold text-primary">{{ formatEur(precioServicio(s)) }}</p>
+              <p v-if="s.precioDescuento && s.precioDescuento < s.precio" class="text-[11px] text-on-surface-variant line-through">
+                {{ formatEur(s.precio) }}
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-4 flex gap-2" @click.stop>
+            <button
+              class="flex flex-1 items-center justify-center rounded-xl bg-primary-container px-3 py-2.5 text-xs font-bold text-white"
+              :aria-label="`Editar servicio: ${s.nombre}`"
+              @click="abrirEditar(s)"
+            >
+              Editar
+            </button>
+            <button
+              class="flex flex-1 items-center justify-center rounded-xl bg-red-50 px-3 py-2.5 text-xs font-bold text-error"
+              :aria-label="`Eliminar servicio: ${s.nombre}`"
+              @click="eliminar(s.id)"
+            >
+              Eliminar
+            </button>
+          </div>
+          </article>
+
+          <div v-if="serviciosFiltrados.length === 0" class="rounded-2xl border border-dashed border-outline-variant/30 px-4 py-10 text-center text-sm text-on-surface-variant">
+            No hay servicios en este filtro
+          </div>
+        </div>
+
+        <div class="hidden overflow-x-auto md:block">
+          <table class="w-full text-left border-separate border-spacing-y-3" aria-label="Catálogo de servicios">
           <thead>
             <tr class="text-on-surface-variant/60 text-[10px] uppercase tracking-[0.15em] font-bold">
               <th scope="col" class="pb-4 px-4">Servicio</th>
@@ -208,7 +277,12 @@ function formatEur(n: number): string {
                 </div>
               </td>
               <td class="py-4 px-4 text-on-surface-variant">{{ s.duracionMinutos }} min</td>
-              <td class="py-4 px-4 font-bold">{{ formatEur(s.precio) }}</td>
+              <td class="py-4 px-4 font-bold">
+                {{ formatEur(precioServicio(s)) }}
+                <span v-if="s.precioDescuento && s.precioDescuento < s.precio" class="ml-2 text-xs text-on-surface-variant font-normal line-through">
+                  {{ formatEur(s.precio) }}
+                </span>
+              </td>
               <td class="py-4 px-4 text-right rounded-r-xl" @click.stop>
                 <div class="flex justify-end gap-2">
                   <button
@@ -240,8 +314,9 @@ function formatEur(n: number): string {
               </td>
             </tr>
           </tbody>
-        </table>
-      </div>
+          </table>
+        </div>
+      </template>
     </div>
   </div>
 
@@ -259,12 +334,12 @@ function formatEur(n: number): string {
         role="dialog"
         aria-modal="true"
         :aria-label="servicioEditar.id ? `Editar servicio: ${servicioEditar.nombre}` : 'Nuevo servicio'"
-        class="fixed right-0 top-0 h-screen w-full max-w-md bg-white shadow-2xl border-l border-outline-variant/20 z-50 flex flex-col"
+        class="fixed right-0 top-0 z-50 flex h-screen w-full max-w-md flex-col border-l border-outline-variant/20 bg-white shadow-2xl"
       >
 
-        <div class="p-8 border-b border-outline-variant/10 flex items-center justify-between flex-shrink-0">
+        <div class="flex flex-shrink-0 items-center justify-between border-b border-outline-variant/10 p-5 sm:p-8">
           <div>
-            <h3 class="text-xl font-bold text-primary">{{ servicioEditar.id ? 'Detalle del Servicio' : 'Nuevo Servicio' }}</h3>
+            <h3 class="text-lg font-bold text-primary sm:text-xl">{{ servicioEditar.id ? 'Detalle del Servicio' : 'Nuevo Servicio' }}</h3>
             <p class="text-xs text-on-surface-variant">{{ servicioEditar.id ? 'Editando configuración actual' : 'Completa los campos' }}</p>
           </div>
           <button class="p-2 hover:bg-surface-container-low rounded-full text-on-surface-variant" aria-label="Cerrar" @click="drawerAbierto = false">
@@ -272,14 +347,14 @@ function formatEur(n: number): string {
           </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-8 space-y-6">
+        <div class="flex-1 space-y-5 overflow-y-auto p-5 sm:space-y-6 sm:p-8">
 
           <div class="space-y-2">
             <label class="label" for="srv-nombre">Nombre del Servicio</label>
             <input id="srv-nombre" v-model="servicioEditar.nombre" type="text" class="input font-bold" placeholder="Ej. Balayage Premium" />
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div class="space-y-2">
               <label class="label" for="srv-genero">Público</label>
               <select id="srv-genero" v-model="servicioEditar.genero" class="select-field">
@@ -299,7 +374,7 @@ function formatEur(n: number): string {
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div class="space-y-2">
               <label class="label" for="srv-duracion">Duración (min)</label>
               <input id="srv-duracion" v-model.number="servicioEditar.duracionMinutos" type="number" min="5" class="input" />
@@ -308,6 +383,19 @@ function formatEur(n: number): string {
               <label class="label" for="srv-precio">Precio (€)</label>
               <input id="srv-precio" v-model.number="servicioEditar.precio" type="number" min="0" step="0.5" class="input font-bold" />
             </div>
+          </div>
+
+          <div class="space-y-2">
+            <label class="label" for="srv-precio-descuento">Precio promo (€)</label>
+            <input
+              id="srv-precio-descuento"
+              v-model.number="servicioEditar.precioDescuento"
+              type="number"
+              min="0"
+              step="0.5"
+              class="input font-bold"
+              placeholder="Opcional"
+            />
           </div>
 
           <div class="space-y-2">
@@ -332,9 +420,9 @@ function formatEur(n: number): string {
 
         </div>
 
-        <div class="p-8 border-t border-outline-variant/10 bg-surface-container-lowest flex-shrink-0">
+        <div class="flex-shrink-0 border-t border-outline-variant/10 bg-surface-container-lowest p-5 sm:p-8">
           <button
-            class="btn-primary w-full py-4"
+            class="btn-primary w-full py-3.5 sm:py-4"
             :disabled="guardando"
             @click="guardar"
           >

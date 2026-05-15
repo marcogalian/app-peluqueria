@@ -135,17 +135,13 @@
 
   /* ── Cards ───────────────────────────────────────────── */
   .card {
-    @apply bg-surface-container-lowest rounded-2xl shadow-card border border-outline-variant/20
-           transition-all duration-300
-           hover:shadow-card-md;
+    @apply bg-surface-container-lowest rounded-2xl shadow-card border border-outline-variant/20;
   }
 
-  /* Card de KPI — fondo gris claro, blanco al hover */
+  /* Card de KPI — fondo gris claro */
   .card-kpi {
     @apply bg-surface-container-low rounded-2xl p-6
-           border border-outline-variant/10
-           transition-all duration-300
-           hover:bg-white hover:shadow-card-md hover:-translate-y-0.5;
+           border border-outline-variant/10;
   }
 
   /* ── Inputs ──────────────────────────────────────────── */
