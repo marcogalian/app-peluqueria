@@ -46,6 +46,9 @@ public class AntiAbuseFilter extends OncePerRequestFilter {
     @Value("${app.security.anti-abuse.chat-per-minute:8}")
     private int chatLimit;
 
+    @Value("${app.security.anti-abuse.trust-forwarded-for:false}")
+    private boolean trustForwardedFor;
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -117,7 +120,7 @@ public class AntiAbuseFilter extends OncePerRequestFilter {
     }
 
     private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
+        String forwardedFor = trustForwardedFor ? request.getHeader("X-Forwarded-For") : null;
         if (forwardedFor != null && !forwardedFor.isBlank()) {
             return forwardedFor.split(",")[0].trim();
         }

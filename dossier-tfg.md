@@ -58,7 +58,7 @@ Frente a las soluciones genéricas o el método manual, este proyecto plantea un
 
 2. **Seguridad de nivel profesional:** JWT con Refresh Tokens garantiza que solo el personal autorizado acceda a la información. El chat interno utiliza cifrado AES para proteger los mensajes. La autenticación diferencia claramente entre el rol de administrador y el rol de empleado, aplicando restricciones tanto en el frontend como en el backend.
 
-3. **Despliegue reproducible con Docker:** La aplicación se despliega en cualquier máquina con un único comando (`docker compose up --build`), eliminando problemas de configuración de entorno y facilitando la puesta en producción.
+3. **Despliegue reproducible con Docker:** La aplicación se despliega en cualquier máquina copiando `docker/.env.example` a `docker/.env` y ejecutando `docker compose up --build -d`, eliminando problemas de configuración de entorno y facilitando la puesta en producción.
 
 4. **Asistente de IA integrado con el negocio:** El asistente conversacional no es un chatbot genérico, sino que está conectado al dominio de la peluquería. Utiliza Spring AI con function calling sobre OpenAI para responder preguntas en lenguaje natural consultando datos reales de la base de datos: citas del día, clientes VIP, inventario bajo stock, resultados financieros, etc.
 
@@ -90,9 +90,9 @@ Desde el punto de vista técnico, el proyecto aplica patrones de arquitectura qu
 
 **Spring Mail:** Integración de envío de correo electrónico para notificaciones de aprobación o rechazo de ausencias, usando Mailtrap como servidor SMTP de pruebas.
 
-**Spring AI y OpenAI:** Spring AI 1.1.x, compatible con Spring Boot 3.5, actúa como capa de integración con la API de OpenAI. Gestiona el ciclo completo de function calling: el modelo solicita una función de negocio, el backend la ejecuta de forma segura contra PostgreSQL y devuelve el resultado para que el modelo redacte la respuesta final.
+**Spring AI y OpenAI:** El proyecto usa Spring AI 1.1.x, compatible con Spring Boot 3.5, como configuración de integración con OpenAI. La clase `SpringAiModeloLenguaje` invoca OpenAI Chat Completions con `tools` y `tool_choice=auto`: cuando el modelo solicita una función de negocio, el backend ejecuta una consulta controlada contra PostgreSQL y devuelve el resultado para que el modelo redacte la respuesta final. El modelo no accede directamente a la base de datos ni ejecuta SQL libre.
 
-**Springdoc OpenAPI:** Generación automática de documentación de la API REST en formato OpenAPI 3.0, con interfaz Swagger UI accesible en desarrollo.
+**Springdoc OpenAPI:** Generación automática de documentación de la API REST en formato OpenAPI 3.0, con interfaz Swagger UI activable en desarrollo mediante `SWAGGER_ENABLED=true` y desactivada por defecto en Docker.
 
 **JUnit 5 y Mockito:** Framework de pruebas unitarias para el backend, con Mockito para la simulación de dependencias.
 
@@ -237,7 +237,7 @@ El sistema debe satisfacer los siguientes requerimientos funcionales, organizado
 
 #### Requerimientos No Funcionales
 
-**RNF-01. Seguridad:** Todas las contraseñas deben almacenarse con hash BCrypt. La comunicación entre cliente y servidor debe estar protegida mediante tokens JWT firmados. Los mensajes del chat interno deben cifrarse con AES antes de persistirse. Los permisos deben validarse en el backend independientemente de lo que muestre el frontend.
+**RNF-01. Seguridad:** Todas las contraseñas deben almacenarse con hash BCrypt. La comunicación entre cliente y servidor debe estar protegida mediante tokens JWT firmados. Los mensajes del chat interno deben cifrarse con AES antes de persistirse y no deben escribirse en logs en claro. Los permisos deben validarse en el backend independientemente de lo que muestre el frontend. Además, el backend debe aplicar protección anti-abuso por IP y ruta para reducir fuerza bruta, scraping, ráfagas automatizadas y consumo innecesario del asistente IA.
 
 **RNF-02. Rendimiento:** El contexto de negocio del asistente IA se cachea en memoria y se regenera automáticamente cada noche a las 03:00, evitando consultas innecesarias a la base de datos en cada petición del chat.
 
@@ -424,6 +424,7 @@ El comando de despliegue completo es:
 
 ```bash
 cd docker
+cp .env.example .env
 docker compose up --build -d
 ```
 
@@ -433,7 +434,7 @@ Una vez levantados los servicios, la aplicación está disponible en:
 |---|---|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8080 |
-| Swagger UI | http://localhost:8080/swagger-ui.html |
+| Swagger UI | http://localhost:8080/swagger-ui.html, solo si `SWAGGER_ENABLED=true` |
 
 La configuración sensible (claves JWT, clave AES, credenciales de base de datos, clave de API de OpenAI) se gestiona mediante variables de entorno en el archivo `docker/.env`, que no se incluye en el repositorio.
 
@@ -531,6 +532,7 @@ Todos los objetivos específicos definidos en el apartado 4 han sido alcanzados:
 ```bash
 # Arranque completo
 cd docker
+cp .env.example .env
 docker compose up --build -d
 
 # Ver logs del backend
@@ -558,7 +560,10 @@ npm test
 | `JWT_SECRET_KEY` | Clave secreta para firmar JWT (≥ 32 bytes) | Sí |
 | `CHAT_AES_KEY` | Clave AES para cifrado del chat | Sí |
 | `OPENAI_API_KEY` | Clave de API de OpenAI | Para el chatbot |
-| `OPENAI_MODEL` | Modelo de OpenAI a usar | No (default: gpt-4.1-nano) |
+| `OPENAI_MODEL` | Modelo de OpenAI a usar | No (default recomendado: gpt-4o-mini) |
+| `OPENAI_MAX_TOKENS` | Límite de tokens de salida del asistente | No (default: 200) |
+| `ANTI_ABUSE_TRUST_FORWARDED_FOR` | Permite confiar en `X-Forwarded-For` solo si existe un proxy inverso confiable | No (default: false) |
+| `APP_SYNC_DEMO_PASSWORDS` | Sincroniza las contraseñas demo con `APP_DEMO_PASSWORD` al arrancar Docker | No |
 | `MAILTRAP_USERNAME` | Usuario SMTP de Mailtrap | Para emails |
 | `MAILTRAP_PASSWORD` | Contraseña SMTP de Mailtrap | Para emails |
 

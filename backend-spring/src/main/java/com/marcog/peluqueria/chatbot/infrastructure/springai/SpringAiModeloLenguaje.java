@@ -44,7 +44,7 @@ public class SpringAiModeloLenguaje implements ModeloLenguaje {
     @Value("${spring.ai.openai.api-key:}")
     private String apiKey;
 
-    @Value("${spring.ai.openai.chat.options.model:gpt-4.1-nano}")
+    @Value("${spring.ai.openai.chat.options.model:gpt-4o-mini}")
     private String model;
 
     @Value("${spring.ai.openai.chat.options.max-tokens:200}")

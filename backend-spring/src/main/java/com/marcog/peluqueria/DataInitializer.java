@@ -51,6 +51,8 @@ public class DataInitializer implements CommandLineRunner {
     private boolean remoteClientsEnabled;
     @Value("${app.seed.demo-password:}")
     private String demoPassword;
+    @Value("${app.seed.sync-demo-passwords:false}")
+    private boolean syncDemoPasswords;
 
     @Override
     public void run(String... args) {
@@ -75,10 +77,18 @@ public class DataInitializer implements CommandLineRunner {
         var adminExistente = userRepository.findByUsername("admin");
         if (adminExistente.isPresent()) {
             UserEntity admin = adminExistente.get();
+            boolean modificado = false;
             if (!ADMIN_EMAIL.equalsIgnoreCase(admin.getEmail())) {
                 admin.setEmail(ADMIN_EMAIL);
+                modificado = true;
+            }
+            if (syncDemoPasswords && !passwordEncoder.matches(requireDemoPassword(), admin.getPassword())) {
+                admin.setPassword(passwordEncoder.encode(requireDemoPassword()));
+                modificado = true;
+            }
+            if (modificado) {
                 userRepository.save(admin);
-                log.info("DataInitializer: email del administrador demo sincronizado.");
+                log.info("DataInitializer: administrador demo sincronizado.");
             }
             return;
         }
@@ -107,16 +117,26 @@ public class DataInitializer implements CommandLineRunner {
         int actualizados = 0;
         for (UsuarioDemo usuarioDemo : usuarios) {
             var usuario = userRepository.findByUsername(usuarioDemo.username());
-            if (usuario.isPresent() && !usuarioDemo.email().equalsIgnoreCase(usuario.get().getEmail())) {
+            if (usuario.isPresent()) {
                 UserEntity user = usuario.get();
-                user.setEmail(usuarioDemo.email());
-                userRepository.save(user);
-                actualizados++;
+                boolean modificado = false;
+                if (!usuarioDemo.email().equalsIgnoreCase(user.getEmail())) {
+                    user.setEmail(usuarioDemo.email());
+                    modificado = true;
+                }
+                if (syncDemoPasswords && !passwordEncoder.matches(requireDemoPassword(), user.getPassword())) {
+                    user.setPassword(passwordEncoder.encode(requireDemoPassword()));
+                    modificado = true;
+                }
+                if (modificado) {
+                    userRepository.save(user);
+                    actualizados++;
+                }
             }
         }
 
         if (actualizados > 0) {
-            log.info("DataInitializer: {} emails de empleados demo sincronizados.", actualizados);
+            log.info("DataInitializer: {} usuarios demo sincronizados.", actualizados);
         }
     }
 
