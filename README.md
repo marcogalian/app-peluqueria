@@ -98,7 +98,7 @@ Peluqueria Isabella no es solo un chatbot ni una demo de pantallas aisladas. Es 
 | Pinia | Estado global |
 | Tailwind CSS | Estilos |
 | Axios | Cliente HTTP |
-| FullCalendar | Agenda visual |
+| Agenda custom | Vista semanal de citas con slots, solapamiento y estados |
 | Chart.js | Graficas |
 | Lucide | Iconografia |
 | Vitest | Tests unitarios del frontend |
@@ -317,7 +317,7 @@ Para una demo con coste bajo se recomienda `gpt-4o-mini`, modelo economico de Op
 
 ```env
 AI_PROVIDER=spring-ai
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=poner_clave_openai_aqui
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_MAX_TOKENS=200
 SPRING_AI_MODEL_CHAT=openai
@@ -423,7 +423,7 @@ peluqueria/
 ├── backend-spring/       # API Spring Boot
 ├── front-nuxt/           # Aplicacion Nuxt
 ├── docker/               # Docker Compose y variables de entorno
-└── docs/                 # Puesta en marcha publica
+└── puesta-en-marcha/     # Credenciales demo y guia de arranque (no se sube a Git)
 ```
 
 ## Arranque rapido
@@ -473,7 +473,7 @@ APP_DEMO_PASSWORD=Demo1234
 
 Para probar recuperacion por email hay que rellenar `MAILTRAP_USERNAME` y `MAILTRAP_PASSWORD`. Para probar el chatbot real hay que rellenar `OPENAI_API_KEY` y dejar `SPRING_AI_MODEL_CHAT=openai`.
 
-Si el profesor recibe una carpeta privada `entrega-profesor` con credenciales de demo, debe copiar `entrega-profesor/docker/.env` en `docker/.env` antes de ejecutar Docker. Esa carpeta no se sube a Git porque contiene claves API y contrasenas.
+Si el profesor recibe una carpeta privada `puesta-en-marcha` con credenciales de demo, debe copiar `puesta-en-marcha/docker/.env` en `docker/.env` antes de ejecutar Docker. Esa carpeta no se sube a Git porque contiene claves API y contrasenas.
 
 Servicios:
 
@@ -511,9 +511,7 @@ npm run dev
 
 ## Documentacion
 
-- [Puesta en marcha](docs/puesta-en-marcha.md)
-
-Las credenciales demo y notas privadas se entregan aparte y no deben subirse al repositorio publico.
+La guia privada de puesta en marcha se entrega aparte dentro de la carpeta `puesta-en-marcha`, junto con los `.env` reales de demo. Esa carpeta no forma parte del repositorio porque contiene claves API, credenciales SMTP y contrasenas de prueba.
 
 ## Comandos utiles
 

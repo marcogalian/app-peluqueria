@@ -35,6 +35,8 @@ const contactos = ref<Contacto[]>([])
 const contactoActivo = ref<Contacto | null>(null)
 const cargando = ref(true)
 const enviandoEmail = ref(false)
+const eliminandoMensaje = ref(false)
+const mensajeAEliminar = ref<Mensaje | null>(null)
 const emailEstado = ref<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
 
 const emailForm = reactive({
@@ -156,14 +158,28 @@ async function archivarMensaje(mensajeId: string) {
   }
 }
 
-async function eliminarMensaje(mensajeId: string) {
+function pedirEliminarMensaje(mensaje: Mensaje) {
+  mensajeAEliminar.value = mensaje
+}
+
+function cancelarEliminarMensaje() {
+  mensajeAEliminar.value = null
+}
+
+async function eliminarMensajeConfirmado() {
+  if (!mensajeAEliminar.value?.id) return
+
+  eliminandoMensaje.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
-    await api.delete(`/mensajes/${mensajeId}`)
-    mensajes.value = mensajes.value.filter(m => m.id !== mensajeId)
+    await api.delete(`/mensajes/${mensajeAEliminar.value.id}`)
+    mensajes.value = mensajes.value.filter(m => m.id !== mensajeAEliminar.value?.id)
+    cancelarEliminarMensaje()
     toast.success('Mensaje eliminado.')
   } catch {
     toast.error('No se pudo eliminar el mensaje.')
+  } finally {
+    eliminandoMensaje.value = false
   }
 }
 </script>
@@ -343,7 +359,7 @@ async function eliminarMensaje(mensajeId: string) {
                         class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-on-surface-variant transition-colors hover:bg-red-50 hover:text-red-700"
                         title="Eliminar mensaje"
                         aria-label="Eliminar mensaje"
-                        @click="eliminarMensaje(m.id)"
+                        @click="pedirEliminarMensaje(m)"
                       >
                         <Trash2 class="h-3.5 w-3.5" />
                         Eliminar
@@ -362,4 +378,33 @@ async function eliminarMensaje(mensajeId: string) {
       </template>
     </section>
   </div>
+
+  <Teleport to="body">
+    <Transition name="modal-overlay">
+      <div
+        v-if="mensajeAEliminar"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm"
+        @click.self="cancelarEliminarMensaje"
+      >
+        <section class="w-full max-w-md rounded-[28px] border border-outline-variant/15 bg-white p-6 shadow-2xl sm:p-7">
+          <div class="space-y-2">
+            <h3 class="text-lg font-bold text-primary">Eliminar mensaje</h3>
+            <p class="text-sm leading-relaxed text-on-surface-variant">
+              Voy a eliminar el mensaje <strong class="text-on-surface">{{ mensajeAEliminar.asunto || 'Sin asunto' }}</strong>. Esta acción no se puede deshacer.
+            </p>
+          </div>
+
+          <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button class="btn-secondary" :disabled="eliminandoMensaje" @click="cancelarEliminarMensaje">
+              Cancelar
+            </button>
+            <button class="btn-danger" :disabled="eliminandoMensaje" @click="eliminarMensajeConfirmado">
+              <Loader2 v-if="eliminandoMensaje" class="h-4 w-4 animate-spin" aria-hidden="true" />
+              <span>{{ eliminandoMensaje ? 'Eliminando...' : 'Sí, eliminar' }}</span>
+            </button>
+          </div>
+        </section>
+      </div>
+    </Transition>
+  </Teleport>
 </template>

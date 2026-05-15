@@ -246,7 +246,7 @@ function formatFecha(fecha: string): string {
         v-for="notif in notificacionesPendientes"
         :key="notif.id"
         :class="[
-          'card p-5 border-l-4 flex items-start gap-4',
+          'card flex flex-col gap-4 border-l-4 p-4 sm:flex-row sm:items-start sm:gap-4 sm:p-5',
           notif.estado === 'APROBADA'
             ? 'bg-green-50 border-green-500'
             : 'bg-red-50 border-red-500',
@@ -261,7 +261,7 @@ function formatFecha(fecha: string): string {
           <CheckCircle2 v-if="notif.estado === 'APROBADA'" class="w-5 h-5 text-green-700" />
           <AlertTriangle v-else class="w-5 h-5 text-red-700" />
         </div>
-        <div class="flex-1 min-w-0">
+        <div class="min-w-0 flex-1">
           <p
             :class="[
               'text-sm font-bold',
@@ -284,7 +284,7 @@ function formatFecha(fecha: string): string {
           </p>
         </div>
         <button
-          class="p-2 rounded-lg hover:bg-white/50 transition-colors flex-shrink-0"
+          class="self-end rounded-lg p-2 transition-colors hover:bg-white/50 sm:self-start"
           aria-label="Cerrar notificación"
           @click="cerrarNotificacion(notif)"
         >
@@ -294,7 +294,7 @@ function formatFecha(fecha: string): string {
     </div>
 
     <!-- ── Cabecera ──────────────────────────────────────── -->
-    <div class="flex items-end justify-between">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <h2 class="text-3xl font-extrabold tracking-tight text-primary mb-1">
           {{ authStore.isAdmin ? 'Gestión de Ausencias' : 'Mis Vacaciones' }}
@@ -307,7 +307,7 @@ function formatFecha(fecha: string): string {
       </div>
       <button
         v-if="!authStore.isAdmin"
-        class="flex items-center gap-2 bg-primary-container text-white px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all"
+        class="flex w-full items-center justify-center gap-2 rounded-full bg-primary-container px-6 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 sm:w-auto"
         @click="modalAbierto = true"
       >
         <Plus class="w-4 h-4" />
@@ -318,7 +318,7 @@ function formatFecha(fecha: string): string {
     <!-- ── Aviso de días bloqueados (visible siempre) ───── -->
     <div
       v-if="!authStore.isAdmin && diasBloqueados.length > 0"
-      class="card p-4 bg-amber-50 border border-amber-200 flex items-start gap-3"
+      class="card flex flex-col gap-3 border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-start"
     >
       <AlertTriangle class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
       <div class="flex-1">
@@ -335,7 +335,7 @@ function formatFecha(fecha: string): string {
     </div>
 
     <!-- ── KPI cards (solo empleado) ─────────────────────── -->
-    <div v-if="!authStore.isAdmin" class="grid grid-cols-3 gap-4">
+    <div v-if="!authStore.isAdmin" class="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
       <div class="card-kpi">
         <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Pendientes</p>
         <p class="text-3xl font-extrabold text-amber-600">{{ pendientes.length }}</p>
@@ -360,22 +360,25 @@ function formatFecha(fecha: string): string {
       <div
         v-for="solicitud in solicitudes"
         :key="solicitud.id"
-        class="card p-5 flex items-start gap-4"
+        class="card flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:gap-4 sm:p-5"
       >
+        <div class="flex items-start gap-3 sm:contents">
         <div class="w-10 h-10 bg-primary-fixed rounded-xl flex items-center justify-center flex-shrink-0">
           <Calendar class="w-5 h-5 text-primary-container" />
         </div>
 
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1">
+          <div class="mb-1 flex flex-wrap items-center gap-2">
             <span class="font-bold text-primary text-sm">{{ labelTipo(solicitud.tipo) }}</span>
             <span v-if="authStore.isAdmin && solicitud.empleadoNombre" class="text-xs text-on-surface-variant">
               — {{ solicitud.empleadoNombre }}
             </span>
           </div>
-          <p class="text-sm text-on-surface-variant">
-            {{ formatFecha(solicitud.fechaInicio) }} → {{ formatFecha(solicitud.fechaFin) }}
-            <span class="ml-2 text-xs font-bold text-primary">
+          <p class="text-sm leading-relaxed text-on-surface-variant">
+            {{ formatFecha(solicitud.fechaInicio) }}
+            <span class="mx-1 hidden sm:inline">→</span>
+            <span class="block sm:inline">{{ formatFecha(solicitud.fechaFin) }}</span>
+            <span class="mt-1 block text-xs font-bold text-primary sm:ml-2 sm:mt-0 sm:inline">
               ({{ differenceInDays(parseISO(solicitud.fechaFin), parseISO(solicitud.fechaInicio)) + 1 }} días)
             </span>
           </p>
@@ -387,9 +390,10 @@ function formatFecha(fecha: string): string {
             Solicitada el {{ formatFecha(solicitud.solicitadaEn) }}
           </p>
         </div>
+        </div>
 
-        <div class="flex items-center gap-3 flex-shrink-0">
-          <span class="text-[10px] font-bold px-2.5 py-1 rounded-full" :class="badgeEstado(solicitud.estado)">
+        <div class="flex flex-wrap items-center gap-2 sm:flex-shrink-0 sm:justify-end">
+          <span class="text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap" :class="badgeEstado(solicitud.estado)">
             {{ solicitud.estado.toLowerCase() }}
           </span>
 
@@ -413,7 +417,7 @@ function formatFecha(fecha: string): string {
 
           <button
             v-else-if="!authStore.isAdmin && solicitud.estado === 'PENDIENTE'"
-            class="text-xs text-error hover:underline"
+            class="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-error transition-colors hover:bg-red-100"
             :disabled="procesando"
             @click="cancelarSolicitud(solicitud.id)"
           >

@@ -40,8 +40,10 @@ docs/sesion-*.md
 
 # ── Documentación interna / TFG (no subir al repo público) ─
 peluqueria-documentos/
+pelu-documentos/
 documentacion-no-github/
 entrega-profesor/
+puesta-en-marcha/
 MEMORANDUM_DEFENSA_TFG.md
 MEMORANDUM_DEFENSA_TFG.pdf
 MEMORANDUM_FRONTEND_TFG.md

@@ -361,12 +361,34 @@ function pctStock(prod: { stock: number; stockMinimo: number }): number {
           <p class="text-xs sm:text-sm text-text-secondary">Finanzas · Personal · Inventario</p>
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-2 w-full md:flex md:items-center md:gap-3 md:w-auto">
-        <input type="date" v-model="fechaFiltro" class="input dashboard-filter-field min-w-0 w-full md:w-44" />
-        <select v-model="agrupacion" class="select-field dashboard-filter-field min-w-0 w-full md:w-44 cursor-pointer">
-          <option value="DIA">Ver datos del día</option>
-          <option value="MES">Ver datos del mes</option>
-        </select>
+      <div class="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center md:gap-3">
+        <input type="date" v-model="fechaFiltro" class="input dashboard-filter-field min-w-0 w-full sm:w-44" />
+        <div
+          class="flex self-end rounded-xl border border-outline-variant/40 bg-white p-1 shadow-sm sm:self-auto"
+          role="group"
+          aria-label="Agrupar métricas del panel"
+        >
+          <button
+            type="button"
+            class="min-w-[4.5rem] rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+            :class="agrupacion === 'DIA'
+              ? 'bg-primary text-white shadow-sm'
+              : 'text-text-secondary hover:bg-surface-container-low hover:text-text-primary'"
+            @click="agrupacion = 'DIA'"
+          >
+            Día
+          </button>
+          <button
+            type="button"
+            class="min-w-[4.5rem] rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+            :class="agrupacion === 'MES'
+              ? 'bg-primary text-white shadow-sm'
+              : 'text-text-secondary hover:bg-surface-container-low hover:text-text-primary'"
+            @click="agrupacion = 'MES'"
+          >
+            Mes
+          </button>
+        </div>
       </div>
     </div>
 

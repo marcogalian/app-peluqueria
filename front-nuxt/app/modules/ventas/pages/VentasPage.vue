@@ -47,6 +47,7 @@ const errorVenta      = ref('')
 const carritoAbierto  = ref(false)
 const metodoPago      = ref<MetodoPago>('TARJETA')
 const ultimaVenta     = ref<VentaAgrupadaResponse | null>(null)
+const lineaAEliminar  = ref<LineaCarrito | null>(null)
 
 const metodosPago: Array<{ key: MetodoPago; label: string }> = [
   { key: 'TARJETA', label: 'Tarjeta' },
@@ -113,8 +114,22 @@ function cambiarCantidad(productoId: string, delta: number) {
   else if (nueva <= linea.producto.stock) linea.cantidad = nueva
 }
 
+function pedirEliminarLinea(linea: LineaCarrito) {
+  lineaAEliminar.value = linea
+}
+
+function cancelarEliminarLinea() {
+  lineaAEliminar.value = null
+}
+
 function quitarLinea(productoId: string) {
   carrito.value = carrito.value.filter(l => l.producto.id !== productoId)
+}
+
+function confirmarEliminarLinea() {
+  if (!lineaAEliminar.value) return
+  quitarLinea(lineaAEliminar.value.producto.id)
+  cancelarEliminarLinea()
 }
 
 function vaciarCarrito() {
@@ -351,7 +366,7 @@ async function confirmarVenta() {
                   <button
                     class="ml-1 min-w-9 min-h-9 rounded-full hover:bg-error/10 flex items-center justify-center transition-colors"
                     :aria-label="`Eliminar ${linea.producto.nombre} del carrito`"
-                    @click="quitarLinea(linea.producto.id)"
+                    @click="pedirEliminarLinea(linea)"
                   >
                     <Trash2 class="w-3 h-3 text-error" aria-hidden="true" />
                   </button>
@@ -433,6 +448,34 @@ async function confirmarVenta() {
       {{ totalUnidades }} producto{{ totalUnidades > 1 ? 's' : '' }} · {{ formatEur(totalCarrito) }}
     </button>
   </Transition>
+
+  <Teleport to="body">
+    <Transition name="modal-overlay">
+      <div
+        v-if="lineaAEliminar"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm"
+        @click.self="cancelarEliminarLinea"
+      >
+        <section class="w-full max-w-md rounded-[28px] border border-outline-variant/15 bg-white p-6 shadow-2xl sm:p-7">
+          <div class="space-y-2">
+            <h3 class="text-lg font-bold text-primary">Eliminar producto del carrito</h3>
+            <p class="text-sm leading-relaxed text-on-surface-variant">
+              Voy a quitar <strong class="text-on-surface">{{ lineaAEliminar.producto.nombre }}</strong> del carrito. Esta acción no se puede deshacer.
+            </p>
+          </div>
+
+          <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button class="btn-secondary" @click="cancelarEliminarLinea">
+              Cancelar
+            </button>
+            <button class="btn-danger" @click="confirmarEliminarLinea">
+              Sí, eliminar
+            </button>
+          </div>
+        </section>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>

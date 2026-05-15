@@ -141,7 +141,7 @@ async function handleRecuperar() {
          LADO DERECHO — Formulario de login
          ════════════════════════════════════════════════════ -->
     <div class="w-full lg:w-1/2 flex items-center justify-center bg-white px-4 sm:px-8 py-8 sm:py-12">
-      <div class="w-full max-w-sm animate-fade-scale-in">
+      <div class="w-full max-w-lg animate-fade-scale-in">
 
         <!-- Encabezado del formulario -->
         <div class="mb-8">

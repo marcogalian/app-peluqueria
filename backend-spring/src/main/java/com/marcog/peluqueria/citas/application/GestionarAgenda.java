@@ -8,6 +8,7 @@ import com.marcog.peluqueria.clientes.domain.Cliente;
 import com.marcog.peluqueria.clientes.domain.ClienteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,10 +28,12 @@ public class GestionarAgenda {
     private final CitaRepository repository;
     private final ClienteRepository clienteRepository;
 
+    @Transactional(readOnly = true)
     public List<Cita> getAllCitas() {
         return repository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public List<Cita> getCitas(java.time.LocalDateTime startDate, java.time.LocalDateTime endDate, UUID peluqueroId) {
         if (startDate == null && endDate == null && peluqueroId == null) {
             return getAllCitas();
@@ -38,10 +41,12 @@ public class GestionarAgenda {
         return repository.findByCriteria(startDate, endDate, peluqueroId);
     }
 
+    @Transactional(readOnly = true)
     public List<Cita> getCitasByCliente(UUID clienteId) {
         return repository.findByClienteId(clienteId);
     }
 
+    @Transactional(readOnly = true)
     public Cita getCitaById(UUID id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cita not found"));

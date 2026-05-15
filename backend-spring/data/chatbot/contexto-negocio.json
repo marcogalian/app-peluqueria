@@ -35,13 +35,6 @@
   } ],
   "totalEmpleados" : 3,
   "servicios" : [ {
-    "nombre" : "Corte de cabello mujer",
-    "precio" : 25.0,
-    "duracionMinutos" : 45,
-    "genero" : "FEMENINO",
-    "categoria" : "SENORA",
-    "descripcion" : "Corte personalizado con acabado profesional"
-  }, {
     "nombre" : "Corte de cabello hombre",
     "precio" : 15.0,
     "duracionMinutos" : 30,
@@ -152,6 +145,13 @@
     "duracionMinutos" : 30,
     "genero" : "MASCULINO",
     "categoria" : "CABALLERO"
+  }, {
+    "nombre" : "Corte de cabello mujer",
+    "precio" : 25.0,
+    "duracionMinutos" : 45,
+    "genero" : "FEMENINO",
+    "categoria" : "SENORA",
+    "descripcion" : "Corte personalizado con acabado profesional"
   } ],
   "productos" : [ {
     "nombre" : "Champú equilibrante Unisex",
@@ -272,14 +272,6 @@
     "stockMinimo" : 8,
     "stockBajo" : false,
     "categoria" : "COLORACION",
-    "genero" : "UNISEX"
-  }, {
-    "nombre" : "Polvos texturizantes",
-    "precio" : 20.0,
-    "stock" : 8,
-    "stockMinimo" : 5,
-    "stockBajo" : false,
-    "categoria" : "HERRAMIENTA",
     "genero" : "UNISEX"
   }, {
     "nombre" : "Champú hidratante Wella",

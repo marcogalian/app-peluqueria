@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
 import java.util.Locale;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
  * Centraliza el manejo de errores para que ningún controlador necesite capturar excepciones manualmente.
  */
 @RestControllerAdvice
+@Slf4j
 public class ApiExceptionHandler {
 
     @ExceptionHandler(ResponseStatusException.class)
@@ -102,6 +104,12 @@ public class ApiExceptionHandler {
         if (pareceNoEncontrado(ex)) {
             return build(HttpStatus.NOT_FOUND, mensajeSeguro(ex, "Recurso no encontrado."), request.getRequestURI());
         }
+
+        log.error("Error interno no controlado en {} {}: {}",
+                request.getMethod(),
+                request.getRequestURI(),
+                ex.getMessage(),
+                ex);
 
         return build(
                 HttpStatus.INTERNAL_SERVER_ERROR,

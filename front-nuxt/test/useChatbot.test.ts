@@ -32,21 +32,22 @@ describe('useChatbot', () => {
     expect(messages.value[1]).toEqual({ role: 'assistant', content: 'Hola, soy el bot' })
   })
 
-  it('sendMessage envia el historial transformando assistant -> model', async () => {
+  it('sendMessage envia el historial manteniendo user/assistant y recortando a 8 mensajes validos', async () => {
     apiPostMock.mockResolvedValue({
       data: { reply: 'segunda respuesta', suggestedQuestions: [] },
     })
 
     const { sendMessage } = await importarFresco()
-    await sendMessage('primero')
-    await sendMessage('segundo')
+    for (let i = 0; i < 8; i += 1) {
+      await sendMessage(`mensaje ${i}`)
+    }
 
-    // En la segunda llamada el historial debe contener el primer turno completo
-    const segundaLlamada = apiPostMock.mock.calls[1][1]
-    expect(segundaLlamada.message).toBe('segundo')
-    expect(segundaLlamada.history).toHaveLength(2)
-    // El bot del primer turno debe ir como 'model', no 'assistant'
-    expect(segundaLlamada.history[1]).toEqual({ role: 'model', content: 'segunda respuesta' })
+    const ultimaLlamada = apiPostMock.mock.calls.at(-1)?.[1]
+    expect(ultimaLlamada.message).toBe('mensaje 7')
+    expect(ultimaLlamada.history).toHaveLength(8)
+    expect(ultimaLlamada.history[0]).toEqual({ role: 'user', content: 'mensaje 3' })
+    expect(ultimaLlamada.history[1]).toEqual({ role: 'assistant', content: 'segunda respuesta' })
+    expect(ultimaLlamada.history.at(-1)).toEqual({ role: 'assistant', content: 'segunda respuesta' })
   })
 
   it('Si el backend devuelve error con status, se muestra "Error N: ..."', async () => {
@@ -58,6 +59,34 @@ describe('useChatbot', () => {
     await sendMessage('test')
 
     expect(messages.value[1].content).toBe('Error 500: BD caida')
+  })
+
+  it('Si el backend rechaza por historial largo, muestra un mensaje amable', async () => {
+    apiPostMock.mockRejectedValueOnce({
+      response: { status: 400, data: { message: 'El historial no puede superar 12 mensajes' } },
+    })
+
+    const { messages, sendMessage } = await importarFresco()
+    await sendMessage('test')
+
+    expect(messages.value[1].content).toContain('La conversación ya es demasiado larga')
+  })
+
+  it('Los errores locales no se reenvian como parte del historial', async () => {
+    apiPostMock
+      .mockRejectedValueOnce({
+        response: { status: 400, data: { message: 'El historial no puede superar 12 mensajes' } },
+      })
+      .mockResolvedValueOnce({
+        data: { reply: 'ok', suggestedQuestions: [] },
+      })
+
+    const { sendMessage } = await importarFresco()
+    await sendMessage('primero')
+    await sendMessage('segundo')
+
+    const segundaLlamada = apiPostMock.mock.calls[1][1]
+    expect(segundaLlamada.history).toEqual([{ role: 'user', content: 'primero' }])
   })
 
   it('Si no hay status (network error), se muestra mensaje generico', async () => {

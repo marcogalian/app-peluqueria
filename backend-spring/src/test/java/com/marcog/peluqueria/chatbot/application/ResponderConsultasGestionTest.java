@@ -95,7 +95,7 @@ class ResponderConsultasGestionTest {
         when(peluqueroRepository.findByUserId(any())).thenReturn(Optional.of(peluqueroFake()));
 
         ChatResponse respuesta = ResponderConsultasGestion.chat(
-                peticionConMensaje("Que citas tengo?"), empleadoUser);
+                peticionConMensaje("Necesito informacion operativa de hoy"), empleadoUser);
 
         assertEquals("Tienes 3 citas hoy.", respuesta.getReply());
         verify(functionExecutor).execute(eq("getCitasEmpleado"), any(), any(), eq(false));
@@ -274,17 +274,19 @@ class ResponderConsultasGestionTest {
     }
 
     @Test
-    @DisplayName("Empleado solo recibe tools propias sin tools de admin ni empleados")
+    @DisplayName("Empleado solo recibe tools propias sin tools de admin")
     void chat_empleado_pasaSoloToolsPropias() {
         when(llmClient.generateContent(any(), any(), any(),
-                argThat((List<Map<String, Object>> tools) -> tools != null && tools.size() == 3)))
+                argThat((List<Map<String, Object>> tools) -> tools != null && tools.size() == 5)))
                 .thenReturn(new LlmResult("ok", null, null, "modelo"));
 
         ResponderConsultasGestion.chat(peticionConMensaje("test"), empleadoUser);
 
         verify(llmClient).generateContent(any(), any(), any(),
                 argThat((List<Map<String, Object>> tools) -> tools != null
-                        && tools.size() == 3
+                        && tools.size() == 5
+                        && tools.stream().anyMatch(tool -> "getPerfilEmpleado".equals(tool.get("name")))
+                        && tools.stream().anyMatch(tool -> "getRendimientoEmpleado".equals(tool.get("name")))
                         && tools.stream().noneMatch(tool -> "getEmpleados".equals(tool.get("name")))));
     }
 
@@ -305,13 +307,68 @@ class ResponderConsultasGestionTest {
     }
 
     @Test
-    @DisplayName("Empleado recibe contexto sin equipo ni productos de inventario")
+    @DisplayName("Empleado pregunta vacaciones restantes: se enruta a sus vacaciones reales")
+    void chat_empleadoVacacionesRestantes_enrutaFuncionPropia() {
+        when(functionExecutor.execute(eq("getVacacionesEmpleado"), any(), any(), eq(false)))
+                .thenReturn("{\"diasVacacionesAnuales\":22,\"diasVacacionesAprobadas\":5,\"diasVacacionesDisponibles\":17}");
+        when(llmClient.sendFunctionResponse(any(), any(), any(), any(), eq("getVacacionesEmpleado"), any(), any(), anyList()))
+                .thenReturn(new LlmResult("Te quedan 17 dias de vacaciones.", null, null, "modelo"));
+        when(peluqueroRepository.findByUserId(any())).thenReturn(Optional.of(peluqueroFake()));
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("cuantas vacaciones me quedan aun sin usar"), empleadoUser);
+
+        assertTrue(respuesta.getReply().contains("17"));
+        verify(functionExecutor).execute(eq("getVacacionesEmpleado"), any(), any(), eq(false));
+        verify(llmClient, never()).generateContent(any(), any(), any(), anyList());
+    }
+
+    @Test
+    @DisplayName("Empleado pregunta servicios realizados: se enruta a rendimiento propio")
+    void chat_empleadoServiciosRealizados_enrutaFuncionPropia() {
+        when(functionExecutor.execute(eq("getRendimientoEmpleado"), any(), any(), eq(false)))
+                .thenReturn("{\"periodo\":\"semana_pasada\",\"totalServiciosRealizados\":6,\"comisionEstimada\":42.0}");
+        when(llmClient.sendFunctionResponse(any(), any(), any(), any(), eq("getRendimientoEmpleado"), any(), any(), anyList()))
+                .thenReturn(new LlmResult("La semana pasada hiciste 6 servicios.", null, null, "modelo"));
+        when(peluqueroRepository.findByUserId(any())).thenReturn(Optional.of(peluqueroFake()));
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("cuantos servicios hice la semana pasada"), empleadoUser);
+
+        assertTrue(respuesta.getReply().contains("6 servicios"));
+        verify(functionExecutor).execute(
+                eq("getRendimientoEmpleado"),
+                argThat(args -> args != null && "semana_pasada".equals(args.path("periodo").asText())),
+                any(),
+                eq(false));
+        verify(llmClient, never()).generateContent(any(), any(), any(), anyList());
+    }
+
+    @Test
+    @DisplayName("Empleado pregunta cuanto cobra: se enruta a su perfil")
+    void chat_empleadoCuantoCobra_enrutaPerfilPropio() {
+        when(functionExecutor.execute(eq("getPerfilEmpleado"), any(), any(), eq(false)))
+                .thenReturn("{\"horario\":\"09:30 - 13:30\",\"porcentajeComision\":10.0}");
+        when(llmClient.sendFunctionResponse(any(), any(), any(), any(), eq("getPerfilEmpleado"), any(), any(), anyList()))
+                .thenReturn(new LlmResult("Tu comision registrada es del 10%.", null, null, "modelo"));
+        when(peluqueroRepository.findByUserId(any())).thenReturn(Optional.of(peluqueroFake()));
+
+        ChatResponse respuesta = ResponderConsultasGestion.chat(
+                peticionConMensaje("cuanto cobro"), empleadoUser);
+
+        assertTrue(respuesta.getReply().contains("10%"));
+        verify(functionExecutor).execute(eq("getPerfilEmpleado"), any(), any(), eq(false));
+        verify(llmClient, never()).generateContent(any(), any(), any(), anyList());
+    }
+
+    @Test
+    @DisplayName("Empleado recibe contexto sin equipo, sin totalEmpleados y con catalogo de productos saneado")
     void chat_empleado_contextoSinDatosAdmin() {
         when(contextLoader.getContext()).thenReturn("""
                 {"negocio":{"nombre":"Peluquería Isabella"},
                  "equipo":[{"nombre":"Sofía Martínez"}],
                  "totalEmpleados":3,
-                 "productos":[{"nombre":"Champú","stock":10}],
+                 "productos":[{"nombre":"Champú","precio":10.0,"stock":10,"stockMinimo":3}],
                  "servicios":[{"nombre":"Corte"}]}
                 """);
         when(llmClient.generateContent(any(), any(), any(), anyList()))
@@ -323,7 +380,10 @@ class ResponderConsultasGestionTest {
                 argThat(system -> system != null
                         && !system.substring(system.indexOf("Rol del usuario: EMPLEADO.")).contains("Sofía Martínez")
                         && !system.substring(system.indexOf("Rol del usuario: EMPLEADO.")).contains("totalEmpleados")
-                        && !system.substring(system.indexOf("Rol del usuario: EMPLEADO.")).contains("Champú")
+                        && system.substring(system.indexOf("Rol del usuario: EMPLEADO.")).contains("Champú")
+                        && system.substring(system.indexOf("Rol del usuario: EMPLEADO.")).contains("precio")
+                        && !system.substring(system.indexOf("Rol del usuario: EMPLEADO.")).contains("stockMinimo")
+                        && !system.substring(system.indexOf("Rol del usuario: EMPLEADO.")).contains("\"stock\"")
                         && system.contains("Corte")),
                 any(), any(), anyList());
     }

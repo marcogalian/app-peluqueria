@@ -188,11 +188,18 @@ public class CitaController {
             .clienteNombre(cita.getCliente() != null ? cita.getCliente().getNombre() : "")
             .clienteApellidos(cita.getCliente() != null ? cita.getCliente().getApellidos() : "")
             .clienteEsVip(cita.getCliente() != null && cita.getCliente().isEsVip())
-            .clienteDescuentoPorcentaje(cita.getCliente() != null ? cita.getCliente().getDescuentoPorcentaje() : 0)
+            .clienteDescuentoPorcentaje(descuentoCliente(cita))
             .servicioNombre(servicioNombre)
             .comentarios(cita.getComentarios() != null ? cita.getComentarios() : "")
             .motivoCancelacion(cita.getMotivoCancelacion())
             .build();
+    }
+
+    private Integer descuentoCliente(Cita cita) {
+        if (cita.getCliente() == null || cita.getCliente().getDescuentoPorcentaje() == null) {
+            return 0;
+        }
+        return cita.getCliente().getDescuentoPorcentaje();
     }
 
     private CitaResumenDto citaToCitaResumenDto(Cita cita) {

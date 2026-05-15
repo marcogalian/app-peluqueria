@@ -4,6 +4,7 @@ import com.marcog.peluqueria.citas.domain.Cita;
 import com.marcog.peluqueria.citas.domain.CitaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +13,7 @@ import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
+@Transactional
 public class PostgresCitaRepository implements CitaRepository {
 
     private final JpaCitaRepository repository;

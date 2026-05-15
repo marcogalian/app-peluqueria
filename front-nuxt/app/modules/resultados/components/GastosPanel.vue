@@ -267,7 +267,7 @@ function formatFecha(iso: string): string {
     </div>
 
     <!-- ── Cards resumen por categoría ───────────────── -->
-    <div class="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+    <div class="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 xl:grid-cols-7 gap-3">
       <div
         v-for="cat in CATEGORIAS"
         :key="cat"

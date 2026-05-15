@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.marcog.peluqueria.ausencias.domain.EstadoAusencia;
 import com.marcog.peluqueria.ausencias.domain.SolicitudAusencia;
+import com.marcog.peluqueria.ausencias.domain.TipoAusencia;
 import com.marcog.peluqueria.ausencias.domain.AusenciaRepository;
 import com.marcog.peluqueria.chatbot.domain.ConsultasGestionPeluqueria;
 import com.marcog.peluqueria.citas.domain.Cita;
@@ -19,11 +20,15 @@ import com.marcog.peluqueria.productos.domain.Producto;
 import com.marcog.peluqueria.productos.domain.ProductoRepository;
 import com.marcog.peluqueria.productos.infrastructure.persistence.JpaVentaProductoRepository;
 import com.marcog.peluqueria.productos.infrastructure.persistence.VentaProductoEntity;
+import com.marcog.peluqueria.servicios.domain.Servicio;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.Normalizer;
+import java.time.temporal.ChronoUnit;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -47,6 +52,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluqueria {
+    private static final int DIAS_VACACIONES_ANUALES = 22;
 
     // ── Dependencias ────────────────────────────────────────────────
     private final CitaRepository citaRepository;
@@ -81,6 +87,8 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
                 case "getCitasEmpleado" -> getCitasEmpleado(args, peluqueroId);
                 case "getCitasProgramadas" -> getCitasProgramadas(args, peluqueroId, isAdmin);
                 case "getVacacionesEmpleado" -> getVacacionesEmpleado(peluqueroId);
+                case "getPerfilEmpleado" -> getPerfilEmpleado(peluqueroId);
+                case "getRendimientoEmpleado" -> getRendimientoEmpleado(args, peluqueroId);
                 case "getVacacionesEmpleadoPorNombre" -> isAdmin ? getVacacionesEmpleadoPorNombre(args) : ERROR_NO_ADMIN_CITAS;
                 case "getVacacionesEmpleados" -> isAdmin ? getVacacionesEmpleados() : ERROR_NO_ADMIN_CITAS;
                 case "getEmpleados" -> isAdmin ? getEmpleados() : ERROR_NO_ADMIN_CITAS;
@@ -157,7 +165,7 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
                 .collect(Collectors.toList());
 
         List<Map<String, String>> detalle = citas.stream()
-                .map(this::resumirCitaProgramada)
+                .map(cita -> resumirCitaProgramada(cita, isAdmin))
                 .collect(Collectors.toList());
 
         return toJson(Map.of(
@@ -195,11 +203,21 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
         ), "Error serializando empleados");
     }
 
-    private Map<String, String> resumirCitaProgramada(Cita cita) {
+    private Map<String, String> resumirCitaProgramada(Cita cita, boolean isAdmin) {
         String cliente = cita.getCliente() != null
                 ? cita.getCliente().getNombre() + " " + (cita.getCliente().getApellidos() != null ? cita.getCliente().getApellidos() : "")
                 : "Cliente sin asignar";
         String peluquera = cita.getPeluquero() != null ? cita.getPeluquero().getNombre() : "";
+
+        if (!isAdmin) {
+            return Map.of(
+                    "fecha", cita.getFechaHora().format(DateTimeFormatter.ofPattern("dd/MM")),
+                    "hora", cita.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm")),
+                    "cliente", cliente.trim(),
+                    "servicio", primerServicioOSinServicio(cita),
+                    "estado", cita.getEstado() != null ? cita.getEstado().name() : ""
+            );
+        }
 
         return Map.of(
                 "fecha", cita.getFechaHora().format(DateTimeFormatter.ofPattern("dd/MM")),
@@ -220,6 +238,77 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
     private String getVacacionesEmpleado(UUID peluqueroId) {
         List<SolicitudAusencia> ausencias = ausenciaRepository.findByPeluqueroId(peluqueroId);
         return toJson(resumirAusencias("empleado autenticado", ausencias), "Error serializando ausencias");
+    }
+
+    private String getPerfilEmpleado(UUID peluqueroId) {
+        if (peluqueroId == null) {
+            return "{\"error\": \"No hay un perfil de empleado asociado a esta cuenta\"}";
+        }
+
+        return peluqueroRepository.findById(peluqueroId)
+                .map(peluquero -> toJson(Map.of(
+                        "nombre", valorSeguro(peluquero.getNombre()),
+                        "horario", valorSeguro(peluquero.getHorarioBase()),
+                        "porcentajeComision", peluquero.getPorcentajeComision(),
+                        "disponible", peluquero.isDisponible(),
+                        "enBaja", peluquero.isEnBaja(),
+                        "enVacaciones", peluquero.isEnVacaciones()
+                ), "Error serializando perfil del empleado"))
+                .orElse("{\"error\": \"Empleado no encontrado\"}");
+    }
+
+    private String getRendimientoEmpleado(JsonNode args, UUID peluqueroId) {
+        if (peluqueroId == null) {
+            return "{\"error\": \"No hay un perfil de empleado asociado a esta cuenta\"}";
+        }
+
+        RangoFechas rango = resolverRangoEmpleado(args);
+        if (rango.error() != null) {
+            return "{\"error\": \"" + rango.error() + "\"}";
+        }
+
+        Peluquero peluquero = peluqueroRepository.findById(peluqueroId).orElse(null);
+        double porcentajeComision = peluquero != null ? peluquero.getPorcentajeComision() : 0.0;
+
+        List<Cita> completadas = citaRepository.findByCriteria(rango.inicio(), rango.fin(), peluqueroId).stream()
+                .filter(cita -> EstadoCita.COMPLETADO.equals(cita.getEstado()))
+                .sorted((primera, segunda) -> primera.getFechaHora().compareTo(segunda.getFechaHora()))
+                .collect(Collectors.toList());
+
+        int totalServicios = completadas.stream()
+                .mapToInt(cita -> cita.getServicios() != null ? cita.getServicios().size() : 0)
+                .sum();
+
+        BigDecimal ingresos = completadas.stream()
+                .filter(cita -> cita.getServicios() != null)
+                .flatMap(cita -> cita.getServicios().stream())
+                .map(this::precioVentaServicio)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal comisionEstimada = ingresos
+                .multiply(BigDecimal.valueOf(porcentajeComision))
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+        Map<String, Long> serviciosPorNombre = completadas.stream()
+                .filter(cita -> cita.getServicios() != null)
+                .flatMap(cita -> cita.getServicios().stream())
+                .collect(Collectors.groupingBy(
+                        servicio -> valorSeguro(servicio.getNombre()),
+                        LinkedHashMap::new,
+                        Collectors.counting()
+                ));
+
+        return toJson(Map.of(
+                "periodo", rango.etiqueta(),
+                "desde", rango.inicio().toLocalDate().toString(),
+                "hasta", rango.fin().toLocalDate().toString(),
+                "totalCitasCompletadas", completadas.size(),
+                "totalServiciosRealizados", totalServicios,
+                "ingresosGenerados", ingresos,
+                "porcentajeComision", porcentajeComision,
+                "comisionEstimada", comisionEstimada,
+                "serviciosPorNombre", serviciosPorNombre
+        ), "Error serializando rendimiento del empleado");
     }
 
     private String getVacacionesEmpleadoPorNombre(JsonNode args) {
@@ -266,6 +355,9 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
         long pendientes = contarPorEstado(ausencias, EstadoAusencia.PENDIENTE);
         long rechazadas = contarPorEstado(ausencias, EstadoAusencia.RECHAZADA);
         long canceladas = contarPorEstado(ausencias, EstadoAusencia.CANCELADA);
+        long diasVacacionesAprobadas = contarDiasVacaciones(ausencias, EstadoAusencia.APROBADA);
+        long diasVacacionesPendientes = contarDiasVacaciones(ausencias, EstadoAusencia.PENDIENTE);
+        long diasVacacionesDisponibles = Math.max(0, DIAS_VACACIONES_ANUALES - diasVacacionesAprobadas);
 
         List<Map<String, Object>> detalle = ausencias.stream()
                 .map(this::resumirAusencia)
@@ -278,6 +370,10 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
         payload.put("pendientes", pendientes);
         payload.put("rechazadas", rechazadas);
         payload.put("canceladas", canceladas);
+        payload.put("diasVacacionesAnuales", DIAS_VACACIONES_ANUALES);
+        payload.put("diasVacacionesAprobadas", diasVacacionesAprobadas);
+        payload.put("diasVacacionesPendientes", diasVacacionesPendientes);
+        payload.put("diasVacacionesDisponibles", diasVacacionesDisponibles);
         payload.put("detalle", detalle);
         return payload;
     }
@@ -305,6 +401,77 @@ public class ConsultasGestionPeluqueriaPostgres implements ConsultasGestionPeluq
                 .filter(ausencia -> estado.equals(ausencia.getEstado()))
                 .count();
     }
+
+    private long contarDiasVacaciones(List<SolicitudAusencia> ausencias, EstadoAusencia estado) {
+        int anioActual = LocalDate.now().getYear();
+        return ausencias.stream()
+                .filter(ausencia -> TipoAusencia.VACACIONES.equals(ausencia.getTipo()))
+                .filter(ausencia -> estado.equals(ausencia.getEstado()))
+                .filter(ausencia -> ausencia.getFechaInicio() != null && ausencia.getFechaFin() != null)
+                .filter(ausencia -> ausencia.getFechaInicio().getYear() == anioActual
+                        || ausencia.getFechaFin().getYear() == anioActual)
+                .mapToLong(ausencia -> ChronoUnit.DAYS.between(ausencia.getFechaInicio(), ausencia.getFechaFin()) + 1)
+                .sum();
+    }
+
+    private RangoFechas resolverRangoEmpleado(JsonNode args) {
+        LocalDate hoy = LocalDate.now();
+        if (args != null && args.hasNonNull("fecha")) {
+            LocalDate fecha = LocalDate.parse(args.get("fecha").asText());
+            if (fecha.isAfter(hoy)) {
+                return new RangoFechas(null, null, null, "No puedes consultar servicios realizados en una fecha futura");
+            }
+            return new RangoFechas(fecha.atStartOfDay(), fecha.atTime(23, 59, 59), fecha.toString(), null);
+        }
+
+        String periodo = args != null && args.hasNonNull("periodo")
+                ? normalizarPeriodo(args.get("periodo").asText())
+                : "semana";
+
+        return switch (periodo) {
+            case "hoy" -> new RangoFechas(hoy.atStartOfDay(), hoy.atTime(23, 59, 59), "hoy", null);
+            case "ayer" -> {
+                LocalDate ayer = hoy.minusDays(1);
+                yield new RangoFechas(ayer.atStartOfDay(), ayer.atTime(23, 59, 59), "ayer", null);
+            }
+            case "semana_pasada" -> {
+                LocalDate inicio = hoy.minusWeeks(1).with(DayOfWeek.MONDAY);
+                LocalDate fin = inicio.with(DayOfWeek.SUNDAY);
+                yield new RangoFechas(inicio.atStartOfDay(), fin.atTime(23, 59, 59), "semana_pasada", null);
+            }
+            case "mes_pasado" -> {
+                LocalDate inicio = hoy.minusMonths(1).withDayOfMonth(1);
+                LocalDate fin = inicio.withDayOfMonth(inicio.lengthOfMonth());
+                yield new RangoFechas(inicio.atStartOfDay(), fin.atTime(23, 59, 59), "mes_pasado", null);
+            }
+            case "mes" -> {
+                LocalDate inicio = hoy.withDayOfMonth(1);
+                yield new RangoFechas(inicio.atStartOfDay(), hoy.atTime(23, 59, 59), "mes", null);
+            }
+            default -> {
+                LocalDate inicio = hoy.with(DayOfWeek.MONDAY);
+                yield new RangoFechas(inicio.atStartOfDay(), hoy.atTime(23, 59, 59), "semana", null);
+            }
+        };
+    }
+
+    private String normalizarPeriodo(String periodo) {
+        return normalizar(periodo).replace(' ', '_');
+    }
+
+    private BigDecimal precioVentaServicio(Servicio servicio) {
+        if (servicio == null) return BigDecimal.ZERO;
+        if (servicio.getPrecioDescuento() != null && servicio.getPrecioDescuento().compareTo(BigDecimal.ZERO) > 0) {
+            return servicio.getPrecioDescuento();
+        }
+        return servicio.getPrecio() != null ? servicio.getPrecio() : BigDecimal.ZERO;
+    }
+
+    private String valorSeguro(String valor) {
+        return valor != null ? valor : "";
+    }
+
+    private record RangoFechas(LocalDateTime inicio, LocalDateTime fin, String etiqueta, String error) {}
     // ── Funciones admin ─────────────────────────────────────────────
 
     private String getGanancias(JsonNode args) {

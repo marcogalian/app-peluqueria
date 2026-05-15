@@ -25,7 +25,10 @@ const cargando       = ref(true)
 const filtroActivo   = ref<string>('TODOS')
 const drawerAbierto  = ref(false)
 const guardando      = ref(false)
+const eliminando     = ref(false)
+const confirmandoEliminar = ref(false)
 const servicioEditar = ref<Partial<Servicio>>({})
+const servicioAEliminar = ref<Servicio | null>(null)
 
 const filtros = ['TODOS', 'FEMENINO', 'MASCULINO', 'UNISEX']
 const labelFiltro: Record<string, string> = {
@@ -91,15 +94,31 @@ async function guardar() {
   } finally { guardando.value = false }
 }
 
-async function eliminar(id: string) {
+function pedirEliminar(servicio: Servicio) {
+  servicioAEliminar.value = servicio
+  confirmandoEliminar.value = true
+}
+
+function cancelarEliminar() {
+  confirmandoEliminar.value = false
+  servicioAEliminar.value = null
+}
+
+async function eliminarConfirmado() {
+  if (!servicioAEliminar.value?.id) return
+
+  eliminando.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
-    await api.delete(`/v1/servicios/${id}`)
-    servicios.value = servicios.value.filter(s => s.id !== id)
-    if (servicioEditar.value.id === id) drawerAbierto.value = false
+    await api.delete(`/v1/servicios/${servicioAEliminar.value.id}`)
+    servicios.value = servicios.value.filter(s => s.id !== servicioAEliminar.value?.id)
+    if (servicioEditar.value.id === servicioAEliminar.value.id) drawerAbierto.value = false
+    cancelarEliminar()
     toast.success('Servicio eliminado')
   } catch {
     toast.error('Error al eliminar el servicio')
+  } finally {
+    eliminando.value = false
   }
 }
 
@@ -237,7 +256,7 @@ function precioServicio(s: Servicio): number {
             <button
               class="flex flex-1 items-center justify-center rounded-xl bg-red-50 px-3 py-2.5 text-xs font-bold text-error"
               :aria-label="`Eliminar servicio: ${s.nombre}`"
-              @click="eliminar(s.id)"
+              @click="pedirEliminar(s)"
             >
               Eliminar
             </button>
@@ -298,7 +317,7 @@ function precioServicio(s: Servicio): number {
                   <button
                     class="w-8 h-8 rounded-full hover:bg-error hover:text-white flex items-center justify-center transition-all text-error"
                     :aria-label="`Eliminar servicio: ${s.nombre}`"
-                    @click="eliminar(s.id)"
+                    @click="pedirEliminar(s)"
                   >
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -319,6 +338,35 @@ function precioServicio(s: Servicio): number {
       </template>
     </div>
   </div>
+
+  <Teleport to="body">
+    <Transition name="modal-overlay">
+      <div
+        v-if="confirmandoEliminar"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm"
+        @click.self="cancelarEliminar"
+      >
+        <section class="w-full max-w-md rounded-[28px] border border-outline-variant/15 bg-white p-6 shadow-2xl sm:p-7">
+          <div class="space-y-2">
+            <h3 class="text-lg font-bold text-primary">Eliminar servicio</h3>
+            <p class="text-sm leading-relaxed text-on-surface-variant">
+              Vas a eliminar <strong class="text-on-surface">{{ servicioAEliminar?.nombre }}</strong>. Esta acción no se puede deshacer.
+            </p>
+          </div>
+
+          <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button class="btn-secondary" :disabled="eliminando" @click="cancelarEliminar">
+              Cancelar
+            </button>
+            <button class="btn-danger" :disabled="eliminando" @click="eliminarConfirmado">
+              <Loader2 v-if="eliminando" class="h-4 w-4 animate-spin" aria-hidden="true" />
+              <span>{{ eliminando ? 'Eliminando...' : 'Sí, eliminar' }}</span>
+            </button>
+          </div>
+        </section>
+      </div>
+    </Transition>
+  </Teleport>
 
   <!-- ══════════════════════════════════════════════════════
        DRAWER — Crear / Editar servicio

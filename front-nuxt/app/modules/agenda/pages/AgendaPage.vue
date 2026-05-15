@@ -99,11 +99,13 @@ const peluqueros = ref<PeluqueroAgenda[]>([])
 const clientes = ref<ClienteAgenda[]>([])
 const servicios = ref<ServicioAgenda[]>([])
 const citasDia = ref<CitaAgendaItem[]>([])
+const citasConteoSemana = ref<Record<string, number>>({})
 
 const miPeluqueroId = ref<string | null>(null)
 const peluqueroSeleccionadoId = ref<string | null>(null)
 const mostrandoAgendas = ref(false)
 const modalCitaAbierto = ref(false)
+const modalEliminarCitaAbierto = ref(false)
 const citaEditando = ref<CitaAgendaItem | null>(null)
 const horaSeleccionada = ref<string | null>(null)
 
@@ -228,7 +230,7 @@ watch(clienteQuery, (nuevoValor) => {
 
 watch([diaActual, peluqueroSeleccionadoId], async () => {
   if (peluqueroSeleccionadoId.value) {
-    await cargarCitasDia()
+    await Promise.all([cargarCitasDia(), cargarConteoSemana()])
   }
 })
 
@@ -314,6 +316,9 @@ function puedeEmpezarCita(hora: string) {
 function seleccionarCliente(cliente: ClienteAgenda) {
   clienteSeleccionadoId.value = cliente.id
   clienteQuery.value = nombreCompleto(cliente)
+  if (cliente.genero) {
+    formNuevoCliente.genero = cliente.genero
+  }
 }
 
 function limpiarClienteSeleccionado() {
@@ -371,6 +376,7 @@ function seleccionarHora(hora: string) {
 
 function cerrarModalCita() {
   modalCitaAbierto.value = false
+  modalEliminarCitaAbierto.value = false
   resetFormularioCita()
 }
 
@@ -417,6 +423,25 @@ async function cargarDatosBase() {
 
   miPeluqueroId.value = mio?.id ?? null
   peluqueroSeleccionadoId.value = miPeluqueroId.value ?? peluqueros.value[0]?.id ?? null
+}
+
+async function cargarConteoSemana() {
+  if (!peluqueroSeleccionadoId.value) return
+  const inicio = `${format(diasSemana.value[0], 'yyyy-MM-dd')}T00:00:00`
+  const fin = `${format(diasSemana.value[6], 'yyyy-MM-dd')}T23:59:59`
+  try {
+    const { data } = await api.get<CitaApi[]>('/citas', {
+      params: { start: inicio, end: fin, peluqueroId: peluqueroSeleccionadoId.value },
+    })
+    const conteo: Record<string, number> = {}
+    for (const cita of data ?? []) {
+      const fecha = format(new Date(cita.fechaHora), 'yyyy-MM-dd')
+      conteo[fecha] = (conteo[fecha] ?? 0) + 1
+    }
+    citasConteoSemana.value = conteo
+  } catch {
+    // silently fail
+  }
 }
 
 async function cargarCitasDia() {
@@ -571,16 +596,24 @@ async function guardarCita() {
   }
 }
 
+function pedirEliminarCita() {
+  if (!citaEditando.value || !authStore.isAdmin) return
+  modalEliminarCitaAbierto.value = true
+}
+
+function cancelarEliminarCita() {
+  modalEliminarCitaAbierto.value = false
+}
+
 async function eliminarCita() {
   if (!citaEditando.value || !authStore.isAdmin) return
-  const confirmar = window.confirm('¿Eliminar esta cita definitivamente?')
-  if (!confirmar) return
 
   guardando.value = true
   errorGeneralFormulario.value = ''
   try {
     await api.delete(`/citas/${citaEditando.value.id}`)
     toast.success('Cita eliminada')
+    modalEliminarCitaAbierto.value = false
     cerrarModalCita()
     await cargarCitasDia()
   } catch (error) {
@@ -605,7 +638,7 @@ onMounted(async () => {
   cargando.value = true
   try {
     await cargarDatosBase()
-    await cargarCitasDia()
+    await Promise.all([cargarCitasDia(), cargarConteoSemana()])
   } catch {
     errorCarga.value = 'No se pudo preparar la agenda.'
     cargando.value = false
@@ -685,6 +718,13 @@ onMounted(async () => {
       >
         <div class="text-[10px] uppercase">{{ format(dia, 'EEE', { locale: es }) }}</div>
         <div class="text-lg font-black">{{ format(dia, 'd') }}</div>
+        <div class="h-1.5 flex justify-center mt-0.5">
+          <span
+            v-if="citasConteoSemana[format(dia, 'yyyy-MM-dd')]"
+            class="block h-1.5 w-1.5 rounded-full"
+            :class="isSameDay(dia, diaActual) ? 'bg-white/80' : 'bg-green-500'"
+          />
+        </div>
       </button>
     </div>
 
@@ -943,7 +983,7 @@ onMounted(async () => {
                     id="agenda-cliente-genero"
                     v-model="formNuevoCliente.genero"
                     class="select-field"
-                    :disabled="Boolean(clienteSeleccionado) || !puedeEditarAgendaActual"
+                    :disabled="!puedeEditarAgendaActual"
                   >
                     <option value="FEMENINO">Femenino</option>
                     <option value="MASCULINO">Masculino</option>
@@ -1013,7 +1053,7 @@ onMounted(async () => {
                   v-if="modalEnEdicion && authStore.isAdmin"
                   class="btn-danger"
                   :disabled="guardando"
-                  @click="eliminarCita"
+                  @click="pedirEliminarCita"
                 >
                   <Trash2 class="w-4 h-4" aria-hidden="true" />
                   Eliminar
@@ -1034,6 +1074,37 @@ onMounted(async () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </section>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <Teleport to="body">
+      <Transition name="modal-overlay">
+        <div
+          v-if="modalEliminarCitaAbierto"
+          class="fixed inset-0 z-[60] flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm"
+          @click.self="cancelarEliminarCita"
+        >
+          <section class="w-full max-w-md rounded-[28px] border border-outline-variant/15 bg-white p-6 shadow-2xl sm:p-7">
+            <div class="space-y-2">
+              <h3 class="text-lg font-bold text-primary">Eliminar cita</h3>
+              <p class="text-sm leading-relaxed text-on-surface-variant">
+                Voy a eliminar la cita de
+                <strong class="text-on-surface">{{ citaEditando?.clienteNombre }} {{ citaEditando?.clienteApellidos }}</strong>
+                a las <strong class="text-on-surface">{{ citaEditando?.horaInicio }}</strong>. Esta acción no se puede deshacer.
+              </p>
+            </div>
+
+            <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button class="btn-secondary" :disabled="guardando" @click="cancelarEliminarCita">
+                Cancelar
+              </button>
+              <button class="btn-danger" :disabled="guardando" @click="eliminarCita">
+                <Loader2 v-if="guardando" class="w-4 h-4 animate-spin" aria-hidden="true" />
+                <span>{{ guardando ? 'Eliminando...' : 'Sí, eliminar' }}</span>
+              </button>
             </div>
           </section>
         </div>

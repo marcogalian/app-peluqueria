@@ -111,7 +111,7 @@ La presente solución se diferencia al ofrecer una plataforma propia desplegable
 
 **Spring AI + OpenAI:** Spring AI 1.x gestiona el ciclo completo de function calling. El modelo solicita una función de negocio, el backend la ejecuta contra PostgreSQL y devuelve el resultado al modelo para que redacte la respuesta. Hasta tres iteraciones de function calling por petición. Si `SPRING_AI_MODEL_CHAT=none`, el asistente responde con un mensaje informativo sin llamar a la API externa.
 
-**Springdoc OpenAPI:** documentación automática de la API REST en formato OpenAPI 3.0 con Swagger UI. Desactivado por defecto en producción (`SWAGGER_ENABLED=false`).
+**Springdoc OpenAPI:** genera automáticamente la documentación de todos los endpoints REST en formato OpenAPI 3.0 y la expone en una interfaz web interactiva (Swagger UI, `/swagger-ui.html`) que permite explorar y probar la API sin escribir código. En producción está desactivado por defecto (`SWAGGER_ENABLED=false`) porque exponer el mapa completo de la API —rutas, parámetros, modelos y códigos de respuesta— facilita el reconocimiento a un atacante. En el entorno de demo Docker se activa con `SWAGGER_ENABLED=true` para que el evaluador pueda inspeccionar los endpoints.
 
 **JUnit 5 + Mockito:** framework de pruebas unitarias con simulación de dependencias para el backend.
 
@@ -129,9 +129,7 @@ La presente solución se diferencia al ofrecer una plataforma propia desplegable
 
 **Chart.js + vue-chartjs:** librería de gráficas para visualizar ingresos, gastos, beneficios y tendencias en el panel de resultados financieros.
 
-**Axios:** gestiona todas las llamadas HTTP del frontend, incluyendo el envío y consulta de mensajes internos a través de la API REST.
-
-**Axios:** cliente HTTP con interceptores para la gestión automática del token JWT en cada petición a la API y refresco automático mediante Refresh Token.
+**Axios:** cliente HTTP con interceptores para la gestión automática del token JWT en cada petición a la API, refresco automático mediante Refresh Token y gestión centralizada del envío y consulta de mensajes internos.
 
 **Vitest:** framework de pruebas unitarias compatible con el ecosistema Vite/Nuxt.
 
@@ -157,7 +155,7 @@ Diseñar, desarrollar e implementar una aplicación web full-stack para la gesti
 6. Implementar **recuperación segura de contraseña** mediante token de un solo uso enviado por email, con expiración temporal y uso único.
 7. Permitir al **administrador gestionar las contraseñas** de los empleados directamente desde el panel, con notificación automática al afectado.
 8. Integrar un **asistente de IA con Spring AI y OpenAI** con function calling para responder preguntas en lenguaje natural sobre datos reales del negocio, respetando permisos por rol.
-9. Crear un **panel de control con KPIs financieros** en tiempo real (ingresos, gastos, ticket medio, tasa de cancelación, productos más vendidos, rendimiento por empleado).
+9. Crear un **panel de análisis financiero** en tiempo real con KPIs de ingresos por período, ticket medio, tasa de cancelación, rendimiento por empleado, registro de gastos operativos mensuales por categoría (alquiler, luz, agua, nóminas, marketing, suministros y otros), y gráficas de distribución de ingresos por origen (servicios y productos) y gastos por categoría mediante Chart.js.
 10. Desarrollar un **módulo de mensajería interna** con envío de correo entre empleados, historial persistido en base de datos y contador de mensajes no leídos en tiempo real.
 11. Implementar **auditoría automática** de todas las acciones de creación, modificación y eliminación realizadas por los usuarios.
 12. **Desplegar la aplicación con Docker Compose** con un único comando en cualquier entorno con Docker instalado.
@@ -180,7 +178,7 @@ Diseñar, desarrollar e implementar una aplicación web full-stack para la gesti
 | RF-05 | Servicios | Nombre, precio, duración en minutos, categoría y género |
 | RF-06 | Inventario | Stock, alertas de mínimo, ventas por empleado, ajuste manual de stock |
 | RF-07 | Ausencias | Solicitud, aprobación/rechazo, notificación email, semáforo de concurrencia |
-| RF-08 | Resultados | KPIs por periodo, ticket medio, tasa cancelación, top servicios, gastos operativos |
+| RF-08 | Resultados | KPIs por período, ticket medio, tasa cancelación, top servicios, top empleados; panel de gastos mensual por categoría con navegación mensual, gráfica de distribución de gastos e ingresos por origen (servicios y productos) |
 | RF-09 | Mensajería interna | Envío de correo interno entre empleados vía Spring Mail, historial por contacto en BD, contador de no leídos en navegación |
 | RF-10 | Notificaciones | Email: ausencias, stock bajo, recordatorios de cita, reset de contraseña, cambio de contraseña |
 | RF-11 | Asistente IA | Function calling sobre OpenAI, permisos por rol, rechazo de temas ajenos al negocio |
@@ -189,6 +187,8 @@ Diseñar, desarrollar e implementar una aplicación web full-stack para la gesti
 | RF-14 | Configuración | Datos del centro, horarios, gestión de ofertas y días especiales con edición correcta por ID |
 | RF-15 | Galería de fotos | Subida y gestión de imágenes de clientes con validación de tipo de archivo (whitelist) |
 | RF-16 | Anti-abuso | Rate limiting por IP configurable para endpoints generales, de autenticación y del chatbot |
+
+*Fuente: Elaboración propia.*
 
 #### Requerimientos No Funcionales
 
@@ -204,6 +204,8 @@ Diseñar, desarrollar e implementar una aplicación web full-stack para la gesti
 | RNF-08 | Trazabilidad | Toda modificación de datos queda registrada en el módulo de auditoría |
 | RNF-09 | Resiliencia | Sin credenciales de email configuradas, las notificaciones se simulan en logs sin errores |
 | RNF-10 | Protección de errores | `server.error.include-message=never` en producción para no exponer stack traces |
+
+*Fuente: Elaboración propia.*
 
 ---
 
@@ -290,6 +292,8 @@ El `AntiAbuseFilter` se registra como filtro de Servlet antes del filtro JWT. Ma
 | `ANTI_ABUSE_AUTH_PER_MINUTE` | 20 | `/api/auth/**` |
 | `ANTI_ABUSE_CHAT_PER_MINUTE` | 8 | `/api/chat/**` |
 
+*Fuente: Elaboración propia.*
+
 Si se supera el límite, devuelve `429 Too Many Requests`. Se puede desactivar con `ANTI_ABUSE_ENABLED=false`.
 
 #### Sistema de notificaciones
@@ -306,6 +310,8 @@ El módulo `shared/notification/Notificaciones` centraliza el envío de emails. 
 | Recordatorio de cita (24h antes) | Cliente | Email |
 | Recuperación de contraseña | Usuario solicitante | Email |
 | Cambio de contraseña por admin | Empleado afectado | Email |
+
+*Fuente: Elaboración propia.*
 
 #### Diseño del asistente IA
 
@@ -339,11 +345,11 @@ La solución implementada utiliza un `Semaphore(1, true)` (semáforo binario jus
 
 Las bajas médicas quedan intencionadamente fuera de este mecanismo, ya que representan una situación sobrevenida que no debe bloquearse. Para una arquitectura con múltiples instancias de Spring Boot, el siguiente paso sería migrar el bloqueo a Redis (Redisson) o a bloqueo optimista/pesimista en base de datos.
 
-#### Cifrado del chat interno
+#### Cifrado de la mensajería interna
 
-Los mensajes del chat interno se cifran con AES-256 antes de persistirse. El vector de inicialización (IV) se genera aleatoriamente en cada operación mediante `AESCryptoUtil`, garantizando que dos mensajes con el mismo contenido produzcan textos cifrados distintos. La clave AES se configura mediante la variable de entorno `CHAT_AES_KEY` y nunca se almacena en el código fuente.
+Los mensajes internos entre empleados se cifran con AES-256 antes de persistirse en base de datos. El vector de inicialización (IV) se genera aleatoriamente en cada operación mediante `AESCryptoUtil`, garantizando que dos mensajes con el mismo contenido produzcan textos cifrados distintos. La clave AES se configura mediante la variable de entorno `CHAT_AES_KEY` y nunca se almacena en el código fuente.
 
-La mensajería interna entre empleados usa Spring Mail para el envío y persiste los mensajes en base de datos para que el receptor los consulte desde su bandeja.
+El envío se realiza vía Spring Mail (Mailtrap sandbox) y el receptor consulta los mensajes desde su bandeja, que muestra el historial por contacto y el contador de no leídos.
 
 #### Auditoría automática
 
@@ -361,6 +367,14 @@ if (!Set.of(".jpg", ".jpeg", ".png", ".webp").contains(ext)) {
 
 Esto previene que un atacante pueda subir archivos ejecutables o scripts disfrazados de imágenes.
 
+#### Panel de gastos operativos
+
+El módulo de resultados incluye un panel mensual para registrar los gastos operativos del negocio. Siete categorías predefinidas —alquiler local, luz, agua, suministros/productos, marketing, nóminas y otros— organizan los gastos en tarjetas resumen con el total acumulado por categoría. El administrador navega mes a mes, añade y edita gastos mediante un modal reutilizable y confirma las eliminaciones con un diálogo de confirmación antes de proceder, siguiendo el mismo patrón de seguridad aplicado al resto del panel de administración.
+
+La categoría **Nóminas** incorpora integración con el catálogo de empleados: al seleccionarla, el modal carga la lista de peluqueras activas desde el endpoint `/api/peluqueros` y auto-rellena el concepto como "Nómina bruta [nombre]", reduciendo errores de entrada.
+
+Dos gráficas de tipo *doughnut* (Chart.js) complementan el análisis financiero: una muestra la distribución porcentual de gastos por categoría en el panel de Gastos, y otra desglosa el origen de los ingresos del período —servicios frente a productos— en la vista de Rendimiento, aportando visibilidad sobre qué línea de negocio contribuye más a la facturación.
+
 #### Gestión de errores centralizada
 
 `ApiExceptionHandler` (`@RestControllerAdvice`) centraliza las respuestas de error del backend con códigos HTTP correctos:
@@ -372,6 +386,8 @@ Esto previene que un atacante pueda subir archivos ejecutables o scripts disfraz
 | `IllegalArgumentException` | 400 Bad Request |
 | `AccessDeniedException` | 403 Forbidden |
 | `Exception` (genérica) | 500 Internal Server Error |
+
+*Fuente: Elaboración propia.*
 
 Todos los mensajes de error en producción ocultan el stack trace (`server.error.include-message=never`).
 
@@ -395,6 +411,10 @@ En el primer arranque, el sistema crea automáticamente datos de ejemplo. Si `ra
 | sofia | `APP_DEMO_PASSWORD` del `.env` | Empleada |
 | carmen | `APP_DEMO_PASSWORD` del `.env` | Empleada |
 | lucia | `APP_DEMO_PASSWORD` del `.env` | Empleada |
+
+*Fuente: Elaboración propia.*
+
+Los clientes de muestra se generan en el primer arranque mediante llamadas a la API pública **randomuser.me** con parámetro `nat=es`, obteniendo nombres, apellidos y avatares de perfil con aspecto realista y en español. Si el servicio no está disponible (entorno sin internet), el backend recurre automáticamente a un conjunto local de clientes de respaldo, garantizando que el seed funcione en cualquier entorno.
 
 ---
 
@@ -427,6 +447,8 @@ La interfaz se ha diseñado como un panel de gestión profesional orientado a es
 | `ResponderConsultasGestionTest` | Function calling, respuestas directas, permisos por rol y sugerencias del asistente IA. |
 | `ChatFunctionExecutorTest` | Ejecución de funciones del chatbot y control de permisos por rol. |
 
+*Fuente: Elaboración propia.*
+
 #### Frontend — Vitest
 
 | Test | Qué valida |
@@ -434,6 +456,8 @@ La interfaz se ha diseñado como un panel de gestión profesional orientado a es
 | `auth.store.test.ts` | Guardado, restauración y cierre de sesión; roles admin/peluquero; token expirado. |
 | `authService.test.ts` | Llamadas de login, solicitud de reset y cambio de contraseña. |
 | `useChatbot.test.ts` | Mensajes del usuario y asistente, historial, errores, loading y sugerencias. |
+
+*Fuente: Elaboración propia.*
 
 ```bash
 # Backend
@@ -460,6 +484,8 @@ docker compose up --build
 | Backend API | http://localhost:8080 |
 | Swagger UI | http://localhost:8080/swagger-ui.html (solo con `SWAGGER_ENABLED=true`) |
 | PostgreSQL | localhost:5432 |
+
+*Fuente: Elaboración propia.*
 
 Para desarrollo local sin Docker:
 
@@ -592,7 +618,7 @@ Interfaz pública (sin autenticación de empleado) que permita al cliente reserv
 
 #### 5. Aplicación móvil nativa
 
-App para iOS y Android con agenda del empleado, gestión de citas y notificaciones push mediante Firebase Cloud Messaging.
+App multiplataforma para iOS y Android desarrollada con **Flutter**, consumiendo la misma API REST del backend. Incluiría agenda del empleado, gestión de citas y notificaciones push mediante Firebase Cloud Messaging.
 
 #### 6. Control de concurrencia distribuido
 
@@ -678,6 +704,8 @@ cd front-nuxt && npm test
 | `ANTI_ABUSE_CHAT_PER_MINUTE` | Peticiones/min por IP (chat) | No (default: `8`) |
 | `CORS_ORIGINS` | Orígenes CORS permitidos (CSV) | No |
 
+*Fuente: Elaboración propia.*
+
 Generar claves seguras:
 ```bash
 openssl rand -hex 32   # para JWT_SECRET_KEY
@@ -698,13 +726,15 @@ openssl rand -hex 32   # para CHAT_AES_KEY
 | Inventario | Productos y stock | Admin, Empleado (lectura) |
 | Ventas | Registro de ventas de productos | Admin, Empleado |
 | Ausencias | Vacaciones y bajas con semáforo de concurrencia | Admin, Empleado |
-| Finanzas | KPIs financieros detallados | Admin |
+| Finanzas | KPIs financieros, gastos por categoría y gráficas de distribución | Admin |
 | Mensajería | Correo interno entre empleados con historial por contacto y contador no leídos | Admin, Empleado |
 | Chatbot | Asistente IA con function calling | Admin, Empleado |
 | Auditoría | Registro de actividad del equipo | Admin |
 | Configuración | Datos del centro, ofertas, días especiales | Admin |
 | Contraseñas | Gestión de contraseñas de empleados por admin | Admin |
 | Reset contraseña | Recuperación de contraseña por email con token | Público |
+
+*Fuente: Elaboración propia.*
 
 ---
 
@@ -718,6 +748,8 @@ En el primer arranque, el sistema crea automáticamente los siguientes usuarios 
 | sofia | valor de `APP_DEMO_PASSWORD` en `.env` | Empleada |
 | carmen | valor de `APP_DEMO_PASSWORD` en `.env` | Empleada |
 | lucia | valor de `APP_DEMO_PASSWORD` en `.env` | Empleada |
+
+*Fuente: Elaboración propia.*
 
 Si `randomuser.me` no está disponible, el backend usa un conjunto local de clientes de respaldo para no depender de conexión a internet.
 

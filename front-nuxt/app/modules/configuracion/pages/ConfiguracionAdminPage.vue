@@ -75,6 +75,13 @@ const modalDia        = ref(false)
 const diaEditar       = ref<Partial<DiaEspecial>>({})
 const descuentoDiaEspecial = ref(10)
 const guardandoModal  = ref(false)
+const eliminandoConfirmado = ref(false)
+const confirmacionEliminacion = ref<{
+  tipo: 'dia-especial' | 'dia-bloqueado'
+  id: number | string
+  titulo: string
+  descripcion: string
+} | null>(null)
 
 function normalizarConfigCentro(centro?: Partial<ConfigCentro>): ConfigCentro {
   const defaults = configCentro.value
@@ -203,10 +210,13 @@ async function guardarDia() {
   }
 }
 
-async function eliminarDia(id: number) {
-  const { api } = await import('~/infrastructure/http/api')
-  await api.delete(`/v1/dias-especiales/${id}`)
-  dias.value = dias.value.filter(d => d.id !== id)
+function pedirEliminarDia(dia: DiaEspecial) {
+  confirmacionEliminacion.value = {
+    tipo: 'dia-especial',
+    id: dia.id,
+    titulo: 'Eliminar día especial',
+    descripcion: `Voy a eliminar ${dia.nombre} del ${dia.fecha}. Esta acción no se puede deshacer.`,
+  }
 }
 
 function multiplicadorDesdeDescuento(descuento: number): number {
@@ -250,14 +260,43 @@ async function anadirDiaBloqueado() {
   }
 }
 
-async function eliminarDiaBloqueado(id: string) {
+function pedirEliminarDiaBloqueado(dia: DiaBloqueado) {
+  confirmacionEliminacion.value = {
+    tipo: 'dia-bloqueado',
+    id: dia.id,
+    titulo: 'Eliminar día bloqueado',
+    descripcion: `Voy a eliminar el bloqueo ${formatearRangoFechas(dia)}${dia.motivo ? ` (${dia.motivo})` : ''}. Esta acción no se puede deshacer.`,
+  }
+}
+
+function cancelarEliminacion() {
+  confirmacionEliminacion.value = null
+}
+
+async function confirmarEliminacion() {
+  if (!confirmacionEliminacion.value) return
+
+  eliminandoConfirmado.value = true
   try {
     const { api } = await import('~/infrastructure/http/api')
-    await api.delete(`/v1/dias-bloqueados/${id}`)
-    diasBloqueados.value = diasBloqueados.value.filter(d => d.id !== id)
-    toast.success('Día bloqueado eliminado')
+    if (confirmacionEliminacion.value.tipo === 'dia-especial') {
+      await api.delete(`/v1/dias-especiales/${confirmacionEliminacion.value.id}`)
+      dias.value = dias.value.filter(d => d.id !== confirmacionEliminacion.value?.id)
+      toast.success('Día especial eliminado')
+    } else {
+      await api.delete(`/v1/dias-bloqueados/${confirmacionEliminacion.value.id}`)
+      diasBloqueados.value = diasBloqueados.value.filter(d => d.id !== confirmacionEliminacion.value?.id)
+      toast.success('Día bloqueado eliminado')
+    }
+    cancelarEliminacion()
   } catch {
-    toast.error('No se pudo eliminar el día bloqueado')
+    toast.error(
+      confirmacionEliminacion.value.tipo === 'dia-especial'
+        ? 'No se pudo eliminar el día especial'
+        : 'No se pudo eliminar el día bloqueado',
+    )
+  } finally {
+    eliminandoConfirmado.value = false
   }
 }
 
@@ -284,7 +323,7 @@ function formatearRangoFechas(d: DiaBloqueado): string {
     <div v-else class="grid grid-cols-12 gap-4 sm:gap-6">
 
       <!-- ── 1. Ajustes del Centro (4 cols) ────────────────── -->
-      <section class="col-span-12 lg:col-span-4 card-kpi p-5 sm:p-8 shadow-card">
+      <section class="col-span-12 xl:col-span-4 card-kpi p-5 sm:p-8 shadow-card">
         <h3 class="text-lg font-bold text-primary mb-5 sm:mb-6">Ajustes del Centro</h3>
         <form class="space-y-4 sm:space-y-5" @submit.prevent="guardarConfigCentro">
           <div>
@@ -369,7 +408,7 @@ function formatearRangoFechas(d: DiaBloqueado): string {
       </section>
 
       <!-- ── 2. Días Especiales y Precios (8 cols) ─────────── -->
-      <section class="col-span-12 lg:col-span-8 card p-5 sm:p-8">
+      <section class="col-span-12 xl:col-span-8 card p-5 sm:p-8">
         <div class="flex items-start justify-between gap-3 mb-5 sm:mb-6">
           <div class="min-w-0">
             <h3 class="text-lg font-bold text-primary">Días Especiales y Precios</h3>
@@ -398,7 +437,7 @@ function formatearRangoFechas(d: DiaBloqueado): string {
               <span class="text-sm font-black text-primary-container">-{{ descuentoDia(d) }}%</span>
               <button
                 class="p-1.5 rounded-lg hover:bg-error/10 text-error transition-colors"
-                @click="eliminarDia(d.id)"
+                @click="pedirEliminarDia(d)"
               >
                 <Trash2 class="w-4 h-4" />
               </button>
@@ -473,7 +512,7 @@ function formatearRangoFechas(d: DiaBloqueado): string {
             <button
               class="p-2 rounded-lg hover:bg-red-100 text-red-600 transition-colors"
               :aria-label="`Eliminar bloqueo del ${dia.fechaInicio}`"
-              @click="eliminarDiaBloqueado(dia.id)"
+              @click="pedirEliminarDiaBloqueado(dia)"
             >
               <Trash2 class="w-4 h-4" />
             </button>
@@ -485,7 +524,7 @@ function formatearRangoFechas(d: DiaBloqueado): string {
       </section>
 
       <!-- ── 4. Preferencias de Comunicación ──────────────── -->
-      <section class="col-span-12 lg:col-span-6 card-kpi p-5 sm:p-8 shadow-card">
+      <section class="col-span-12 xl:col-span-6 card-kpi p-5 sm:p-8 shadow-card">
         <h3 class="text-lg font-bold text-primary mb-5">Preferencias de Comunicación</h3>
         <div class="space-y-5">
 
@@ -529,7 +568,7 @@ function formatearRangoFechas(d: DiaBloqueado): string {
       </section>
 
       <!-- ── 5. Políticas de Imagen ────────────────────────── -->
-      <section class="col-span-12 lg:col-span-6 card-kpi p-5 sm:p-8 shadow-card">
+      <section class="col-span-12 xl:col-span-6 card-kpi p-5 sm:p-8 shadow-card">
         <h3 class="text-lg font-bold text-primary mb-4">Políticas de Imagen</h3>
         <textarea
           v-model="configCentro.politicaFotos"
@@ -607,6 +646,33 @@ function formatearRangoFechas(d: DiaBloqueado): string {
             </button>
           </div>
         </div>
+      </div>
+    </Transition>
+
+    <Transition name="modal-overlay">
+      <div
+        v-if="confirmacionEliminacion"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm"
+        @click.self="cancelarEliminacion"
+      >
+        <section class="w-full max-w-md rounded-[28px] border border-outline-variant/15 bg-white p-6 shadow-2xl sm:p-7">
+          <div class="space-y-2">
+            <h3 class="text-lg font-bold text-primary">{{ confirmacionEliminacion.titulo }}</h3>
+            <p class="text-sm leading-relaxed text-on-surface-variant">
+              {{ confirmacionEliminacion.descripcion }}
+            </p>
+          </div>
+
+          <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button class="btn-secondary" :disabled="eliminandoConfirmado" @click="cancelarEliminacion">
+              Cancelar
+            </button>
+            <button class="btn-danger" :disabled="eliminandoConfirmado" @click="confirmarEliminacion">
+              <Loader2 v-if="eliminandoConfirmado" class="h-4 w-4 animate-spin" aria-hidden="true" />
+              <span>{{ eliminandoConfirmado ? 'Eliminando...' : 'Sí, eliminar' }}</span>
+            </button>
+          </div>
+        </section>
       </div>
     </Transition>
 
